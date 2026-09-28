@@ -1,4 +1,7 @@
 {
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": "public",
   "rewrites": [
     { "source": "/(.*)", "destination": "https://api.telegram.org/$1" }
   ]
