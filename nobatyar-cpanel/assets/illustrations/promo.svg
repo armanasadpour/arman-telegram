@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 260" role="img" aria-label="">
+  <defs><filter id="ps"><feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#0f172a" flood-opacity=".22"/></filter></defs>
+  <circle cx="200" cy="130" r="110" fill="#ffffff" opacity=".12"/>
+  <g filter="url(#ps)">
+    <rect x="96" y="40" width="200" height="180" rx="22" fill="#fff"/>
+    <rect x="116" y="62" width="70" height="10" rx="5" fill="#bfdbfe"/>
+    <rect x="116" y="82" width="110" height="8" rx="4" fill="#e2e8f0"/>
+    <g fill="#2563eb"><rect x="126" y="168" width="22" height="30" rx="5" opacity=".45"/><rect x="158" y="146" width="22" height="52" rx="5" opacity=".7"/><rect x="190" y="124" width="22" height="74" rx="5"/><rect x="222" y="104" width="22" height="94" rx="5" fill="#06b6d4"/></g>
+    <rect x="116" y="204" width="160" height="4" rx="2" fill="#e2e8f0"/>
+  </g>
+  <g filter="url(#ps)"><rect x="36" y="118" width="96" height="88" rx="18" fill="#fff"/>
+    <rect x="52" y="134" width="64" height="14" rx="4" fill="#dbeafe"/><g fill="#e2e8f0"><rect x="52" y="156" width="14" height="12" rx="3"/><rect x="72" y="156" width="14" height="12" rx="3"/><rect x="92" y="156" width="14" height="12" rx="3"/><rect x="52" y="174" width="14" height="12" rx="3"/><rect x="92" y="174" width="14" height="12" rx="3"/></g><rect x="72" y="174" width="14" height="12" rx="3" fill="#2563eb"/></g>
+  <g filter="url(#ps)"><circle cx="304" cy="64" r="30" fill="#fff"/><path d="m290 64 10 10 18-18" fill="none" stroke="#16a34a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g>
+</svg>

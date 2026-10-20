@@ -1,0 +1,13 @@
+config.php
+config.php.tmp
+install.lock
+private/app.key
+private/photos/
+private/media/
+private/payment.php
+private/sms.php
+private/logs/
+private/backups/
+private/documents/
+private/updates/
+private/updating.flag

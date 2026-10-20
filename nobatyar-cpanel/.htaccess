@@ -1,0 +1,52 @@
+Options -Indexes
+DirectoryIndex index.php
+
+# Friendly public URLs. The application only generates them when this block is active
+# (the E= flag tells PHP that rewriting works). Without mod_rewrite, plain .php links are used.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^ - [E=NOBATYAR_REWRITE:1]
+RewriteRule ^doctor/([0-9]+)(/[^/]*)?/?$ doctor.php?id=$1 [QSA,L]
+RewriteRule ^city/([0-9]+)(/[^/]*)?/?$ index.php?city=$1 [QSA,L]
+RewriteRule ^specialty/([0-9]+)(/[^/]*)?/?$ index.php?specialty_id=$1&view=doctors [QSA,L]
+RewriteRule ^article/([^/]+)/?$ article.php?slug=$1 [QSA,L,B]
+RewriteRule ^page/([a-z-]+)/?$ page.php?slug=$1 [QSA,L]
+RewriteRule ^robots\.txt$ robots.php [L]
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+</IfModule>
+
+# Configuration, documentation, logs, backups and archives are never served.
+<FilesMatch "^(config(\.example)?\.php(\.tmp)?|release\.json|updating\.flag|.*\.(sql|gz|md|log|zip|bak|lock|key|ini|sh))$">
+Require all denied
+</FilesMatch>
+
+<IfModule mod_mime.c>
+AddType font/woff2 .woff2
+AddType application/manifest+json .webmanifest
+</IfModule>
+
+<IfModule mod_headers.c>
+Header always set X-Content-Type-Options "nosniff"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set X-Frame-Options "SAMEORIGIN"
+# The service worker must always be revalidated so a new release replaces the old cache.
+<FilesMatch "^(sw\.js|offline\.html|manifest\.webmanifest|admin\.webmanifest)$">
+Header set Cache-Control "no-cache"
+</FilesMatch>
+</IfModule>
+
+# Static files are versioned (?v=) or rarely change: long browser cache.
+<IfModule mod_expires.c>
+ExpiresActive On
+ExpiresByType text/css "access plus 1 year"
+ExpiresByType application/javascript "access plus 1 year"
+ExpiresByType text/javascript "access plus 1 year"
+ExpiresByType font/woff2 "access plus 1 year"
+ExpiresByType font/ttf "access plus 1 year"
+ExpiresByType image/svg+xml "access plus 1 month"
+ExpiresByType image/png "access plus 1 month"
+</IfModule>
+
+<IfModule mod_deflate.c>
+AddOutputFilterByType DEFLATE text/html text/css application/javascript text/javascript application/json image/svg+xml application/manifest+json
+</IfModule>

@@ -1,0 +1,2 @@
+<?php
+require __DIR__.'/core.php';require_schema();$u=require_user();if(!is_post()){http_response_code(405);exit;}verify_csrf();query("UPDATE notifications SET banner_dismissed=1 WHERE id=? AND user_id=? AND category='announcement'",[(int)($_POST['id']??0),$u['id']]);$back=(string)($_POST['back']??'panel.php');if(!preg_match('/^(panel|patient|doctor-panel|center|wallet)\.php(?:\?[a-zA-Z0-9_=&%.-]*)?$/',$back))$back='panel.php';redirect($back);

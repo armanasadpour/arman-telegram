@@ -1,0 +1,165 @@
+<?php
+/**
+ * Simple weekly schedule of one clinic: tick the days, enter from/to (up to three shifts), save once.
+ * Booking settings in plain words, and leave/closures by date only.
+ * @var array $d @var array $cl @var int $clinic @var array $hours @var array $blocks @var array $rooms
+ */
+$names = [6 => 'شنبه', 0 => 'یکشنبه', 1 => 'دوشنبه', 2 => 'سه‌شنبه', 3 => 'چهارشنبه', 4 => 'پنجشنبه', 5 => 'جمعه'];
+$posted = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'week' ? ($_POST['day'] ?? []) : null;
+$week = [];
+foreach ($names as $w => $_) {
+    $week[$w] = ['on' => false, 'shifts' => [], 'room' => ''];
+}
+if (is_array($posted)) {
+    foreach ($names as $w => $_) {
+        $p = is_array($posted[$w] ?? null) ? $posted[$w] : [];
+        $week[$w]['on'] = !empty($p['on']);
+        foreach ((array) ($p['from'] ?? []) as $i => $f) {
+            if (trim((string) $f) !== '' || trim((string) ($p['to'][$i] ?? '')) !== '') {
+                $week[$w]['shifts'][] = [(string) $f, (string) ($p['to'][$i] ?? '')];
+            }
+        }
+        $week[$w]['room'] = (string) ($p['room'] ?? '');
+    }
+} else {
+    foreach ($hours as $h) {
+        $w = (int) $h['weekday'];
+        $week[$w]['on'] = true;
+        $week[$w]['shifts'][] = [substr($h['opens_at'], 0, 5), substr($h['closes_at'], 0, 5)];
+        $week[$w]['room'] = (string) ($h['room_id'] ?? '');
+    }
+}
+$durations = [10, 15, 20, 25, 30, 40, 45, 60, 90, 120];
+if (!in_array((int) $cl['default_duration'], $durations, true)) {
+    $durations[] = (int) $cl['default_duration'];
+    sort($durations);
+}
+$step = max(5, (int) $cl['default_duration'] + (int) $cl['gap_minutes']);
+$count = function (array $shifts) use ($step, $cl): int {
+    $n = 0;
+    foreach ($shifts as [$a, $b]) {
+        if (preg_match('/^\d\d:\d\d$/', $a) && preg_match('/^\d\d:\d\d$/', $b) && $a < $b) {
+            [$ah, $am] = explode(':', $a);
+            [$bh, $bm] = explode(':', $b);
+            $n += intdiv(((int) $bh * 60 + (int) $bm) - ((int) $ah * 60 + (int) $am), $step);
+        }
+    }
+    return min($n * max(1, (int) $cl['slot_capacity']), (int) $cl['daily_capacity']);
+};
+$timeSelect = function (string $name, string $value, string $label): string {
+    $out = '<select name="' . esc($name) . '" aria-label="' . esc($label) . '" dir="ltr"><option value="">—</option>';
+    $times = [];
+    for ($m = 0; $m < 1440; $m += 15) {
+        $times[] = sprintf('%02d:%02d', intdiv($m, 60), $m % 60);
+    }
+    if ($value !== '' && !in_array($value, $times, true)) {
+        $times[] = $value;
+        sort($times);
+    }
+    foreach ($times as $t) {
+        $out .= '<option value="' . $t . '"' . selected_attr($t === $value) . '>' . fa_number($t) . '</option>';
+    }
+    return $out . '</select>';
+};
+$token = function (string $action) use ($clinic) {
+    form_token($action);
+    echo '<input type="hidden" name="clinic_id" value="' . (int) $clinic . '">';
+};
+?>
+<div class="sched" data-schedule data-step="<?= $step ?>" data-seats="<?= max(1, (int) $cl['slot_capacity']) ?>" data-daily="<?= (int) $cl['daily_capacity'] ?>">
+  <section class="sc-card">
+    <div class="sc-head">
+      <div><h2>ساعت حضور در <?= esc($cl['name']) ?></h2><p class="muted">روزهایی که در مطب هستید را تیک بزنید و ساعت شروع و پایان را وارد کنید. در پایان «ذخیره برنامه» را بزنید.</p></div>
+    </div>
+    <form method="post" class="sc-week" data-week-form>
+      <?php $token('week'); ?>
+      <div class="sc-tools" hidden data-week-tools>
+        <button type="button" class="button ghost small" data-copy-week><?= icon('clipboard') ?> همین ساعت‌ها برای همه روزهای روشن</button>
+      </div>
+      <?php foreach ($names as $w => $label): $day = $week[$w]; $shifts = $day['shifts'] ?: [['09:00', '13:00']]; ?>
+        <div class="sc-day<?= $day['on'] ? ' on' : '' ?>" data-day>
+          <label class="sc-switch">
+            <input type="checkbox" name="day[<?= $w ?>][on]" value="1"<?= checked_attr($day['on']) ?> data-day-on>
+            <span class="sc-knob" aria-hidden="true"></span>
+            <strong><?= $label ?></strong>
+          </label>
+          <div class="sc-shifts" data-shifts>
+            <?php for ($i = 0; $i < 3; $i++): $s = $shifts[$i] ?? ['', '']; $empty = $s[0] === '' && $s[1] === '' && $i > 0; ?>
+              <div class="sc-shift" data-shift<?= $empty ? ' data-empty' : '' ?>>
+                <span class="sc-from" aria-hidden="true">از</span>
+                <?= $timeSelect('day[' . $w . '][from][]', substr($s[0], 0, 5), $label . ' بازه ' . fa_number($i + 1) . ' از ساعت') ?>
+                <span class="sc-dash" aria-hidden="true">تا</span>
+                <?= $timeSelect('day[' . $w . '][to][]', substr($s[1], 0, 5), $label . ' بازه ' . fa_number($i + 1) . ' تا ساعت') ?>
+                <?php if ($i > 0): ?><button type="button" class="icon-button sc-remove" data-shift-remove hidden aria-label="حذف این بازه"><?= icon('x') ?></button><?php endif; ?>
+              </div>
+            <?php endfor; ?>
+            <button type="button" class="link-button sc-add" data-shift-add hidden><?= icon('plus') ?> افزودن بازه دیگر (مثلاً عصر)</button>
+            <?php if ($rooms): ?>
+              <label class="sc-room">اتاق مرکز<select name="day[<?= $w ?>][room]"><option value="">بدون اتاق مشخص</option><?php foreach ($rooms as $r): ?><option value="<?= (int) $r['id'] ?>"<?= selected_attr($day['room'] === (string) $r['id']) ?>><?= esc($r['name']) ?></option><?php endforeach; ?></select></label>
+            <?php endif; ?>
+          </div>
+          <span class="sc-off">تعطیل</span>
+          <small class="sc-count" data-count><?= $day['on'] ? '≈ ' . fa_number($count($day['shifts'])) . ' نوبت' : '' ?></small>
+        </div>
+      <?php endforeach; ?>
+      <div class="sc-save">
+        <button class="button"><?= icon('check') ?> ذخیره برنامه</button>
+        <small class="muted">نوبت‌های قطعی قبلی با تغییر برنامه حذف نمی‌شوند.</small>
+      </div>
+    </form>
+  </section>
+
+  <section class="sc-card">
+    <div class="sc-head"><div><h2>نوبت‌دهی</h2><p class="muted">مدت هر نوبت و تعداد بیماران.</p></div></div>
+    <form method="post" class="sc-settings">
+      <?php $token('clinic_settings'); ?>
+      <div class="sc-grid">
+        <label class="field"><span>مدت هر نوبت</span>
+          <select name="default_duration"><?php foreach ($durations as $m): ?><option value="<?= $m ?>"<?= selected_attr((int) $cl['default_duration'] === $m) ?>><?= fa_number($m) ?> دقیقه</option><?php endforeach; ?></select>
+        </label>
+        <label class="field"><span>بیمار در هر نوبت</span><input type="number" name="slot_capacity" min="1" max="20" value="<?= (int) $cl['slot_capacity'] ?>" inputmode="numeric"></label>
+        <label class="field"><span>حداکثر بیمار در روز</span><input type="number" name="daily_capacity" min="1" max="500" value="<?= (int) $cl['daily_capacity'] ?>" inputmode="numeric"></label>
+      </div>
+      <details class="sc-more"<?= (int) $cl['gap_minutes'] > 0 ? ' open' : '' ?>>
+        <summary>تنظیمات بیشتر</summary>
+        <label class="field"><span>استراحت بین دو نوبت (دقیقه)</span><input type="number" name="gap_minutes" min="0" max="120" value="<?= (int) $cl['gap_minutes'] ?>" inputmode="numeric"></label>
+      </details>
+      <button class="button secondary"><?= icon('check') ?> ذخیره</button>
+    </form>
+  </section>
+
+  <section class="sc-card">
+    <div class="sc-head"><div><h2>مرخصی و تعطیلی</h2><p class="muted">در این روزها نوبت جدید داده نمی‌شود.</p></div></div>
+    <form method="post" class="sc-block" data-block-form>
+      <?php $token('block_days'); ?>
+      <div class="seg sc-kind">
+        <?php foreach (['leave' => 'مرخصی', 'holiday' => 'تعطیلی', 'closed' => 'بستن مطب'] as $k => $l): ?><label><input type="radio" name="kind" value="<?= $k ?>"<?= checked_attr($k === 'leave') ?>><span><?= $l ?></span></label><?php endforeach; ?>
+      </div>
+      <div class="sc-grid two">
+        <label class="field"><span>از تاریخ</span><input name="from_date" value="<?= esc(jdate(date('Y-m-d'))) ?>" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۷/۲۶" required></label>
+        <label class="field"><span>تا تاریخ</span><input name="to_date" value="" dir="ltr" inputmode="numeric" placeholder="همان روز"></label>
+      </div>
+      <label class="check"><input type="checkbox" name="partial" value="1" data-partial> فقط چند ساعت از روز</label>
+      <div class="sc-grid two" data-partial-times>
+        <label class="field"><span>از ساعت</span><?= $timeSelect('from_time', '10:00', 'از ساعت') ?></label>
+        <label class="field"><span>تا ساعت</span><?= $timeSelect('to_time', '12:00', 'تا ساعت') ?></label>
+      </div>
+      <label class="field"><span>توضیح (اختیاری)</span><input name="reason" maxlength="500" placeholder="مثلاً سفر کاری"></label>
+      <?php if ($d['is_owner']): ?><label class="check"><input type="checkbox" name="all_clinics" value="1"> برای همه مطب‌های من</label><?php endif; ?>
+      <button class="button secondary"><?= icon('calendar') ?> ثبت</button>
+    </form>
+    <?php if ($blocks): ?>
+      <ul class="sc-blocks">
+        <?php foreach ($blocks as $b): $whole = substr($b['starts_at'], 11) === '00:00:00' && substr($b['ends_at'], 11) === '00:00:00'; ?>
+          <li>
+            <span class="badge"><?= esc(['leave' => 'مرخصی', 'holiday' => 'تعطیلی', 'closed' => 'بسته'][$b['kind']] ?? 'بسته') ?></span>
+            <span class="sc-when"><?= esc($whole ? (substr($b['starts_at'], 0, 10) === date('Y-m-d', strtotime($b['ends_at'] . ' -1 day')) ? jalali_long(substr($b['starts_at'], 0, 10)) : jdate($b['starts_at']) . ' تا ' . jdate(date('Y-m-d', strtotime($b['ends_at'] . ' -1 day')))) : jdate($b['starts_at'], true) . ' تا ' . jdate($b['ends_at'], true)) ?><small><?= esc($b['reason']) ?><?= $b['clinic_id'] ? '' : ' • همه مطب‌ها' ?></small></span>
+            <?php if ($d['is_owner'] || $b['clinic_id']): ?>
+              <form method="post" class="inline-form"><?php $token('block_remove'); ?><input type="hidden" name="id" value="<?= (int) $b['id'] ?>"><button class="link-button danger-link">حذف</button></form>
+            <?php endif; ?>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+  </section>
+</div>

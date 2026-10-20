@@ -1,0 +1,9 @@
+<section class="panel"><h2>الگوهای پیامک</h2><p>متن محلی از مسیر ارسال معمولی و خط فرستنده شما ارسال می‌شود و به ساخت الگوی Verify نیاز ندارد. روش Verify همچنان برای خطوط و الگوهای قبلی قابل انتخاب است. محدودیت‌های خط و گیرندگان مسدودشده تابع سرویس پیامک است.</p><a href="admin.php?tab=sms">تنظیم خط و کلید کاوه‌نگار</a></section>
+<form method="post" class="stack"><?php form_token('sms_templates'); ?>
+<?php foreach(sms_events() as $key=>$event): $t=sms_template($key) ?: ['enabled'=>0,'template'=>'','delivery_mode'=>'text','body'=>$event['suggested']]; ?>
+<section class="panel" data-sms-editor><div class="panel-head"><h2><?= esc($event['label']) ?></h2><label class="check"><input type="checkbox" name="enabled[<?= esc($key) ?>]"<?= checked_attr((bool)$t['enabled']) ?>>فعال</label></div>
+<label>روش ارسال<select name="mode[<?= esc($key) ?>]"><option value="text"<?= selected_attr($t['delivery_mode']==='text') ?>>متن دلخواه سامانه</option><option value="lookup"<?= selected_attr($t['delivery_mode']==='lookup') ?>>الگوی Verify کاوه‌نگار</option></select></label>
+<label>نام الگوی Verify (فقط برای روش Verify)<input name="template[<?= esc($key) ?>]" value="<?= esc($t['template']) ?>" maxlength="100" dir="ltr"></label>
+<label>متن پیامک<textarea name="body[<?= esc($key) ?>]" maxlength="2000" data-sms-body rows="4"><?= esc($t['body'] ?: $event['suggested']) ?></textarea></label><p class="muted small" data-sms-count aria-live="polite"></p>
+<div class="sms-tags"><?php foreach($event['tokens']+['site_name'=>'نام سامانه','site_url'=>'نشانی سامانه'] as $tag=>$label): ?><button type="button" class="secondary small" data-insert-tag="%<?= esc($tag) ?>"><?= esc($label) ?> <bdi>%<?= esc($tag) ?></bdi></button><?php endforeach; ?></div><small class="muted">تعداد قطعات برآورد متن فعلی است؛ جایگزینی تگ‌ها و روش محاسبه اپراتور می‌تواند آن را تغییر دهد.</small></section>
+<?php endforeach; ?><button>ذخیره همه الگوها</button></form>
