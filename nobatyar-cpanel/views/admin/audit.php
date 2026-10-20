@@ -2,8 +2,8 @@
 $query = ['tab' => 'audit', 'from' => jdate($filters['from']), 'to' => jdate($filters['to']), 'actor' => $filters['actor'], 'action_prefix' => $filters['action_prefix']]; ?>
 <form method="get" class="filter-bar panel">
   <input type="hidden" name="tab" value="audit">
-  <label>از تاریخ<input name="from" value="<?= esc(jdate($filters['from'])) ?>" dir="ltr" maxlength="10"></label>
-  <label>تا تاریخ<input name="to" value="<?= esc(jdate($filters['to'])) ?>" dir="ltr" maxlength="10"></label>
+  <label>از تاریخ<input data-jdate name="from" value="<?= esc(jdate($filters['from'])) ?>" dir="ltr" maxlength="10"></label>
+  <label>تا تاریخ<input data-jdate name="to" value="<?= esc(jdate($filters['to'])) ?>" dir="ltr" maxlength="10"></label>
   <label>انجام‌دهنده<select name="actor">
     <option value="">همه</option>
     <option value="admins"<?= selected_attr($filters['actor'] === 'admins') ?>>همه مدیران</option>

@@ -125,8 +125,8 @@ $token = function (string $action) use ($clinic) {
       <?php if ($rangeEnded): ?><p class="sc-warn"><?= icon('alert') ?><span>این برنامه در <?= esc(jalali_long($hours[0]['valid_until'])) ?> تمام شده و نوبتی داده نمی‌شود؛ تاریخ پایان را تمدید یا خالی کنید.</span></p><?php endif; ?>
       <?php if ($rangeLater): ?><p class="notice"><?= icon('calendar') ?> این برنامه از <?= esc(jalali_long($hours[0]['valid_from'])) ?> شروع می‌شود.</p><?php endif; ?>
       <div class="sc-range">
-        <label class="field"><span>از تاریخ</span><input name="valid_from" value="<?= esc($range['from']) ?>" dir="ltr" inputmode="numeric" maxlength="10" placeholder="از امروز"></label>
-        <label class="field"><span>تا تاریخ</span><input name="valid_until" value="<?= esc($range['until']) ?>" dir="ltr" inputmode="numeric" maxlength="10" placeholder="بدون پایان"></label>
+        <label class="field"><span>از تاریخ</span><input data-jdate name="valid_from" value="<?= esc($range['from']) ?>" dir="ltr" inputmode="numeric" maxlength="10" placeholder="از امروز"></label>
+        <label class="field"><span>تا تاریخ</span><input data-jdate name="valid_until" value="<?= esc($range['until']) ?>" dir="ltr" inputmode="numeric" maxlength="10" placeholder="بدون پایان"></label>
         <small class="muted">مثلاً ۱۴۰۵/۰۸/۰۱ تا ۱۴۰۵/۰۹/۳۰؛ خالی یعنی از امروز و بدون تاریخ پایان.</small>
       </div>
       <div class="sc-tools" hidden data-week-tools>
@@ -199,8 +199,8 @@ $token = function (string $action) use ($clinic) {
         <?php foreach (['leave' => 'مرخصی', 'holiday' => 'تعطیلی', 'closed' => 'بستن مطب'] as $k => $l): ?><label><input type="radio" name="kind" value="<?= $k ?>"<?= checked_attr($k === 'leave') ?>><span><?= $l ?></span></label><?php endforeach; ?>
       </div>
       <div class="sc-grid two">
-        <label class="field"><span>از تاریخ</span><input name="from_date" value="<?= esc(jdate(date('Y-m-d'))) ?>" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۷/۲۶" required></label>
-        <label class="field"><span>تا تاریخ</span><input name="to_date" value="" dir="ltr" inputmode="numeric" placeholder="همان روز"></label>
+        <label class="field"><span>از تاریخ</span><input data-jdate name="from_date" value="<?= esc(jdate(date('Y-m-d'))) ?>" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۷/۲۶" required></label>
+        <label class="field"><span>تا تاریخ</span><input data-jdate name="to_date" value="" dir="ltr" inputmode="numeric" placeholder="همان روز"></label>
       </div>
       <label class="check"><input type="checkbox" name="partial" value="1" data-partial> فقط چند ساعت از روز</label>
       <div class="sc-grid two" data-partial-times>

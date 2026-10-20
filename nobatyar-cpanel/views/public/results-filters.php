@@ -64,8 +64,8 @@ $sel = array_flip($input['specialty']);
       <?php endif; ?>
       <?php if ($on['range']): ?>
         <div class="filter-range">
-          <label>از تاریخ<input name="from" value="<?= esc($input['from'] ? jdate($input['from']) : '') ?>" placeholder="<?= esc(jdate(date('Y-m-d'))) ?>" inputmode="numeric" maxlength="10" dir="ltr"></label>
-          <label>تا تاریخ<input name="to" value="<?= esc($input['to'] ? jdate($input['to']) : '') ?>" placeholder="<?= esc(jdate(date('Y-m-d', strtotime('+6 days')))) ?>" inputmode="numeric" maxlength="10" dir="ltr"></label>
+          <label>از تاریخ<input data-jdate name="from" value="<?= esc($input['from'] ? jdate($input['from']) : '') ?>" placeholder="<?= esc(jdate(date('Y-m-d'))) ?>" inputmode="numeric" maxlength="10" dir="ltr"></label>
+          <label>تا تاریخ<input data-jdate name="to" value="<?= esc($input['to'] ? jdate($input['to']) : '') ?>" placeholder="<?= esc(jdate(date('Y-m-d', strtotime('+6 days')))) ?>" inputmode="numeric" maxlength="10" dir="ltr"></label>
         </div>
         <small class="muted">بازه حداکثر ۱۴ روز</small>
       <?php endif; ?>

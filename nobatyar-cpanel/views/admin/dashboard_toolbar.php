@@ -15,8 +15,8 @@ $chart = isset($_GET['chart']) && in_array($_GET['chart'], ['revenue', 'bookings
     <div class="ad-pop-body">
       <form method="get" class="filter-bar dash-range">
         <input type="hidden" name="tab" value="dashboard">
-        <label>از تاریخ<input name="from" value="<?= esc(jdate($range['from'])) ?>" dir="ltr" maxlength="10" placeholder="۱۴۰۵/۰۷/۰۱" inputmode="numeric"></label>
-        <label>تا تاریخ<input name="to" value="<?= esc(jdate($range['to'])) ?>" dir="ltr" maxlength="10" placeholder="۱۴۰۵/۰۷/۳۰" inputmode="numeric"></label>
+        <label>از تاریخ<input data-jdate name="from" value="<?= esc(jdate($range['from'])) ?>" dir="ltr" maxlength="10" placeholder="۱۴۰۵/۰۷/۰۱" inputmode="numeric"></label>
+        <label>تا تاریخ<input data-jdate name="to" value="<?= esc(jdate($range['to'])) ?>" dir="ltr" maxlength="10" placeholder="۱۴۰۵/۰۷/۳۰" inputmode="numeric"></label>
         <button><?= icon('filter') ?> نمایش</button>
       </form>
       <?php if ($canExport): ?>

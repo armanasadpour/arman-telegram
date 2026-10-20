@@ -69,6 +69,7 @@
 <p class="net-status" data-net-status hidden aria-live="assertive">اتصال اینترنت قطع است؛ تا برقراری دوباره، اطلاعات تازه نمایش داده نمی‌شود.</p>
 <script src="assets/release.js?v=<?= esc(APP_VERSION) ?>" defer></script>
 <script src="assets/app.js?v=<?= esc(APP_VERSION) ?>" defer></script>
+<script src="assets/jdate.js?v=<?= esc(APP_VERSION) ?>" defer></script>
 <?php if (str_contains((string) ($options['body_class'] ?? ''), 'doctor-register-page')): ?><script src="assets/doctor-register.js?v=<?= esc(APP_VERSION) ?>" defer></script><?php endif; ?>
 <?php if ($adminShell): ?><script src="assets/admin.js?v=<?= esc(APP_VERSION) ?>" defer></script><?php endif; ?>
 <?php if ($shell): ?><script src="assets/shell.js?v=<?= esc(APP_VERSION) ?>" defer></script><?php endif; ?>

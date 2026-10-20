@@ -280,10 +280,11 @@ function input(
     string $type = 'text',
     bool $required = true,
     int $max = 190,
+    string $attrs = '',
 ): void {
     echo '<label>' .
         esc($label) .
-        '<input type="' .
+        '<input' . ($attrs !== '' ? ' ' . $attrs : '') . ' type="' .
         esc($type) .
         '" name="' .
         esc($name) .

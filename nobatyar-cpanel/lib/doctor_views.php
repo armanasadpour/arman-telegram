@@ -391,9 +391,9 @@ function calendar_view(array $d, array $clinics, string $tab, int $clinic): void
         $tab .
         '">';
     select_field('مطب', 'clinic', $clinics, $clinic);
-    input($tab === 'history' ? 'تا تاریخ شمسی' : 'تاریخ شمسی', 'date', jdate($day), 'text', true, 10);
+    input($tab === 'history' ? 'تا تاریخ شمسی' : 'تاریخ شمسی', 'date', jdate($day), 'text', true, 10, 'data-jdate');
     if ($tab === 'history') {
-        input('از تاریخ شمسی', 'from', jdate($from), 'text', true, 10);
+        input('از تاریخ شمسی', 'from', jdate($from), 'text', true, 10, 'data-jdate');
     }
     if ($tab === 'calendar') {
         echo '<label>نمای تقویم<select name="view">';
@@ -532,7 +532,7 @@ function booking_cards(array $rows, array $d, array $clinics, bool $manage): voi
                 echo '<option value="' . $s['id'] . '">' . esc($s['name']) . '</option>';
             }
             echo '</select></label>';
-            input('زمان جدید شمسی (از زمان‌های آزاد صفحه عمومی)', 'starts_at', '', 'text', false, 30);
+            input('زمان جدید شمسی (از زمان‌های آزاد صفحه عمومی)', 'starts_at', '', 'text', false, 30, 'data-jdate="time"');
             echo '<a href="doctor.php?id=' .
                 $d['id'] .
                 '">مشاهده زمان‌های قابل رزرو</a></fieldset><button>ثبت تغییر نوبت</button></form></details>';

@@ -32,7 +32,7 @@ $id = (int) $d['id'];
       <form method="post" class="stack">
         <?php form_token('notice_save'); ?>
         <label>متن اطلاعیه (حداکثر ۵۰۰ نویسه؛ خالی = برداشتن)<textarea name="notice_text" maxlength="500" rows="3"><?= esc((string) ($d['notice_text'] ?? '')) ?></textarea></label>
-        <label>نمایش تا تاریخ (اختیاری)<input name="notice_until" value="<?= esc(!empty($d['notice_until']) ? jdate($d['notice_until']) : '') ?>" placeholder="۱۴۰۵/۰۷/۲۱" dir="ltr" maxlength="10"></label>
+        <label>نمایش تا تاریخ (اختیاری)<input data-jdate name="notice_until" value="<?= esc(!empty($d['notice_until']) ? jdate($d['notice_until']) : '') ?>" placeholder="۱۴۰۵/۰۷/۲۱" dir="ltr" maxlength="10"></label>
         <label class="check"><input type="checkbox" name="notify_patients" value="1"> برای بیماران دارای نوبت قطعی هم اعلان فرستاده شود</label>
         <button>ذخیره اطلاعیه</button>
       </form>

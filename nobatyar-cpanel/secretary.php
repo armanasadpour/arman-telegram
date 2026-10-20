@@ -192,7 +192,7 @@ try {
             echo '<form method="get" class="filter-bar no-print"><input type="hidden" name="tab" value="calendar"><input type="hidden" name="clinic" value="' .
                 $clinic .
                 '">';
-            input('تاریخ شمسی شروع', 'date', jdate($day));
+            input('تاریخ شمسی شروع', 'date', jdate($day), 'text', true, 10, 'data-jdate');
             echo '<label>نما<select name="view"><option value="day">روزانه</option><option value="week" ' .
                 ($view === 'week' ? 'selected' : '') .
                 '>هفتگی از تاریخ انتخابی</option></select></label><label>وضعیت<select name="status"><option value="">همه وضعیت‌ها</option>';
@@ -382,7 +382,7 @@ try {
                 '</option>';
         }
         echo '</select></label>';
-        input('تاریخ شمسی', 'date', jdate($day));
+        input('تاریخ شمسی', 'date', jdate($day), 'text', true, 10, 'data-jdate');
         echo '<button>نمایش زمان‌های آزاد</button></form><p><a href="secretary.php?clinic=' .
             $clinic .
             '&tab=patients">جستجو یا ثبت بیمار و خانواده</a></p>';
@@ -433,8 +433,8 @@ try {
         reception_scope($clinic, 'bookings');
         echo '<article class="card"><h2>اعلام تأخیر پزشک</h2><p>زمان نوبت‌ها جابه‌جا نمی‌شود. برای نوبت‌های قطعی بازه، اعلان داخلی و فهرست پیگیری ساخته می‌شود. برای بیمار بدون حساب متصل، پیامک یا تماس لازم است.</p><form method="post">';
         form_token('delay');
-        input('شروع بازه شمسی', 'starts_at', jdate(date('Y-m-d H:i:s'), true));
-        input('پایان بازه شمسی', 'ends_at', jdate(date('Y-m-d H:i:s', time() + 3600), true));
+        input('شروع بازه شمسی', 'starts_at', jdate(date('Y-m-d H:i:s'), true), 'text', true, 190, 'data-jdate="time"');
+        input('پایان بازه شمسی', 'ends_at', jdate(date('Y-m-d H:i:s', time() + 3600), true), 'text', true, 190, 'data-jdate="time"');
         input('دقیقه تأخیر', 'minutes', '30', 'number');
         input('علت', 'reason', '');
         echo '<label class="check"><input type="checkbox" name="send_sms" value="1"> پیامک تأخیر هم برای همه بیماران این بازه در صف ارسال قرار گیرد (با رعایت تنظیمات بیمار و فعال‌بودن الگو)</label><p class="muted">زمان تقریبی مراجعه هر نوبت به اندازه تأخیر جلو می‌رود و در پنل بیمار نمایش داده می‌شود.</p>';

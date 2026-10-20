@@ -19,7 +19,7 @@ $e = $post && ($post['action'] ?? '') === 'article_save' ? $post + ($edit ?? [])
       <label>تخصص مرتبط (اختیاری)<select name="specialty_id"><option value="">بدون تخصص</option><?php foreach ($specialties as $s): ?><option value="<?= (int) $s['id'] ?>"<?= selected_attr((int) ($e['specialty_id'] ?? 0) === (int) $s['id']) ?>><?= esc($s['name']) ?></option><?php endforeach; ?></select></label>
       <label>وضعیت<select name="status"><option value="draft"<?= selected_attr(($e['status'] ?? 'draft') === 'draft') ?>>پیش‌نویس</option><option value="published"<?= selected_attr(($e['status'] ?? '') === 'published') ?>>منتشرشده</option></select></label>
       <?php $pub = $e['published_at'] ?? ''; ?>
-      <label>تاریخ انتشار (اختیاری؛ برای انتشار زمان‌بندی‌شده)<input name="published_at" value="<?= esc($pub && preg_match('/^\d{4}-/', (string) $pub) ? jdate($pub) : (string) $pub) ?>" dir="ltr" maxlength="10" placeholder="۱۴۰۵/۰۸/۰۱"></label>
+      <label>تاریخ انتشار (اختیاری؛ برای انتشار زمان‌بندی‌شده)<input data-jdate name="published_at" value="<?= esc($pub && preg_match('/^\d{4}-/', (string) $pub) ? jdate($pub) : (string) $pub) ?>" dir="ltr" maxlength="10" placeholder="۱۴۰۵/۰۸/۰۱"></label>
     </div>
     <div class="image-field">
       <?php if (!empty($e['cover_file'])): ?><img src="media.php?kind=article&amp;file=<?= esc($e['cover_file']) ?>" alt="" width="240" height="126"><?php endif; ?>

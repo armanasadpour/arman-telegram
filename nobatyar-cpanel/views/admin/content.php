@@ -23,8 +23,8 @@ $jd = fn($v) => $v && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $v) ? jdate($
       <div class="form-grid">
         <?php input('پیوند (مثل centers.php یا https://...)', 'link_url', $e['link_url'] ?? '', 'text', false, 255); ?>
         <?php input('متن دکمه', 'link_label', $e['link_label'] ?? '', 'text', false, 40); ?>
-        <?php input('شروع نمایش (اختیاری)', 'starts_on', $jd($e['starts_on'] ?? ''), 'text', false, 10); ?>
-        <?php input('پایان نمایش (اختیاری)', 'ends_on', $jd($e['ends_on'] ?? ''), 'text', false, 10); ?>
+        <?php input('شروع نمایش (اختیاری)', 'starts_on', $jd($e['starts_on'] ?? ''), 'text', false, 10, 'data-jdate'); ?>
+        <?php input('پایان نمایش (اختیاری)', 'ends_on', $jd($e['ends_on'] ?? ''), 'text', false, 10, 'data-jdate'); ?>
       </div>
       <label>تصویر (اختیاری، به ۱۲۰۰×۴۰۰ برش می‌خورد؛ حداکثر ۲ مگابایت)<input type="file" name="image" accept="image/png,image/jpeg,image/webp"></label>
       <?php if (!empty($e['image_file'])): ?><label class="check"><input type="checkbox" name="remove_image" value="1"> حذف تصویر فعلی</label><?php endif; ?>

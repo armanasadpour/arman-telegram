@@ -4,7 +4,7 @@
 //   - Pages (*.php), the API and anything with personal, medical or financial data are never cached:
 //     they always come from the network. When the network is down, a page request shows offline.html.
 // VERSION must match APP_VERSION (checked by the tests); a new version replaces the old cache.
-const VERSION = '1.0.7';
+const VERSION = '1.0.8';
 const CACHE = 'nobatyar-static-' + VERSION;
 const PRECACHE = [
   'offline.html',
@@ -12,6 +12,7 @@ const PRECACHE = [
   'admin.webmanifest',
   'assets/style.css?v=' + VERSION,
   'assets/app.js?v=' + VERSION,
+  'assets/jdate.js?v=' + VERSION,
   'assets/shell.js?v=' + VERSION,
   'assets/search.js?v=' + VERSION,
   'assets/booking.js?v=' + VERSION,

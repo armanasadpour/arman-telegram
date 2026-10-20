@@ -113,7 +113,7 @@ if ($manage && $b['status'] === 'confirmed') {
             echo '<option value="' . $s['id'] . '">' . esc($s['name']) . '</option>';
         }
         echo '</select></label>';
-        input('تاریخ و ساعت شمسی مقصد', 'starts_at', '');
+        input('تاریخ و ساعت شمسی مقصد', 'starts_at', '', 'text', true, 190, 'data-jdate="time"');
         input('علت انتقال', 'reason', '');
         echo '<label><input type="checkbox" name="patient_contacted" value="1" required> بیمار را از زمان و مطب جدید مطلع کردم</label><button>ثبت جابه‌جایی</button></form></article>';
     }

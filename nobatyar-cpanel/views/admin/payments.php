@@ -39,8 +39,8 @@ $query = ['tab' => 'payments', 'from' => jdate($filters['from']), 'to' => jdate(
 
 <form method="get" class="filter-bar panel">
   <input type="hidden" name="tab" value="payments">
-  <label>از تاریخ<input name="from" value="<?= esc(jdate($filters['from'])) ?>" dir="ltr"></label>
-  <label>تا تاریخ<input name="to" value="<?= esc(jdate($filters['to'])) ?>" dir="ltr"></label>
+  <label>از تاریخ<input data-jdate name="from" value="<?= esc(jdate($filters['from'])) ?>" dir="ltr"></label>
+  <label>تا تاریخ<input data-jdate name="to" value="<?= esc(jdate($filters['to'])) ?>" dir="ltr"></label>
   <label>وضعیت<select name="status"><option value="">همه</option><?php foreach (payment_status_labels() as $k => $l): ?><option value="<?= $k ?>"<?= selected_attr($filters['status'] === $k) ?>><?= esc($l) ?></option><?php endforeach; ?></select></label>
   <label>درگاه<select name="gateway"><option value="">همه</option><?php foreach ($registry as $k => $g): ?><option value="<?= $k ?>"<?= selected_attr($filters['gateway'] === $k) ?>><?= esc($g['label']) ?></option><?php endforeach; ?></select></label>
   <label>نوع<select name="purpose"><option value="">همه</option><?php foreach (['booking', 'subscription', 'gateway_test'] as $k): ?><option value="<?= $k ?>"<?= selected_attr($filters['purpose'] === $k) ?>><?= esc(payment_purpose_label($k)) ?></option><?php endforeach; ?></select></label>

@@ -16,8 +16,8 @@ $table = function (array $rows, string $label): void { ?>
 ?>
 <form method="get" class="filter-bar panel">
   <input type="hidden" name="center" value="<?= (int) $c['id'] ?>"><input type="hidden" name="tab" value="reports">
-  <label>از تاریخ<input name="from" value="<?= esc(jdate($f['from'])) ?>" dir="ltr"></label>
-  <label>تا تاریخ<input name="to" value="<?= esc(jdate($f['to'])) ?>" dir="ltr"></label>
+  <label>از تاریخ<input data-jdate name="from" value="<?= esc(jdate($f['from'])) ?>" dir="ltr"></label>
+  <label>تا تاریخ<input data-jdate name="to" value="<?= esc(jdate($f['to'])) ?>" dir="ltr"></label>
   <?php if (!$s['branch_id']): ?>
     <label>شعبه<select name="branch"><option value="0">همه</option><?php foreach ($branches as $b): ?><option value="<?= (int) $b['id'] ?>"<?= selected_attr($f['branch'] === (int) $b['id']) ?>><?= esc($b['name']) ?></option><?php endforeach; ?></select></label>
   <?php endif; ?>

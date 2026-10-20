@@ -67,7 +67,7 @@ function jalali_input(string $label, string $name, ?string $value = null, bool $
 {
     echo '<label>' .
         esc($label) .
-        '<input name="' .
+        '<input ' . ($time ? 'data-jdate="time"' : 'data-jdate') . ' name="' .
         esc($name) .
         '" value="' .
         esc($value ? jdate($value, $time) : '') .

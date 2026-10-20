@@ -10,8 +10,8 @@
           <label>شعبه<select name="branch_id"><option value="">همه شعبه‌ها</option><?php foreach ($branches as $b): ?><option value="<?= (int) $b['id'] ?>"<?= selected_attr((int) ($post['branch_id'] ?? 0) === (int) $b['id']) ?>><?= esc($b['name']) ?></option><?php endforeach; ?></select></label>
         <?php endif; ?>
         <label>پزشک<select name="doctor_id"><option value="">همه پزشکان</option><?php foreach ($doctors as $d): ?><option value="<?= (int) $d['id'] ?>"<?= selected_attr((int) ($post['doctor_id'] ?? 0) === (int) $d['id']) ?>><?= esc($d['name']) ?></option><?php endforeach; ?></select></label>
-        <?php input('نوبت‌ها از تاریخ', 'date_from', $post['date_from'] ?? jdate(date('Y-m-d')), 'text', true, 20); ?>
-        <?php input('تا تاریخ', 'date_to', $post['date_to'] ?? jdate(date('Y-m-d', strtotime('+7 days'))), 'text', true, 20); ?>
+        <?php input('نوبت‌ها از تاریخ', 'date_from', $post['date_from'] ?? jdate(date('Y-m-d')), 'text', true, 20, 'data-jdate'); ?>
+        <?php input('تا تاریخ', 'date_to', $post['date_to'] ?? jdate(date('Y-m-d', strtotime('+7 days'))), 'text', true, 20, 'data-jdate'); ?>
       </div>
       <?php input('عنوان', 'title', $post['title'] ?? '', 'text', true, 120); ?>
       <label>متن اطلاعیه<textarea name="body" maxlength="1000" required><?= esc($post['body'] ?? '') ?></textarea></label>

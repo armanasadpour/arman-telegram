@@ -119,8 +119,8 @@ if ($partial) {
       <form method="post" class="waitlist-form" action="<?= esc($base(['date' => jdate($day)])) ?>">
         <?php form_token('waitlist'); ?>
         <div class="form-grid">
-          <label>از تاریخ<input name="date_from" value="<?= esc(jdate(max($day, date('Y-m-d')))) ?>" dir="ltr" inputmode="numeric" required></label>
-          <label>تا تاریخ<input name="date_to" value="<?= esc(jdate(date('Y-m-d', strtotime(max($day, date('Y-m-d')) . ' +6 days')))) ?>" dir="ltr" inputmode="numeric" required></label>
+          <label>از تاریخ<input data-jdate name="date_from" value="<?= esc(jdate(max($day, date('Y-m-d')))) ?>" dir="ltr" inputmode="numeric" required></label>
+          <label>تا تاریخ<input data-jdate name="date_to" value="<?= esc(jdate(date('Y-m-d', strtotime(max($day, date('Y-m-d')) . ' +6 days')))) ?>" dir="ltr" inputmode="numeric" required></label>
           <?php if ($viewer): ?>
             <label>برای<select name="family_member_id"><option value="0">خودم</option><?php foreach (query('SELECT id,name FROM family_members WHERE user_id=? AND active=1', [$viewer['id']])->fetchAll() as $f): ?><option value="<?= (int) $f['id'] ?>"><?= esc($f['name']) ?></option><?php endforeach; ?></select></label>
             <?php if (!$viewer['name']): ?><label>نام بیمار<input name="name" maxlength="190" required></label><?php endif; ?>

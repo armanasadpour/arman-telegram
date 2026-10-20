@@ -187,8 +187,8 @@ $kinds = subscription_order_kinds();
           <label>اختصاصی پزشک<select name="doctor_id"><option value="">عمومی (همه)</option>
             <?php foreach ($doctors as $dd): ?><option value="<?= (int) $dd['id'] ?>"<?= selected_attr((int) ($edit['doctor_id'] ?? 0) === (int) $dd['id']) ?>><?= esc($dd['name']) ?></option><?php endforeach; ?>
           </select></label>
-          <?php input('شروع اعتبار (شمسی، اختیاری)', 'starts_at', !empty($edit['starts_at']) ? jdate($edit['starts_at']) : '', 'text', false, 10); ?>
-          <?php input('پایان اعتبار (شمسی، اختیاری)', 'ends_at', !empty($edit['ends_at']) ? jdate($edit['ends_at']) : '', 'text', false, 10); ?>
+          <?php input('شروع اعتبار (شمسی، اختیاری)', 'starts_at', !empty($edit['starts_at']) ? jdate($edit['starts_at']) : '', 'text', false, 10, 'data-jdate'); ?>
+          <?php input('پایان اعتبار (شمسی، اختیاری)', 'ends_at', !empty($edit['ends_at']) ? jdate($edit['ends_at']) : '', 'text', false, 10, 'data-jdate'); ?>
         </div>
         <label class="check"><input type="checkbox" name="active"<?= checked_attr((bool) ($edit['active'] ?? true)) ?>> فعال</label>
         <div class="actions"><button>ذخیره کد</button> <a href="admin.php?tab=subscriptions&amp;view=codes">فرم جدید</a></div>
@@ -253,8 +253,8 @@ $kinds = subscription_order_kinds();
 <?php elseif ($view === 'report'): $r = $report; ?>
   <form method="get" class="filter-bar">
     <input type="hidden" name="tab" value="subscriptions"><input type="hidden" name="view" value="report">
-    <label>از تاریخ<input name="from" value="<?= esc(jdate($from)) ?>" dir="ltr" placeholder="۱۴۰۵/۰۷/۰۱"></label>
-    <label>تا تاریخ<input name="to" value="<?= esc(jdate($to)) ?>" dir="ltr"></label>
+    <label>از تاریخ<input data-jdate name="from" value="<?= esc(jdate($from)) ?>" dir="ltr" placeholder="۱۴۰۵/۰۷/۰۱"></label>
+    <label>تا تاریخ<input data-jdate name="to" value="<?= esc(jdate($to)) ?>" dir="ltr"></label>
     <label>استان<select name="province"><option value="0">همه</option><?php foreach ($provinces as $p): ?><option value="<?= (int) $p['id'] ?>"<?= selected_attr($province === (int) $p['id']) ?>><?= esc($p['name']) ?></option><?php endforeach; ?></select></label>
     <button><?= icon('filter') ?> نمایش</button>
     <a class="button secondary" href="admin.php?<?= esc(http_build_query(['tab' => 'subscriptions', 'view' => 'report', 'from' => jdate($from), 'to' => jdate($to), 'province' => $province, 'export' => 'xlsx'])) ?>"><?= icon('download') ?> خروجی اکسل</a>

@@ -2121,3 +2121,27 @@ h1 .pro-tick img.doctor-verified-icon{width:26px;height:26px;min-width:26px}
 .sc-range .field{margin:0}
 .sc-range small{align-self:center}
 @media (max-width:640px){.sc-range{grid-template-columns:1fr 1fr}.sc-range small{grid-column:1/-1}}
+
+/* 1.0.8: Jalali date picker (assets/jdate.js) for fields marked data-jdate. */
+.jdp{position:absolute;z-index:1000;width:300px;max-width:calc(100vw - 16px);background:#fff;color:#17233B;border:1px solid #E5EAF2;border-radius:16px;box-shadow:0 18px 40px -12px #0f172a40;padding:10px;font:inherit;font-size:14px;direction:rtl;user-select:none}
+.jdp[hidden]{display:none}
+.jdp-head{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.jdp-head select{flex:1;min-width:0;margin:0;min-height:36px!important;padding:2px 8px;border-radius:10px;font-size:14px}
+.jdp .jdp-nav{flex:0 0 36px;height:36px;min-height:0;margin:0;padding:0;box-shadow:none;border:1px solid #E5EAF2;border-radius:10px;background:#fff;color:#3B4A63;font-size:18px;line-height:1;cursor:pointer}
+.jdp .jdp-nav:hover{background:#F6F8FC}
+.jdp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.jdp-wd{font-size:12px;color:#718096;padding:4px 0}
+.jdp-wd:last-child{color:#B91C1C}
+.jdp .jdp-day{display:flex;align-items:center;justify-content:center;height:36px;min-height:0;margin:0;padding:0;border:0;box-shadow:none;font-weight:400;border-radius:10px;background:none;color:inherit;font:inherit;cursor:pointer}
+.jdp .jdp-day:hover{background:#EFF6FF}
+.jdp .jdp-day.fri{color:#B91C1C}
+.jdp .jdp-day.today{box-shadow:inset 0 0 0 1px #2563eb;color:#1d4ed8;font-weight:600}
+.jdp .jdp-day.sel{background:#2563eb;color:#fff;font-weight:600}
+.jdp-time{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;direction:ltr}
+.jdp-time select{margin:0;min-height:36px!important;width:auto;padding:2px 8px;border-radius:10px}
+.jdp-foot{display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid #EEF2F8}
+.jdp .jdp-foot button{margin:0;min-height:34px;box-shadow:none;font-weight:400;padding:4px 12px;border:1px solid #E5EAF2;border-radius:10px;background:#fff;color:#3B4A63;font:inherit;font-size:13px;cursor:pointer}
+.jdp .jdp-foot .jdp-ok{background:#2563eb;border-color:#2563eb;color:#fff}
+.jdp-day:focus-visible,.jdp-nav:focus-visible,.jdp-foot button:focus-visible{outline:3px solid #3978F64d;outline-offset:1px}
+input[data-jdate]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%23718096' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:left 10px center!important;padding-left:36px!important}
+@media print{.jdp{display:none}}
