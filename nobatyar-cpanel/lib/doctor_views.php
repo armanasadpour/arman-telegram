@@ -161,6 +161,7 @@ function doctor_view(string $tab, array $d, array $clinics, ?array $cl): void
                 'hours' => query('SELECT * FROM working_hours WHERE clinic_id=? AND active=1 ORDER BY (weekday+1)%7,opens_at', [$clinic])->fetchAll(),
                 'blocks' => query('SELECT * FROM schedule_blocks WHERE doctor_id=? AND (clinic_id=? OR clinic_id IS NULL) AND active=1 AND ends_at>NOW() ORDER BY starts_at LIMIT 100', [$id, $clinic])->fetchAll(),
                 'rooms' => $cl['branch_id'] ? center_rooms((int) $cl['branch_id'], true) : [],
+                'services' => $services,
             ]);
             break;
         case 'calendar':

@@ -1,3 +1,7 @@
+# 1.0.6 — مهاجرت ۲۸ (افزایشی، تکرارپذیر)
+
+- `working_hours.valid_from` و `working_hours.valid_until` (بازه تاریخ برنامه هفتگی؛ خالی = از اکنون / بدون پایان).
+
 # 1.0.5 — مهاجرت ۲۷ (افزایشی، تکرارپذیر)
 
 - `working_hours.slot_minutes` (مدت نوبت همان روز؛ خالی = `clinics.default_duration`).

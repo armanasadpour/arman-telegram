@@ -5,7 +5,7 @@
  * @var array $services @var int $doctorId @var array $defaultDurations clinic name => default length
  */
 $lengths = [0, 10, 15, 20, 25, 30, 40, 45, 60, 90, 120];
-$suggest = ['ویزیت عمومی', 'ویزیت تخصصی', 'ویزیت مجدد (پیگیری)', 'مشاوره', 'معاینه و تجویز', 'نوار قلب', 'سونوگرافی', 'تزریق و پانسمان'];
+$suggest = service_presets();
 $lengthSelect = function (int $value) use ($lengths): string {
     $opts = $lengths;
     if (!in_array($value, $opts, true)) {

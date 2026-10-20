@@ -317,9 +317,11 @@ function availability(int $clinic, int $service, string $day, int $excludeBookin
     $weekday = (int) date('w', strtotime($day));
     $out = [];
     foreach (
-        query('SELECT * FROM working_hours WHERE clinic_id=? AND weekday=? AND active=1 ORDER BY opens_at', [
+        query('SELECT * FROM working_hours WHERE clinic_id=? AND weekday=? AND active=1 AND (valid_from IS NULL OR valid_from<=?) AND (valid_until IS NULL OR valid_until>=?) ORDER BY opens_at', [
             $clinic,
             $weekday,
+            $day,
+            $day,
         ])->fetchAll()
         as $r
     ) {

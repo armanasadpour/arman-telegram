@@ -1037,7 +1037,12 @@ function working_hours_add(int $doctor, int $clinic, array $data): array
     if ($start >= $end) {
         throw new AuthError('پایان حضور باید بعد از شروع و در همان روز باشد.');
     }
-    if (query('SELECT h.id FROM working_hours h JOIN clinics c ON c.id=h.clinic_id WHERE c.doctor_id=? AND h.active=1 AND h.weekday=? AND h.opens_at<? AND h.closes_at>?', [$doctor, $day, $end, $start])->fetch()) {
+    $from = empty($data['valid_from']) ? null : valid_date((string) $data['valid_from']);
+    $until = empty($data['valid_until']) ? null : valid_date((string) $data['valid_until']);
+    // Two weekly periods only clash when their date ranges (empty = open-ended) overlap too.
+    $dates = ' AND (h.valid_until IS NULL OR ? IS NULL OR h.valid_until>=?) AND (h.valid_from IS NULL OR ? IS NULL OR h.valid_from<=?)';
+    $dateArgs = [$from, $from, $until, $until];
+    if (query('SELECT h.id FROM working_hours h JOIN clinics c ON c.id=h.clinic_id WHERE c.doctor_id=? AND h.active=1 AND h.weekday=? AND h.opens_at<? AND h.closes_at>?' . $dates, array_merge([$doctor, $day, $end, $start], $dateArgs))->fetch()) {
         throw new AuthError('این ساعت با برنامه هفتگی یکی از مطب‌ها یا شعبه‌های پزشک تداخل دارد.');
     }
     $cl = query('SELECT * FROM clinics WHERE id=?', [$clinic])->fetch();
@@ -1048,16 +1053,16 @@ function working_hours_add(int $doctor, int $clinic, array $data): array
         }
         query('SELECT id FROM center_rooms WHERE id=? FOR UPDATE', [$room]);
         $clash = query(
-            'SELECT d.name FROM working_hours h JOIN clinics c ON c.id=h.clinic_id JOIN doctors d ON d.id=c.doctor_id WHERE h.room_id=? AND h.active=1 AND c.active=1 AND h.weekday=? AND h.opens_at<? AND h.closes_at>? LIMIT 1',
-            [$room, $day, $end, $start],
+            'SELECT d.name FROM working_hours h JOIN clinics c ON c.id=h.clinic_id JOIN doctors d ON d.id=c.doctor_id WHERE h.room_id=? AND h.active=1 AND c.active=1 AND h.weekday=? AND h.opens_at<? AND h.closes_at>?' . $dates . ' LIMIT 1',
+            array_merge([$room, $day, $end, $start], $dateArgs),
         )->fetchColumn();
         if ($clash !== false) {
             throw new AuthError('این اتاق در همین ساعت به ' . $clash . ' اختصاص دارد؛ اتاق یا ساعت دیگری انتخاب کنید.', 409);
         }
     }
     $len = empty($data['slot_minutes']) ? null : number_range($data, 'slot_minutes', 5, 180);
-    query('INSERT INTO working_hours(clinic_id,weekday,opens_at,closes_at,room_id,slot_minutes) VALUES(?,?,?,?,?,?)', [$clinic, $day, $start, $end, $room, $len]);
-    return ['clinic_id' => $clinic, 'weekday' => $day, 'start' => $start, 'end' => $end, 'room_id' => $room, 'slot_minutes' => $len, 'hours_id' => (int) db()->lastInsertId()];
+    query('INSERT INTO working_hours(clinic_id,weekday,opens_at,closes_at,room_id,slot_minutes,valid_from,valid_until) VALUES(?,?,?,?,?,?,?,?)', [$clinic, $day, $start, $end, $room, $len, $from, $until]);
+    return ['clinic_id' => $clinic, 'weekday' => $day, 'start' => $start, 'end' => $end, 'room_id' => $room, 'slot_minutes' => $len, 'valid_from' => $from, 'valid_until' => $until, 'hours_id' => (int) db()->lastInsertId()];
 }
 
 function center_hours_add(int $center, int $clinic, array $data): void

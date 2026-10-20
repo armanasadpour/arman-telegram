@@ -2100,3 +2100,23 @@ h1 .pro-tick img.doctor-verified-icon{width:26px;height:26px;min-width:26px}
 /* 1.0.5: per-day appointment length in the weekly schedule. */
 .sc-len{display:flex;align-items:center;gap:8px;margin:2px 0 0!important;font-size:13px;color:var(--ink-2)}
 .sc-len select{margin:0;min-height:38px!important;padding:4px 10px;font-size:14px;max-width:220px}
+
+/* 1.0.6: services quick pick and date range on the schedule page. */
+.sc-warn{display:flex;align-items:flex-start;gap:10px;margin:0 0 12px;padding:12px 14px;border-radius:14px;background:var(--warning-50);border:1px solid #FDE7B0;color:#7C4A03;font-size:14px;line-height:1.9}
+.sc-warn .icon{width:18px;height:18px;flex-shrink:0;margin-top:4px;color:var(--warning)}
+.svc-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.svc-chip{position:relative;margin:0!important;cursor:pointer}
+.svc-chip input{position:absolute;opacity:0;width:1px;height:1px}
+.svc-chip span{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink-2);font-size:14px;transition:background .15s,border-color .15s}
+.svc-chip span .icon{display:none;width:15px;height:15px}
+.svc-chip input:checked+span{background:var(--primary-50);border-color:var(--primary);color:var(--primary-700);font-weight:500}
+.svc-chip input:checked+span .icon{display:inline-block}
+.svc-chip input:focus-visible+span{outline:3px solid #3978F64d;outline-offset:2px}
+.sc-svc-other{max-width:360px}
+.sc-svc-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.sc-svc-actions a{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.sc-svc-actions a .icon{width:16px;height:16px}
+.sc-range{display:grid;grid-template-columns:repeat(2,minmax(0,200px)) 1fr;align-items:end;gap:8px 12px;margin:0 0 10px;padding:0 0 12px;border-bottom:1px solid var(--line-2)}
+.sc-range .field{margin:0}
+.sc-range small{align-self:center}
+@media (max-width:640px){.sc-range{grid-template-columns:1fr 1fr}.sc-range small{grid-column:1/-1}}

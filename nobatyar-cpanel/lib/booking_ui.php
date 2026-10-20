@@ -62,7 +62,7 @@ function booking_day_strip(int $clinic, int $service, int $days, int $move = 0):
 function clinic_hours(int $clinic): array
 {
     $names = [6 => 'شنبه', 0 => 'یکشنبه', 1 => 'دوشنبه', 2 => 'سه‌شنبه', 3 => 'چهارشنبه', 4 => 'پنجشنبه', 5 => 'جمعه'];
-    $rows = query('SELECT weekday,opens_at,closes_at FROM working_hours WHERE clinic_id=? AND active=1 ORDER BY opens_at', [$clinic])->fetchAll();
+    $rows = query('SELECT weekday,opens_at,closes_at FROM working_hours WHERE clinic_id=? AND active=1 AND (valid_until IS NULL OR valid_until>=?) ORDER BY opens_at', [$clinic, date('Y-m-d')])->fetchAll();
     $out = [];
     foreach ($names as $w => $label) {
         $ranges = [];

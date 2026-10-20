@@ -2,8 +2,10 @@
 /**
  * Simple weekly schedule of one clinic: tick the days, enter from/to (up to three shifts), save once.
  * Each day may use its own appointment length (e.g. every 10 minutes on Saturdays); empty means the clinic default.
+ * The program may hold only between two dates (empty = from now / without end).
+ * Services patients can book are ticked at the top, so a doctor never ends up with hours but nothing to book.
  * Booking settings in plain words, and leave/closures by date only.
- * @var array $d @var array $cl @var int $clinic @var array $hours @var array $blocks @var array $rooms
+ * @var array $d @var array $cl @var int $clinic @var array $hours @var array $blocks @var array $rooms @var array $services
  */
 $names = [6 => 'شنبه', 0 => 'یکشنبه', 1 => 'دوشنبه', 2 => 'سه‌شنبه', 3 => 'چهارشنبه', 4 => 'پنجشنبه', 5 => 'جمعه'];
 $posted = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'week' ? ($_POST['day'] ?? []) : null;
@@ -32,6 +34,20 @@ if (is_array($posted)) {
         $week[$w]['len'] = (string) ($h['slot_minutes'] ?? '');
     }
 }
+$isPost = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST';
+$range = ['from' => '', 'until' => ''];
+if ($posted !== null) {
+    $range = ['from' => (string) ($_POST['valid_from'] ?? ''), 'until' => (string) ($_POST['valid_until'] ?? '')];
+} elseif ($hours) {
+    $range = ['from' => $hours[0]['valid_from'] ? jdate($hours[0]['valid_from']) : '', 'until' => $hours[0]['valid_until'] ? jdate($hours[0]['valid_until']) : ''];
+}
+$rangeEnded = $hours && $hours[0]['valid_until'] && $hours[0]['valid_until'] < date('Y-m-d');
+$rangeLater = $hours && $hours[0]['valid_from'] && $hours[0]['valid_from'] > date('Y-m-d');
+$activeServices = array_filter($services, fn($s) => !empty($s['active']) && empty($s['plan_locked']));
+$picked = $isPost && ($_POST['action'] ?? '') === 'services_pick'
+    ? array_flip(array_filter((array) ($_POST['svc'] ?? []), 'is_string'))
+    : ($services ? array_flip(array_column(array_filter($services, fn($s) => !empty($s['active'])), 'name')) : ['ویزیت عمومی' => 0]);
+$chips = array_values(array_unique(array_merge(array_column($services, 'name'), service_presets())));
 $durations = [10, 15, 20, 25, 30, 40, 45, 60, 90, 120];
 if (!in_array((int) $cl['default_duration'], $durations, true)) {
     $durations[] = (int) $cl['default_duration'];
@@ -78,12 +94,41 @@ $token = function (string $action) use ($clinic) {
 };
 ?>
 <div class="sched" data-schedule data-step="<?= $step ?>" data-gap="<?= (int) $cl['gap_minutes'] ?>" data-seats="<?= max(1, (int) $cl['slot_capacity']) ?>" data-daily="<?= (int) $cl['daily_capacity'] ?>">
+  <section class="sc-card sc-services">
+    <div class="sc-head"><div><h2>خدماتی که بیمار رزرو می‌کند</h2><p class="muted">بیمار هنگام گرفتن نوبت یکی از این خدمات را انتخاب می‌کند؛ هر کدام را که ارائه می‌دهید روشن کنید.</p></div></div>
+    <?php if (!$activeServices): ?>
+      <p class="sc-warn"><?= icon('alert') ?><span>هنوز خدمت فعالی ندارید؛ بدون خدمت، بیماران نمی‌توانند نوبت بگیرند.<?= $d['is_owner'] ? ' دست‌کم یکی را انتخاب و ذخیره کنید (با ذخیره برنامه هفتگی، «ویزیت عمومی» خودکار اضافه می‌شود).' : ' از پزشک بخواهید خدمات را تعریف کند.' ?></span></p>
+    <?php endif; ?>
+    <?php if ($d['is_owner']): ?>
+      <form method="post" class="sc-svc-form">
+        <?php $token('services_pick'); ?>
+        <div class="svc-chips" role="group" aria-label="خدمات">
+          <?php foreach ($chips as $n): ?><label class="svc-chip"><input type="checkbox" name="svc[]" value="<?= esc($n) ?>"<?= checked_attr(isset($picked[$n])) ?>><span><?= icon('check') ?><?= esc($n) ?></span></label><?php endforeach; ?>
+        </div>
+        <label class="field sc-svc-other"><span>خدمت دیگر (اختیاری)</span><input name="svc_other" maxlength="190" placeholder="مثلاً لیزر موهای زائد"></label>
+        <div class="sc-svc-actions">
+          <button class="button secondary"><?= icon('check') ?> ذخیره خدمات</button>
+          <a href="doctor-panel.php?doctor=<?= (int) $cl['doctor_id'] ?>&amp;tab=services"><?= icon('edit') ?> مدت و تعرفه هر خدمت</a>
+        </div>
+      </form>
+    <?php elseif ($activeServices): ?>
+      <p class="muted"><?= esc(implode('، ', array_column($activeServices, 'name'))) ?></p>
+    <?php endif; ?>
+  </section>
+
   <section class="sc-card">
     <div class="sc-head">
-      <div><h2>ساعت حضور در <?= esc($cl['name']) ?></h2><p class="muted">روزهایی که در مطب هستید را تیک بزنید و ساعت شروع و پایان را وارد کنید. اگر روزی فاصله نوبت‌ها فرق دارد (مثلاً شنبه‌ها هر ۱۰ دقیقه)، «مدت هر نوبت» همان روز را تغییر دهید. در پایان «ذخیره برنامه» را بزنید.</p></div>
+      <div><h2>ساعت حضور در <?= esc($cl['name']) ?></h2><p class="muted">بازه تاریخ برنامه را (در صورت نیاز) تعیین کنید، روزهایی که در مطب هستید را تیک بزنید و ساعت شروع و پایان را وارد کنید. اگر روزی فاصله نوبت‌ها فرق دارد (مثلاً شنبه‌ها هر ۱۰ دقیقه)، «مدت هر نوبت» همان روز را تغییر دهید. در پایان «ذخیره برنامه» را بزنید.</p></div>
     </div>
     <form method="post" class="sc-week" data-week-form>
       <?php $token('week'); ?>
+      <?php if ($rangeEnded): ?><p class="sc-warn"><?= icon('alert') ?><span>این برنامه در <?= esc(jalali_long($hours[0]['valid_until'])) ?> تمام شده و نوبتی داده نمی‌شود؛ تاریخ پایان را تمدید یا خالی کنید.</span></p><?php endif; ?>
+      <?php if ($rangeLater): ?><p class="notice"><?= icon('calendar') ?> این برنامه از <?= esc(jalali_long($hours[0]['valid_from'])) ?> شروع می‌شود.</p><?php endif; ?>
+      <div class="sc-range">
+        <label class="field"><span>از تاریخ</span><input name="valid_from" value="<?= esc($range['from']) ?>" dir="ltr" inputmode="numeric" maxlength="10" placeholder="از امروز"></label>
+        <label class="field"><span>تا تاریخ</span><input name="valid_until" value="<?= esc($range['until']) ?>" dir="ltr" inputmode="numeric" maxlength="10" placeholder="بدون پایان"></label>
+        <small class="muted">مثلاً ۱۴۰۵/۰۸/۰۱ تا ۱۴۰۵/۰۹/۳۰؛ خالی یعنی از امروز و بدون تاریخ پایان.</small>
+      </div>
       <div class="sc-tools" hidden data-week-tools>
         <button type="button" class="button ghost small" data-copy-week><?= icon('clipboard') ?> همین ساعت‌ها و مدت نوبت برای همه روزهای روشن</button>
       </div>

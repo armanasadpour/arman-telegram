@@ -241,6 +241,10 @@ function doctor_action(int $doctor, string $action, array $data): array
             case 'hours':
                 $details = working_hours_add($doctor, $clinic, $data);
                 break;
+            case 'services_pick':
+                $details = services_pick($doctor, $data);
+                $message = 'خدمات قابل رزرو ذخیره شد.';
+                break;
             case 'week':
                 $week = weekly_hours_input($data);
                 query('UPDATE working_hours SET active=0 WHERE clinic_id=? AND active=1', [$clinic]);
@@ -249,6 +253,10 @@ function doctor_action(int $doctor, string $action, array $data): array
                 }
                 $details = ['clinic_id' => $clinic, 'week' => $week];
                 $message = $week ? 'برنامه هفتگی ذخیره شد.' : 'همه روزها تعطیل ثبت شد؛ تا تعریف ساعت حضور، نوبتی ارائه نمی‌شود.';
+                // Without an active service nobody can book: add «ویزیت عمومی» so the new hours are usable at once.
+                if ($week && default_service_ensure($doctor)) {
+                    $message .= ' خدمت «ویزیت عمومی» هم خودکار اضافه شد تا بیماران بتوانند نوبت بگیرند.';
+                }
                 break;
             case 'hours_remove':
                 $old = query('SELECT * FROM working_hours WHERE id=? AND clinic_id=? AND active=1', [
@@ -369,12 +377,21 @@ function doctor_action(int $doctor, string $action, array $data): array
 }
 /**
  * Weekly editor: day[W][on]=1 and day[W][from][]/[to][] (up to three shifts per day, 24-hour HH:MM),
- * day[W][room] for center rooms, day[W][len] for that day's appointment length (empty = clinic default). Returns rows for working_hours_add(); errors name the day.
+ * day[W][room] for center rooms, day[W][len] for that day's appointment length (empty = clinic default),
+ * valid_from/valid_until (Jalali, optional) for the dates the program holds. Returns rows for working_hours_add(); errors name the day.
  */
 function weekly_hours_input(array $data): array
 {
     $names = [6 => 'شنبه', 0 => 'یکشنبه', 1 => 'دوشنبه', 2 => 'سه‌شنبه', 3 => 'چهارشنبه', 4 => 'پنجشنبه', 5 => 'جمعه'];
     $days = is_array($data['day'] ?? null) ? $data['day'] : [];
+    $validFrom = field($data, 'valid_from', 10, false) === '' ? null : parse_jdate(field($data, 'valid_from', 10));
+    $validUntil = field($data, 'valid_until', 10, false) === '' ? null : parse_jdate(field($data, 'valid_until', 10));
+    if ($validFrom && $validUntil && $validUntil < $validFrom) {
+        throw new AuthError('«تا تاریخ» برنامه نباید قبل از «از تاریخ» باشد.');
+    }
+    if ($validUntil && $validUntil < date('Y-m-d')) {
+        throw new AuthError('تاریخ پایان برنامه گذشته است؛ تاریخ تازه‌تری وارد کنید یا خالی بگذارید.');
+    }
     $rows = [];
     foreach ($names as $w => $label) {
         $d = is_array($days[$w] ?? null) ? $days[$w] : [];
@@ -412,10 +429,67 @@ function weekly_hours_input(array $data): array
             throw new AuthError($label . ': مدت نوبت باید بین ۵ تا ۱۸۰ دقیقه باشد.');
         }
         foreach ($shifts as [$a, $b]) {
-            $rows[] = ['weekday' => $w, 'opens_at' => $a, 'closes_at' => $b, 'room_id' => $room, 'slot_minutes' => $len];
+            $rows[] = ['weekday' => $w, 'opens_at' => $a, 'closes_at' => $b, 'room_id' => $room, 'slot_minutes' => $len, 'valid_from' => $validFrom, 'valid_until' => $validUntil];
         }
     }
     return $rows;
+}
+
+/** Common services offered as one-tap choices on the schedule page and as name suggestions. */
+function service_presets(): array
+{
+    return ['ویزیت عمومی', 'ویزیت تخصصی', 'ویزیت مجدد (پیگیری)', 'مشاوره', 'معاینه و تجویز', 'نوار قلب', 'سونوگرافی', 'تزریق و پانسمان'];
+}
+
+/** Adds (or turns back on) «ویزیت عمومی» when the doctor has no active service; true when it did. */
+function default_service_ensure(int $doctor): bool
+{
+    if (query('SELECT id FROM doctor_services WHERE doctor_id=? AND active=1 LIMIT 1', [$doctor])->fetch()) {
+        return false;
+    }
+    $old = query("SELECT id FROM doctor_services WHERE doctor_id=? AND name='ویزیت عمومی' ORDER BY id LIMIT 1", [$doctor])->fetchColumn();
+    if ($old) {
+        query('UPDATE doctor_services SET active=1 WHERE id=?', [$old]);
+    } else {
+        query("INSERT INTO doctor_services(doctor_id,name,duration_minutes,active) VALUES(?,'ویزیت عمومی',0,1)", [$doctor]);
+    }
+    entitlement_sync($doctor);
+    return true;
+}
+
+/**
+ * Schedule page quick pick: svc[] = names to offer (ticked chips), svc_other = one more typed name.
+ * Ticked existing services are turned on, the rest off; new names are added with the clinic's length.
+ */
+function services_pick(int $doctor, array $data): array
+{
+    $picked = [];
+    foreach (array_merge((array) ($data['svc'] ?? []), [$data['svc_other'] ?? '']) as $n) {
+        $n = is_scalar($n) ? trim(strtr((string) $n, ['ي' => 'ی', 'ك' => 'ک'])) : '';
+        if ($n !== '') {
+            if (mb_strlen($n) > 190) {
+                throw new AuthError('نام خدمت حداکثر ۱۹۰ نویسه است.');
+            }
+            validate_doctor_name($n);
+            $picked[$n] = true;
+        }
+    }
+    if (!$picked) {
+        throw new AuthError('دست‌کم یک خدمت انتخاب کنید؛ بدون خدمت، بیماران نمی‌توانند نوبت بگیرند.');
+    }
+    require_within_limit($doctor, 'services', count($picked) - 1);
+    $have = [];
+    foreach (query('SELECT id,name FROM doctor_services WHERE doctor_id=?', [$doctor])->fetchAll() as $s) {
+        query('UPDATE doctor_services SET active=? WHERE id=?', [isset($picked[$s['name']]) ? 1 : 0, $s['id']]);
+        $have[$s['name']] = true;
+    }
+    foreach (array_keys($picked) as $n) {
+        if (!isset($have[$n])) {
+            query('INSERT INTO doctor_services(doctor_id,name,duration_minutes,active) VALUES(?,?,0,1)', [$doctor, $n]);
+        }
+    }
+    entitlement_sync($doctor);
+    return ['services' => array_keys($picked)];
 }
 
 /** «از تاریخ / تا تاریخ» (and optional hours) → the starts_at/ends_at pair of the closure action. */
