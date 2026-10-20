@@ -66,6 +66,20 @@
 <?php if (!$adminShell && $contact['phone'] && !empty($contact['fab']) && !str_contains((string) ($options['body_class'] ?? ''), 'queue-display')): ?>
 <a class="support-fab" href="tel:<?= esc(preg_replace('/[^0-9+]/', '', $contact['phone'])) ?>" aria-label="تماس با پشتیبانی" title="تماس با پشتیبانی"><?= icon('headset') ?></a>
 <?php endif; ?>
+<?php $pwaApp = $adminShell ? '' : (['doctor-panel.php' => 'doctor', 'center.php' => 'center', 'patient.php' => 'patient', 'panel.php' => 'patient'][basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''))] ?? ''); ?>
+<?php if ($pwaApp): $pwaName = ['doctor' => 'پنل پزشک', 'center' => 'پنل مرکز درمانی', 'patient' => $siteName][$pwaApp]; ?>
+<div class="pwa-banner" data-pwa-banner="<?= $pwaApp ?>" role="dialog" aria-labelledby="pwa-title" hidden>
+  <img src="assets/icons/icon-192.png" alt="" width="48" height="48">
+  <div class="pwa-text">
+    <strong id="pwa-title">نصب برنامه «<?= esc($pwaName) ?>»</strong>
+    <span data-hint="prompt">با یک لمس از صفحه اصلی باز می‌شود و اعلان نوبت‌ها را دریافت می‌کنید.</span>
+    <span data-hint="ios">در Safari دکمه اشتراک‌گذاری <?= icon('share', 'icon pwa-inline') ?> و سپس «<bdi dir="ltr">Add to Home Screen</bdi>» را بزنید.</span>
+    <span data-hint="menu">از منوی <b>⋮</b> مرورگر، «نصب برنامه» یا «افزودن به صفحه اصلی» را بزنید.</span>
+  </div>
+  <button type="button" class="pwa-install" data-pwa-install><?= icon('install') ?> نصب</button>
+  <button type="button" class="pwa-close" data-pwa-close aria-label="بستن"><?= icon('x') ?></button>
+</div>
+<?php endif; ?>
 <p class="net-status" data-net-status hidden aria-live="assertive">اتصال اینترنت قطع است؛ تا برقراری دوباره، اطلاعات تازه نمایش داده نمی‌شود.</p>
 <script src="assets/release.js?v=<?= esc(APP_VERSION) ?>" defer></script>
 <script src="assets/app.js?v=<?= esc(APP_VERSION) ?>" defer></script>

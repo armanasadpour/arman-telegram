@@ -14,6 +14,9 @@ $adminShell = str_contains($bodyClass, 'admin-page');
 // 1.0.0-rc.15: the administration panel installs as its own app (own id, start page, name and icon);
 // with the site manifest the browser saw it as the patient app and opened index.php.
 $adminApp = $adminShell || $page === 'admin.php';
+// 1.0.9: the doctor and center panels install as their own apps too (own id, start page and name).
+$panelManifest = $adminApp ? 'admin.webmanifest' : (['doctor-panel.php' => 'doctor.webmanifest', 'center.php' => 'center.webmanifest'][$page] ?? 'manifest.webmanifest');
+$appTitle = $adminApp ? 'مدیریت ' . $siteName : (['doctor-panel.php' => 'پنل پزشک', 'center.php' => 'پنل مرکز'][$page] ?? $siteName);
 ?><!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -33,8 +36,8 @@ $adminApp = $adminShell || $page === 'admin.php';
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="<?= $adminShell && str_contains($bodyClass, 'admin-dark') ? '#0b0e14' : '#3978F6' ?>">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="<?= $adminApp ? 'مدیریت ' . esc($siteName) : esc($siteName) ?>">
-<link rel="manifest" href="<?= $adminApp ? 'admin.webmanifest' : 'manifest.webmanifest' ?>">
+<meta name="apple-mobile-web-app-title" content="<?= esc($appTitle) ?>">
+<link rel="manifest" href="<?= $panelManifest ?>">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icons/<?= $adminApp ? 'admin-apple-touch-icon.png' : 'apple-touch-icon.png' ?>">
 <link rel="preload" href="assets/fonts/regular.woff2" as="font" type="font/woff2" crossorigin>

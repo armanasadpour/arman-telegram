@@ -2062,7 +2062,7 @@ label.plan-col:hover{border-color:#93c5fd}
 .pro-tick img.doctor-verified-icon{display:block;width:22px;height:22px;min-width:22px;max-width:none;object-fit:contain;border:0;border-radius:0;box-shadow:none;background:transparent}
 h1 .pro-tick img.doctor-verified-icon{width:26px;height:26px;min-width:26px}
 .pro-admin-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px;background:#edf3fc;border-radius:18px;scroll-snap-type:x proximity}.pro-admin-tabs a{white-space:nowrap;border:0!important;scroll-snap-align:center;padding:12px 20px!important;border-radius:12px!important}.pro-admin-tabs a.current{background:#3678f6!important;color:white!important;box-shadow:0 5px 14px #3678f633}.doctor-review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px}.doctor-review-card{border:1px solid #e0eafa!important;border-radius:24px!important;background:linear-gradient(145deg,#f0f7ff,#fff 45%)!important}.doctor-review-heading{display:flex;align-items:center;gap:16px}.doctor-review-heading h2{font-size:18px;margin:0}.doctor-review-heading p{font-size:13px;color:#7585a0}.doctor-review-heading .doctor-avatar{width:72px;height:72px}.review-actions{margin-top:20px;border-top:1px solid #e8eef8;padding-top:16px}.button-row{display:flex;flex-wrap:wrap;gap:8px}.button-row button{flex:1;font-size:12px!important;padding:10px!important;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:12px!important}.review-approve{background:#16875e!important}.sms-tags{display:flex;flex-wrap:wrap;gap:8px}.wallet-toggle{display:flex;align-items:center;gap:12px;background:#f0f6ff;border-radius:16px;padding:16px;margin:14px 0}.wallet-toggle input{appearance:none;width:44px!important;height:24px!important;min-height:24px!important;flex:none;background:#b6c5db;border-radius:20px;position:relative;cursor:pointer}.wallet-toggle input:after{content:'';position:absolute;width:18px;height:18px;top:3px;right:3px;border-radius:50%;background:#fff;transition:right .15s}.wallet-toggle input:checked{background:#3578f6}.wallet-toggle input:checked:after{right:23px}[hidden]{display:none!important}
-.panel-finance-links{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.panel-announcement{position:relative;background:linear-gradient(115deg,#edf5ff,#e5f1ff);border:1px solid #bcd6ff;border-radius:20px;padding:22px 22px 18px 54px;margin:16px 0;color:#25497c}.panel-announcement strong{display:flex;align-items:center;gap:10px}.panel-announcement p{line-height:1.9;margin:12px 0}.panel-announcement .notice-close{position:absolute;top:12px;left:12px;border:0;background:#ffffffaa;color:#4273a6;border-radius:50%;padding:0;width:30px;height:30px;font-size:23px}
+.panel-finance-links{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
 .site-custom-logo.brand-icon{width:120px!important;height:48px!important;padding:0!important;object-fit:contain;background:transparent!important;border-radius:0!important;box-shadow:none!important}.ad-logo .site-custom-logo{width:48px;height:32px;object-fit:contain}.site-custom-logo{max-width:100%}
 /* Uploaded branding replaces the public header wordmark. */
 .drawer-brand .site-custom-logo.brand-icon{width:180px!important;height:72px!important;max-width:100%;display:block}.drawer-brand{min-width:0}.drawer-close{flex-shrink:0}
@@ -2087,15 +2087,15 @@ h1 .pro-tick img.doctor-verified-icon{width:26px;height:26px;min-width:26px}
 @media(max-width:360px){.site-header .brand-logo-only{flex-basis:130px}.site-header .brand-logo-only .site-custom-logo{width:130px!important;height:52px!important}}
 
 /* 1.0.5: floating «تماس با پشتیبانی» button (general settings → support_fab), bottom-left, above the phone bars. */
-.support-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:45;display:grid;place-items:center;width:48px;height:48px;margin:0;border-radius:50%;background:var(--primary);color:#fff;box-shadow:0 8px 20px -6px #1d4ed880;transition:transform .2s var(--ease),background .2s}
+.support-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom) + var(--pwa-h,0px));z-index:45;display:grid;place-items:center;width:48px;height:48px;margin:0;border-radius:50%;background:var(--primary);color:#fff;box-shadow:0 8px 20px -6px #1d4ed880;transition:transform .2s var(--ease),background .2s}
 .support-fab:hover,.support-fab:focus-visible{background:var(--primary-600);color:#fff;transform:scale(1.06)}
 .support-fab:focus-visible{outline:3px solid #3978F64d;outline-offset:3px}
 .support-fab .icon{width:22px;height:22px}
 @media (max-width:720px){
-  body:has(.bottom-nav) .support-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
-  .doctor-page .support-fab,.booking-page .support-fab{bottom:calc(16px + env(safe-area-inset-bottom))}
+  body:has(.bottom-nav) .support-fab{bottom:calc(78px + env(safe-area-inset-bottom) + var(--pwa-h,0px))}
+  .doctor-page .support-fab,.booking-page .support-fab{bottom:calc(16px + env(safe-area-inset-bottom) + var(--pwa-h,0px))}
 }
-@media (max-width:920px){body:has(.book-bar) .support-fab{bottom:calc(84px + env(safe-area-inset-bottom))}}
+@media (max-width:920px){body:has(.book-bar) .support-fab{bottom:calc(84px + env(safe-area-inset-bottom) + var(--pwa-h,0px))}}
 @media print{.support-fab{display:none}}
 
 /* 1.0.5: per-day appointment length in the weekly schedule. */
@@ -2145,3 +2145,38 @@ h1 .pro-tick img.doctor-verified-icon{width:26px;height:26px;min-width:26px}
 .jdp-day:focus-visible,.jdp-nav:focus-visible,.jdp-foot button:focus-visible{outline:3px solid #3978F64d;outline-offset:1px}
 input[data-jdate]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%23718096' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:left 10px center!important;padding-left:36px!important}
 @media print{.jdp{display:none}}
+
+/* 1.0.9: panel announcement card. */
+.panel-announcement{position:relative;display:flex;align-items:flex-start;gap:14px;margin:16px 0;padding:16px 16px 16px 12px;background:#fff;border:1px solid var(--line);border-inline-start:4px solid var(--primary);border-radius:16px;box-shadow:0 6px 18px -12px #1e3a8a40;color:var(--ink)}
+.pa-icon{flex:0 0 40px;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--primary-50);color:var(--primary)}
+.pa-icon .icon{width:20px;height:20px}
+.pa-body{flex:1;min-width:0}
+.pa-kicker{display:block;font-size:12px;font-weight:500;color:var(--primary);letter-spacing:0;margin-bottom:2px}
+.pa-title{display:block;font-size:15.5px;font-weight:700;line-height:1.7;color:var(--ink)}
+.panel-announcement p{margin:4px 0 0;font-size:14px;line-height:1.9;color:var(--ink-2);overflow-wrap:anywhere}
+.pa-link{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:13.5px;font-weight:500}
+.pa-link .icon{width:15px;height:15px}
+.panel-announcement .pa-dismiss{flex:0 0 auto;margin:0;padding:0;background:none;border:0;box-shadow:none;display:block}
+.panel-announcement .pa-close{display:grid;place-items:center;width:32px;height:32px;min-height:0;margin:0;padding:0;border:0;border-radius:10px;background:transparent;color:var(--muted);box-shadow:none}
+.panel-announcement .pa-close:hover{background:var(--bg);color:var(--ink)}
+.panel-announcement .pa-close .icon{width:18px;height:18px}
+
+/* 1.0.9: install banner of the doctor / center / patient panels. */
+.pwa-banner{position:fixed;inset-inline:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:46;display:flex;align-items:center;gap:12px;max-width:460px;margin-inline-start:auto;padding:12px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 40px -16px #0f172a59}
+.pwa-banner[hidden]{display:none}
+.pwa-banner img{flex:0 0 48px;border-radius:12px}
+.pwa-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.7}
+.pwa-text strong{font-size:14.5px;color:var(--ink)}
+.pwa-text span{font-size:12.5px;color:var(--ink-2)}
+.pwa-text [data-hint]{display:none}
+.pwa-banner[data-mode=prompt] [data-hint=prompt],.pwa-banner[data-mode=ios] [data-hint=ios],.pwa-banner[data-mode=menu] [data-hint=menu]{display:block}
+.pwa-inline{width:15px;height:15px;vertical-align:-2px;color:var(--primary)}
+.pwa-text bdi{white-space:nowrap}
+.pwa-banner .pwa-install{display:none;flex:0 0 auto;min-height:38px;margin:0;padding:6px 14px;border-radius:12px;font-size:14px}
+.pwa-banner[data-mode=prompt] .pwa-install{display:inline-flex}
+.pwa-banner .pwa-install .icon{width:16px;height:16px}
+.pwa-banner .pwa-close{flex:0 0 auto;align-self:flex-start;display:grid;place-items:center;width:30px;height:30px;min-height:0;margin:0;padding:0;border:0;border-radius:9px;background:transparent;color:var(--muted);box-shadow:none}
+.pwa-banner .pwa-close:hover{background:var(--bg);color:var(--ink)}
+.pwa-banner .pwa-close .icon{width:17px;height:17px}
+@media (max-width:720px){body:has(.bottom-nav) .pwa-banner{bottom:calc(76px + env(safe-area-inset-bottom))}.doctor-page .pwa-banner,.booking-page .pwa-banner{bottom:calc(12px + env(safe-area-inset-bottom))}}
+@media print{.pwa-banner{display:none}}

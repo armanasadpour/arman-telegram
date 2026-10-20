@@ -888,3 +888,101 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
     }, 180);
   }, {passive:true});
 });
+
+/*
+ * 1.0.9 panels (doctor, center, patient): own install banner with a close button, and the notification
+ * permission asked on the first tap. Android/desktop Chrome get the browser's install prompt; iPhone gets
+ * the Safari «Add to Home Screen» hint; other Android browsers the menu hint. Closing hides it for 14 days.
+ */
+(() => {
+  const banner = document.querySelector('[data-pwa-banner]');
+  if (!banner) return;
+  const store = {
+    get: (k) => {
+      try {
+        return localStorage.getItem(k);
+      } catch (e) {
+        return null;
+      }
+    },
+    set: (k, v) => {
+      try {
+        localStorage.setItem(k, v);
+      } catch (e) {}
+    },
+  };
+  const within = (k, days) => Date.now() - (+store.get(k) || 0) < days * 864e5;
+  const root = document.documentElement;
+  const ua = navigator.userAgent;
+  const ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const android = /android/i.test(ua);
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const dismissKey = 'pwa-dismissed-' + banner.dataset.pwaBanner;
+  const show = (mode) => {
+    banner.dataset.mode = mode;
+    banner.hidden = false;
+    root.style.setProperty('--pwa-h', banner.offsetHeight + 12 + 'px');
+  };
+  const hide = () => {
+    banner.hidden = true;
+    root.style.removeProperty('--pwa-h');
+  };
+
+  if (!standalone && !within(dismissKey, 14)) {
+    let deferred = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferred = e;
+      show('prompt');
+    });
+    if (ios) setTimeout(() => show('ios'), 1200);
+    else if (android) setTimeout(() => deferred || show('menu'), 4000);
+    banner.querySelector('[data-pwa-install]').addEventListener('click', () => {
+      if (!deferred) return;
+      deferred.prompt();
+      deferred.userChoice
+        .then((c) => c.outcome === 'accepted' && hide())
+        .finally(() => (deferred = null));
+    });
+    banner.querySelector('[data-pwa-close]').addEventListener('click', () => {
+      store.set(dismissKey, String(Date.now()));
+      hide();
+    });
+    window.addEventListener('appinstalled', hide);
+  }
+
+  // Notifications: asked on the first plain tap (a user gesture, which iOS and Chrome require), at most
+  // every 3 days while undecided. Taps on links and submit buttons are left alone so they never get lost.
+  const pushable = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  if (!pushable || Notification.permission !== 'default' || within('push-asked', 3)) return;
+  const keyBytes = (b64) => Uint8Array.from(atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0));
+  const subscribe = () =>
+    fetch('api.php?route=push/key', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((key) => {
+        if (!key.data || !key.data.available) return null;
+        return navigator.serviceWorker.ready
+          .then((reg) => reg.pushManager.getSubscription().then((s) => s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key.data.key) })))
+          .then((sub) =>
+            fetch('api.php?route=session', { credentials: 'same-origin' })
+              .then((r) => r.json())
+              .then((s) =>
+                fetch('api.php?route=push/subscribe', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': s.data.csrf },
+                  body: JSON.stringify(Object.assign(sub.toJSON(), { consent: true })),
+                }),
+              ),
+          );
+      });
+  const ask = (e) => {
+    if (e.target.closest('a[href], button[type=submit], form button:not([type]), [data-pwa-banner]')) return;
+    document.removeEventListener('click', ask, true);
+    store.set('push-asked', String(Date.now()));
+    Notification.requestPermission()
+      .then((p) => p === 'granted' && subscribe())
+      .catch(() => {});
+  };
+  document.addEventListener('click', ask, true);
+})();
