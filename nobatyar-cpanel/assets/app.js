@@ -977,12 +977,68 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
           );
       });
   const ask = (e) => {
-    if (e.target.closest('a[href], button[type=submit], form button:not([type]), [data-pwa-banner]')) return;
+    // The location request (patients without a city) goes first; notifications wait for a later tap.
+    if (e.permissionTaken || window.geoAskPending || e.target.closest('a[href], button[type=submit], form button:not([type]), [data-pwa-banner]')) return;
+    e.permissionTaken = true;
     document.removeEventListener('click', ask, true);
     store.set('push-asked', String(Date.now()));
     Notification.requestPermission()
       .then((p) => p === 'granted' && subscribe())
       .catch(() => {});
   };
+  document.addEventListener('click', ask, true);
+})();
+
+/*
+ * 1.0.10 patients: with no city chosen yet, the first plain tap asks for the location and picks the nearest
+ * province and city (geo/locate). Asked at most once a week while undecided; a refusal changes nothing.
+ * Only one permission is asked per tap, so it never stacks with the notification request.
+ */
+(() => {
+  if (!document.querySelector('[data-geo-auto]') || !('geolocation' in navigator) || !window.isSecureContext) return;
+  let last = 0;
+  try {
+    last = +localStorage.getItem('geo-asked') || 0;
+  } catch (e) {}
+  if (Date.now() - last < 7 * 864e5) return;
+  const say = (text) => {
+    const t = document.createElement('p');
+    t.className = 'toast show';
+    t.setAttribute('role', 'status');
+    t.textContent = text;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4500);
+  };
+  const ask = (e) => {
+    if (e.permissionTaken || e.target.closest('a[href], button[type=submit], form button:not([type]), [data-pwa-banner]')) return;
+    e.permissionTaken = true;
+    window.geoAskPending = false;
+    document.removeEventListener('click', ask, true);
+    try {
+      localStorage.setItem('geo-asked', String(Date.now()));
+    } catch (err) {}
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        fetch('api.php?route=session', { credentials: 'same-origin' })
+          .then((r) => r.json())
+          .then((s) =>
+            fetch('api.php?route=geo/locate', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': s.data.csrf },
+              body: JSON.stringify({ lat: +pos.coords.latitude.toFixed(4), lng: +pos.coords.longitude.toFixed(4) }),
+            }),
+          )
+          .then((r) => r.json().then((j) => (r.ok ? j.data : Promise.reject(j))))
+          .then((c) => {
+            document.querySelectorAll('.city-chip span').forEach((n) => (n.textContent = c.name));
+            say('شهر شما: ' + c.name + '، استان ' + c.province + ' — از «انتخاب شهر» قابل تغییر است.');
+          })
+          .catch(() => {}),
+      () => {},
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 },
+    );
+  };
+  window.geoAskPending = true;
   document.addEventListener('click', ask, true);
 })();

@@ -80,6 +80,7 @@
   <button type="button" class="pwa-close" data-pwa-close aria-label="بستن"><?= icon('x') ?></button>
 </div>
 <?php endif; ?>
+<?php if (!$adminShell && !in_array(basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')), ['doctor-panel.php', 'center.php', 'secretary.php', 'secretary-receipt.php', 'queue.php', 'city.php'], true) && schema_is_current_safe() && !current_city()): ?><span data-geo-auto hidden></span><?php endif; ?>
 <p class="net-status" data-net-status hidden aria-live="assertive">اتصال اینترنت قطع است؛ تا برقراری دوباره، اطلاعات تازه نمایش داده نمی‌شود.</p>
 <script src="assets/release.js?v=<?= esc(APP_VERSION) ?>" defer></script>
 <script src="assets/app.js?v=<?= esc(APP_VERSION) ?>" defer></script>

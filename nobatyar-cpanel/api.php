@@ -35,6 +35,7 @@ try {
         'search/map' => 'GET',
         'geo/nearby' => 'GET',
         'geo/select' => 'POST',
+        'geo/locate' => 'POST',
         'specialties' => 'GET',
         'profile' => 'POST',
         'bookings' => 'GET',
@@ -287,6 +288,17 @@ try {
                 ],
                 cities_nearby(positive_id($_GET['city'] ?? 0)),
             );
+            break;
+        case 'geo/locate':
+            // Browser position → nearest active city, remembered like a manual choice. Coordinates are not stored.
+            $lat = is_numeric($data['lat'] ?? null) ? (float) $data['lat'] : 0.0;
+            $lng = is_numeric($data['lng'] ?? null) ? (float) $data['lng'] : 0.0;
+            $near = city_from_position($lat, $lng);
+            if (!$near) {
+                throw new AuthError('شهر شما در فهرست شهرهای فعال پیدا نشد؛ آن را دستی انتخاب کنید.', 404);
+            }
+            $c = set_visitor_city((int) $near['id']);
+            $out = ['id' => (int) $c['id'], 'name' => $c['name'], 'province_id' => (int) $c['province_id'], 'province' => $near['province_name']];
             break;
         case 'geo/select':
             $c = set_visitor_city(positive_id($data['city_id'] ?? 0));

@@ -100,6 +100,33 @@ function distance_km(float $lat1, float $lng1, float $lat2, float $lng2): float
     return round($r * 2 * atan2(sqrt($a), sqrt(1 - $a)), 1);
 }
 
+/**
+ * Nearest active city to a position from the browser (within 120 km, inside Iran's bounding box); null when
+ * none is close enough, so a visitor abroad or with a bad fix is simply left to choose by hand.
+ */
+function city_from_position(float $lat, float $lng): ?array
+{
+    if ($lat < 24 || $lat > 40.5 || $lng < 43.5 || $lng > 63.5) {
+        return null;
+    }
+    $dLat = 120 / 111.0;
+    $dLng = 120 / max(1.0, 111.0 * cos(deg2rad($lat)));
+    $best = null;
+    foreach (
+        query(
+            'SELECT c.id,c.name,c.province_id,p.name province_name,c.latitude,c.longitude FROM cities c JOIN provinces p ON p.id=c.province_id WHERE c.active=1 AND p.active=1 AND c.latitude BETWEEN ? AND ? AND c.longitude BETWEEN ? AND ?',
+            [$lat - $dLat, $lat + $dLat, $lng - $dLng, $lng + $dLng],
+        )->fetchAll()
+        as $c
+    ) {
+        $c['distance_km'] = distance_km($lat, $lng, (float) $c['latitude'], (float) $c['longitude']);
+        if ($c['distance_km'] <= 120 && (!$best || $c['distance_km'] < $best['distance_km'])) {
+            $best = $c;
+        }
+    }
+    return $best;
+}
+
 /** Remembers the visitor's city for 180 days and on the account when logged in. */
 function set_visitor_city(int $cityId): array
 {
