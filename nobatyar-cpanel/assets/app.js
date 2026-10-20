@@ -750,10 +750,7 @@
     const on = days.filter((d) => d.querySelector('[data-day-on]').checked);
     if (!on.length) return;
     const src = [...on[0].querySelectorAll('[data-shift]')].map((s) => (s.hidden ? null : [...s.querySelectorAll('select')].map((i) => i.value)));
-    const srcLen = on[0].querySelector('[data-day-len]')?.value ?? '';
     on.slice(1).forEach((day) => {
-      const len = day.querySelector('[data-day-len]');
-      if (len) len.value = srcLen;
       [...day.querySelectorAll('[data-shift]')].forEach((s, i) => {
         const v = src[i];
         const inputs = s.querySelectorAll('select');
@@ -761,6 +758,16 @@
         inputs[0].value = v ? v[0] : '';
         inputs[1].value = v ? v[1] : '';
       });
+      refresh(day);
+    });
+  });
+  box.querySelector('[data-copy-len]')?.addEventListener('click', () => {
+    const on = days.filter((d) => d.querySelector('[data-day-on]').checked);
+    if (!on.length) return;
+    const src = on[0].querySelector('[data-day-len]')?.value ?? '';
+    on.slice(1).forEach((day) => {
+      const len = day.querySelector('[data-day-len]');
+      if (len) len.value = src;
       refresh(day);
     });
   });

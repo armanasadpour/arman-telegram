@@ -130,7 +130,8 @@ $token = function (string $action) use ($clinic) {
         <small class="muted">مثلاً ۱۴۰۵/۰۸/۰۱ تا ۱۴۰۵/۰۹/۳۰؛ خالی یعنی از امروز و بدون تاریخ پایان.</small>
       </div>
       <div class="sc-tools" hidden data-week-tools>
-        <button type="button" class="button ghost small" data-copy-week><?= icon('clipboard') ?> همین ساعت‌ها و مدت نوبت برای همه روزهای روشن</button>
+        <button type="button" class="button ghost small" data-copy-week><?= icon('clock') ?> همین ساعت‌ها برای همه روزهای روشن</button>
+        <button type="button" class="button ghost small" data-copy-len><?= icon('timer') ?> همین مدت نوبت برای همه روزهای روشن</button>
       </div>
       <?php foreach ($names as $w => $label): $day = $week[$w]; $shifts = $day['shifts'] ?: [['09:00', '13:00']]; ?>
         <div class="sc-day<?= $day['on'] ? ' on' : '' ?>" data-day>
