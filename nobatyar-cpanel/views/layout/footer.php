@@ -63,6 +63,9 @@
 </nav>
 <?php endif; ?>
 <?php if ($shell): ?><?php render('layout/drawer', $shell); ?><?php if ($shell['auth']): ?><?php render('auth/sheet', $shell['auth']); ?><?php endif; ?><?php endif; ?>
+<?php if (!$adminShell && $contact['phone'] && !empty($contact['fab']) && !str_contains((string) ($options['body_class'] ?? ''), 'queue-display')): ?>
+<a class="support-fab" href="tel:<?= esc(preg_replace('/[^0-9+]/', '', $contact['phone'])) ?>" aria-label="تماس با پشتیبانی" title="تماس با پشتیبانی"><?= icon('headset') ?></a>
+<?php endif; ?>
 <p class="net-status" data-net-status hidden aria-live="assertive">اتصال اینترنت قطع است؛ تا برقراری دوباره، اطلاعات تازه نمایش داده نمی‌شود.</p>
 <script src="assets/release.js?v=<?= esc(APP_VERSION) ?>" defer></script>
 <script src="assets/app.js?v=<?= esc(APP_VERSION) ?>" defer></script>

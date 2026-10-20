@@ -313,7 +313,6 @@ function availability(int $clinic, int $service, string $day, int $excludeBookin
     if ($dayCount >= (int) $c['daily_capacity']) {
         return [];
     }
-    $duration = (int) $svc['duration_minutes'] ?: (int) $c['default_duration'];
     $gap = (int) $c['gap_minutes'];
     $weekday = (int) date('w', strtotime($day));
     $out = [];
@@ -324,6 +323,8 @@ function availability(int $clinic, int $service, string $day, int $excludeBookin
         ])->fetchAll()
         as $r
     ) {
+        // A day-specific length replaces the clinic default; a service with its own length keeps it.
+        $duration = (int) $svc['duration_minutes'] ?: ((int) ($r['slot_minutes'] ?? 0) ?: (int) $c['default_duration']);
         $end = strtotime($day . ' ' . $r['closes_at']);
         for (
             $at = strtotime($day . ' ' . $r['opens_at']);

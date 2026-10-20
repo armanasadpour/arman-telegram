@@ -369,7 +369,7 @@ function doctor_action(int $doctor, string $action, array $data): array
 }
 /**
  * Weekly editor: day[W][on]=1 and day[W][from][]/[to][] (up to three shifts per day, 24-hour HH:MM),
- * day[W][room] for center rooms. Returns rows for working_hours_add(); errors name the day.
+ * day[W][room] for center rooms, day[W][len] for that day's appointment length (empty = clinic default). Returns rows for working_hours_add(); errors name the day.
  */
 function weekly_hours_input(array $data): array
 {
@@ -407,8 +407,12 @@ function weekly_hours_input(array $data): array
             throw new AuthError($label . ' انتخاب شده ولی ساعت حضور ندارد؛ ساعت را وارد کنید یا تیک روز را بردارید.');
         }
         $room = empty($d['room']) ? '' : (string) (int) $d['room'];
+        $len = is_scalar($d['len'] ?? '') ? digits(trim((string) ($d['len'] ?? ''))) : 'x';
+        if ($len !== '' && (!ctype_digit($len) || (int) $len < 5 || (int) $len > 180)) {
+            throw new AuthError($label . ': مدت نوبت باید بین ۵ تا ۱۸۰ دقیقه باشد.');
+        }
         foreach ($shifts as [$a, $b]) {
-            $rows[] = ['weekday' => $w, 'opens_at' => $a, 'closes_at' => $b, 'room_id' => $room];
+            $rows[] = ['weekday' => $w, 'opens_at' => $a, 'closes_at' => $b, 'room_id' => $room, 'slot_minutes' => $len];
         }
     }
     return $rows;

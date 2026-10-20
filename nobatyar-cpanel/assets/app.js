@@ -685,6 +685,7 @@
   if (!box) return;
   const fa = (n) => String(n).replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d]);
   const step = +box.dataset.step || 15;
+  const gap = +box.dataset.gap || 0;
   const seats = +box.dataset.seats || 1;
   const daily = +box.dataset.daily || 999;
   const mins = (t) => (/^\d\d:\d\d$/.test(t) ? +t.slice(0, 2) * 60 + +t.slice(3) : null);
@@ -698,11 +699,13 @@
     const hidden = shifts.filter((s) => s.hidden);
     const add = day.querySelector('[data-shift-add]');
     if (add) add.hidden = !on || hidden.length === 0;
+    const len = +(day.querySelector('[data-day-len]')?.value || 0);
+    const dayStep = len ? Math.max(5, len + gap) : step;
     let n = 0;
     shifts.forEach((s) => {
       if (s.hidden) return;
       const [a, b] = [...s.querySelectorAll('select')].map((i) => mins(i.value));
-      if (a !== null && b !== null && b > a) n += Math.floor((b - a) / step);
+      if (a !== null && b !== null && b > a) n += Math.floor((b - a) / dayStep);
     });
     const out = day.querySelector('[data-count]');
     if (out) out.textContent = on ? '≈ ' + fa(Math.min(n * seats, daily)) + ' نوبت' : '';
@@ -747,7 +750,10 @@
     const on = days.filter((d) => d.querySelector('[data-day-on]').checked);
     if (!on.length) return;
     const src = [...on[0].querySelectorAll('[data-shift]')].map((s) => (s.hidden ? null : [...s.querySelectorAll('select')].map((i) => i.value)));
+    const srcLen = on[0].querySelector('[data-day-len]')?.value ?? '';
     on.slice(1).forEach((day) => {
+      const len = day.querySelector('[data-day-len]');
+      if (len) len.value = srcLen;
       [...day.querySelectorAll('[data-shift]')].forEach((s, i) => {
         const v = src[i];
         const inputs = s.querySelectorAll('select');

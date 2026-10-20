@@ -333,7 +333,7 @@ function admin_view_data(string $tab, string $error): array
         case 'general':
             return $data + [
                 'values' => array_combine(
-                    $keys = ['site_name', 'support_phone', 'support_email', 'support_hours', 'footer_text', 'ticket_max_open'],
+                    $keys = ['site_name', 'support_phone', 'support_email', 'support_hours', 'footer_text', 'ticket_max_open', 'support_fab'],
                     array_map(fn($k) => $error && isset($_POST[$k]) ? (string) $_POST[$k] : setting($k), $keys),
                 ),
             ];

@@ -1,3 +1,8 @@
+# 1.0.5 — مهاجرت ۲۷ (افزایشی، تکرارپذیر)
+
+- `working_hours.slot_minutes` (مدت نوبت همان روز؛ خالی = `clinics.default_duration`).
+- تنظیم `support_fab` (دکمه شناور تماس با پشتیبانی؛ پیش‌فرض ۱).
+
 # 1.0.0-rc.21 — مهاجرت ۲۴ (افزایشی، تکرارپذیر)
 
 - `users.deleted_at` و `users.suspended_reason` (علت تعلیق که هنگام ورود نمایش داده می‌شود)، `doctors.deleted_at`.

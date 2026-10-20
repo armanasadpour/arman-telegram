@@ -10,6 +10,7 @@
       <?php input('تلفن پشتیبانی', 'support_phone', $values['support_phone'], 'tel', false, 20); ?>
       <?php input('ایمیل پشتیبانی', 'support_email', $values['support_email'], 'email', false, 190); ?>
     </div>
+    <label class="check"><input type="checkbox" name="support_fab" value="1"<?= checked_attr($values['support_fab'] === '1') ?>>دکمه شناور «تماس با پشتیبانی» در گوشه پایین سمت چپ سایت<small>با لمس آن، تلفن پشتیبانی بالا شماره‌گیری می‌شود؛ بدون شماره پشتیبانی نمایش داده نمی‌شود.</small></label>
     <?php input('ساعات پاسخ‌گویی (مثلاً شنبه تا چهارشنبه ۹ تا ۱۷)', 'support_hours', $values['support_hours'], 'text', false, 120); ?>
     <label>متن پانویس (اختیاری)<textarea name="footer_text" maxlength="300"><?= esc($values['footer_text']) ?></textarea></label>
     <?php input('سقف تیکت باز هر کاربر', 'ticket_max_open', $values['ticket_max_open'] ?: '3', 'number', true, 2); ?>

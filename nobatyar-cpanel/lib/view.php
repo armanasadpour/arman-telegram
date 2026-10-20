@@ -73,7 +73,7 @@ function layout_end(): void
     render('layout/footer', [
         'options' => $GLOBALS['__layout'] ?? [],
         'siteName' => schema_is_current_safe() ? site_name() : 'نوبت‌یار',
-        'contact' => schema_is_current_safe() ? site_contact() : ['phone' => '', 'email' => '', 'hours' => '', 'footer' => ''],
+        'contact' => schema_is_current_safe() ? site_contact() : ['phone' => '', 'email' => '', 'hours' => '', 'footer' => '', 'fab' => false],
         'bottomNav' => bottom_nav((string) (($GLOBALS['__layout'] ?? [])['body_class'] ?? '')),
         'shell' => shell_data((string) (($GLOBALS['__layout'] ?? [])['body_class'] ?? '')),
         'footer' => schema_is_current_safe()

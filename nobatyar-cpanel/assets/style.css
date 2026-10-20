@@ -2084,3 +2084,19 @@ h1 .pro-tick img.doctor-verified-icon{width:26px;height:26px;min-width:26px}
 .site-header .brand-logo-only .site-custom-logo{display:block;width:190px!important;height:76px!important;max-width:100%;object-position:center}
 @media(max-width:920px){.site-header .brand-logo-only{flex-basis:160px}.site-header .brand-logo-only .site-custom-logo{width:160px!important;height:64px!important}}
 @media(max-width:360px){.site-header .brand-logo-only{flex-basis:130px}.site-header .brand-logo-only .site-custom-logo{width:130px!important;height:52px!important}}
+
+/* 1.0.5: floating «تماس با پشتیبانی» button (general settings → support_fab), bottom-left, above the phone bars. */
+.support-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:45;display:grid;place-items:center;width:48px;height:48px;margin:0;border-radius:50%;background:var(--primary);color:#fff;box-shadow:0 8px 20px -6px #1d4ed880;transition:transform .2s var(--ease),background .2s}
+.support-fab:hover,.support-fab:focus-visible{background:var(--primary-600);color:#fff;transform:scale(1.06)}
+.support-fab:focus-visible{outline:3px solid #3978F64d;outline-offset:3px}
+.support-fab .icon{width:22px;height:22px}
+@media (max-width:720px){
+  body:has(.bottom-nav) .support-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
+  .doctor-page .support-fab,.booking-page .support-fab{bottom:calc(16px + env(safe-area-inset-bottom))}
+}
+@media (max-width:920px){body:has(.book-bar) .support-fab{bottom:calc(84px + env(safe-area-inset-bottom))}}
+@media print{.support-fab{display:none}}
+
+/* 1.0.5: per-day appointment length in the weekly schedule. */
+.sc-len{display:flex;align-items:center;gap:8px;margin:2px 0 0!important;font-size:13px;color:var(--ink-2)}
+.sc-len select{margin:0;min-height:38px!important;padding:4px 10px;font-size:14px;max-width:220px}

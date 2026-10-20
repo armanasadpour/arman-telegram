@@ -1,6 +1,7 @@
 <?php
 /**
  * Simple weekly schedule of one clinic: tick the days, enter from/to (up to three shifts), save once.
+ * Each day may use its own appointment length (e.g. every 10 minutes on Saturdays); empty means the clinic default.
  * Booking settings in plain words, and leave/closures by date only.
  * @var array $d @var array $cl @var int $clinic @var array $hours @var array $blocks @var array $rooms
  */
@@ -8,7 +9,7 @@ $names = [6 => 'شنبه', 0 => 'یکشنبه', 1 => 'دوشنبه', 2 => 'سه�
 $posted = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'week' ? ($_POST['day'] ?? []) : null;
 $week = [];
 foreach ($names as $w => $_) {
-    $week[$w] = ['on' => false, 'shifts' => [], 'room' => ''];
+    $week[$w] = ['on' => false, 'shifts' => [], 'room' => '', 'len' => ''];
 }
 if (is_array($posted)) {
     foreach ($names as $w => $_) {
@@ -20,6 +21,7 @@ if (is_array($posted)) {
             }
         }
         $week[$w]['room'] = (string) ($p['room'] ?? '');
+        $week[$w]['len'] = is_scalar($p['len'] ?? '') ? (string) ($p['len'] ?? '') : '';
     }
 } else {
     foreach ($hours as $h) {
@@ -27,6 +29,7 @@ if (is_array($posted)) {
         $week[$w]['on'] = true;
         $week[$w]['shifts'][] = [substr($h['opens_at'], 0, 5), substr($h['closes_at'], 0, 5)];
         $week[$w]['room'] = (string) ($h['room_id'] ?? '');
+        $week[$w]['len'] = (string) ($h['slot_minutes'] ?? '');
     }
 }
 $durations = [10, 15, 20, 25, 30, 40, 45, 60, 90, 120];
@@ -35,7 +38,15 @@ if (!in_array((int) $cl['default_duration'], $durations, true)) {
     sort($durations);
 }
 $step = max(5, (int) $cl['default_duration'] + (int) $cl['gap_minutes']);
-$count = function (array $shifts) use ($step, $cl): int {
+$lengths = $durations;
+foreach ($week as $day) {
+    if ($day['len'] !== '' && !in_array((int) $day['len'], $lengths, true)) {
+        $lengths[] = (int) $day['len'];
+    }
+}
+sort($lengths);
+$count = function (array $shifts, string $len = '') use ($step, $cl): int {
+    $step = $len !== '' ? max(5, (int) $len + (int) $cl['gap_minutes']) : $step;
     $n = 0;
     foreach ($shifts as [$a, $b]) {
         if (preg_match('/^\d\d:\d\d$/', $a) && preg_match('/^\d\d:\d\d$/', $b) && $a < $b) {
@@ -66,15 +77,15 @@ $token = function (string $action) use ($clinic) {
     echo '<input type="hidden" name="clinic_id" value="' . (int) $clinic . '">';
 };
 ?>
-<div class="sched" data-schedule data-step="<?= $step ?>" data-seats="<?= max(1, (int) $cl['slot_capacity']) ?>" data-daily="<?= (int) $cl['daily_capacity'] ?>">
+<div class="sched" data-schedule data-step="<?= $step ?>" data-gap="<?= (int) $cl['gap_minutes'] ?>" data-seats="<?= max(1, (int) $cl['slot_capacity']) ?>" data-daily="<?= (int) $cl['daily_capacity'] ?>">
   <section class="sc-card">
     <div class="sc-head">
-      <div><h2>ساعت حضور در <?= esc($cl['name']) ?></h2><p class="muted">روزهایی که در مطب هستید را تیک بزنید و ساعت شروع و پایان را وارد کنید. در پایان «ذخیره برنامه» را بزنید.</p></div>
+      <div><h2>ساعت حضور در <?= esc($cl['name']) ?></h2><p class="muted">روزهایی که در مطب هستید را تیک بزنید و ساعت شروع و پایان را وارد کنید. اگر روزی فاصله نوبت‌ها فرق دارد (مثلاً شنبه‌ها هر ۱۰ دقیقه)، «مدت هر نوبت» همان روز را تغییر دهید. در پایان «ذخیره برنامه» را بزنید.</p></div>
     </div>
     <form method="post" class="sc-week" data-week-form>
       <?php $token('week'); ?>
       <div class="sc-tools" hidden data-week-tools>
-        <button type="button" class="button ghost small" data-copy-week><?= icon('clipboard') ?> همین ساعت‌ها برای همه روزهای روشن</button>
+        <button type="button" class="button ghost small" data-copy-week><?= icon('clipboard') ?> همین ساعت‌ها و مدت نوبت برای همه روزهای روشن</button>
       </div>
       <?php foreach ($names as $w => $label): $day = $week[$w]; $shifts = $day['shifts'] ?: [['09:00', '13:00']]; ?>
         <div class="sc-day<?= $day['on'] ? ' on' : '' ?>" data-day>
@@ -94,12 +105,18 @@ $token = function (string $action) use ($clinic) {
               </div>
             <?php endfor; ?>
             <button type="button" class="link-button sc-add" data-shift-add hidden><?= icon('plus') ?> افزودن بازه دیگر (مثلاً عصر)</button>
+            <label class="sc-len">مدت هر نوبت
+              <select name="day[<?= $w ?>][len]" data-day-len>
+                <option value="">مثل تنظیم مطب (<?= fa_number((int) $cl['default_duration']) ?> دقیقه)</option>
+                <?php foreach ($lengths as $m): ?><option value="<?= $m ?>"<?= selected_attr($day['len'] === (string) $m) ?>><?= fa_number($m) ?> دقیقه</option><?php endforeach; ?>
+              </select>
+            </label>
             <?php if ($rooms): ?>
               <label class="sc-room">اتاق مرکز<select name="day[<?= $w ?>][room]"><option value="">بدون اتاق مشخص</option><?php foreach ($rooms as $r): ?><option value="<?= (int) $r['id'] ?>"<?= selected_attr($day['room'] === (string) $r['id']) ?>><?= esc($r['name']) ?></option><?php endforeach; ?></select></label>
             <?php endif; ?>
           </div>
           <span class="sc-off">تعطیل</span>
-          <small class="sc-count" data-count><?= $day['on'] ? '≈ ' . fa_number($count($day['shifts'])) . ' نوبت' : '' ?></small>
+          <small class="sc-count" data-count><?= $day['on'] ? '≈ ' . fa_number($count($day['shifts'], $day['len'])) . ' نوبت' : '' ?></small>
         </div>
       <?php endforeach; ?>
       <div class="sc-save">
@@ -110,7 +127,7 @@ $token = function (string $action) use ($clinic) {
   </section>
 
   <section class="sc-card">
-    <div class="sc-head"><div><h2>نوبت‌دهی</h2><p class="muted">مدت هر نوبت و تعداد بیماران.</p></div></div>
+    <div class="sc-head"><div><h2>نوبت‌دهی</h2><p class="muted">مدت پیش‌فرض هر نوبت و تعداد بیماران؛ برای روزهایی که در برنامه هفتگی مدت جداگانه دارند، همان مدت به کار می‌رود.</p></div></div>
     <form method="post" class="sc-settings">
       <?php $token('clinic_settings'); ?>
       <div class="sc-grid">

@@ -1055,8 +1055,9 @@ function working_hours_add(int $doctor, int $clinic, array $data): array
             throw new AuthError('این اتاق در همین ساعت به ' . $clash . ' اختصاص دارد؛ اتاق یا ساعت دیگری انتخاب کنید.', 409);
         }
     }
-    query('INSERT INTO working_hours(clinic_id,weekday,opens_at,closes_at,room_id) VALUES(?,?,?,?,?)', [$clinic, $day, $start, $end, $room]);
-    return ['clinic_id' => $clinic, 'weekday' => $day, 'start' => $start, 'end' => $end, 'room_id' => $room, 'hours_id' => (int) db()->lastInsertId()];
+    $len = empty($data['slot_minutes']) ? null : number_range($data, 'slot_minutes', 5, 180);
+    query('INSERT INTO working_hours(clinic_id,weekday,opens_at,closes_at,room_id,slot_minutes) VALUES(?,?,?,?,?,?)', [$clinic, $day, $start, $end, $room, $len]);
+    return ['clinic_id' => $clinic, 'weekday' => $day, 'start' => $start, 'end' => $end, 'room_id' => $room, 'slot_minutes' => $len, 'hours_id' => (int) db()->lastInsertId()];
 }
 
 function center_hours_add(int $center, int $clinic, array $data): void

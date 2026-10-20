@@ -26,9 +26,10 @@ function site_contact(): array
             'email' => setting('support_email'),
             'hours' => setting('support_hours'),
             'footer' => setting('footer_text'),
+            'fab' => setting('support_fab', '1') === '1',
         ];
     } catch (Throwable $e) {
-        return ['phone' => '', 'email' => '', 'hours' => '', 'footer' => ''];
+        return ['phone' => '', 'email' => '', 'hours' => '', 'footer' => '', 'fab' => false];
     }
 }
 
@@ -73,6 +74,7 @@ function general_settings_save(array $d,array $files=[]): void
         'support_hours' => field($d, 'support_hours', 120, false),
         'footer_text' => field($d, 'footer_text', 300, false),
         'ticket_max_open' => (string) number_range($d, 'ticket_max_open', 1, 20),
+        'support_fab' => empty($d['support_fab']) ? '0' : '1',
     ]);
     audit('settings.general');
 }
