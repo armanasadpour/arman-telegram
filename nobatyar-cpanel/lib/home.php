@@ -249,7 +249,8 @@ function home_all_doctors(?array $city, int $offset, int $limit): array
 }
 
 /**
- * Homepage specialty categories: every active specialty (general, specialty, allied), most doctors in the city
+ * Homepage specialty categories: every active specialty (general, specialty, allied) — the grid shows those with
+ * doctors, «همه تخصص‌ها» opens the full list — most doctors in the city
  * (or country) first, then the administrator's order. A specialty is hidden by deactivating it. When the city has
  * no doctors at all, country-wide counts decide the order.
  */

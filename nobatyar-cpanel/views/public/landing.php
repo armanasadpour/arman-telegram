@@ -138,26 +138,22 @@ if ($homeWork): ?>
   </section>
 <?php break; case 'specialties': if (!$specialtyCards) break; ?>
   <section class="home-sec" aria-labelledby="h-specialties">
-    <?php $head('specialties', 'specialties.php', 'همه تخصص‌ها'); ?>
+    <?php $head('specialties'); ?>
     <?php
     $specCard = function (array $s): void { ?>
         <a class="spec-card" href="<?= esc(specialty_url((int) $s['id'], $s['name'])) ?>">
           <?= specialty_visual($s, 'spec-icon') ?><strong><?= esc(specialty_display_title($s['name'], $s['level'] ?? null)) ?></strong>
         </a>
     <?php };
-    $more = count($specialtyCards) > 10; ?>
-    <div class="spec-grid five">
-      <?php foreach (array_slice($specialtyCards, 0, $more ? 9 : 10) as $s) $specCard($s); ?>
-      <?php if ($more): ?>
-        <button type="button" class="spec-card spec-more" data-spec-more aria-haspopup="dialog" aria-controls="spec-sheet"><span class="spec-icon"><?= icon('grip') ?></span><strong>بیشتر</strong></button>
-      <?php endif; ?>
+    $withDoctors = array_filter($specialtyCards, fn($s) => (int) $s['doctors'] > 0); ?>
+    <div class="spec-grid cols">
+      <?php foreach ($withDoctors as $s) $specCard($s); ?>
+      <button type="button" class="spec-card spec-more" data-spec-toggle aria-expanded="false" aria-controls="spec-all"><span class="spec-icon"><?= icon('grip') ?></span><strong>همه تخصص‌ها</strong><span class="spec-chev"><?= icon('chevron-down') ?></span></button>
     </div>
-    <?php if ($more): ?>
-      <dialog class="spec-sheet" id="spec-sheet" aria-labelledby="spec-sheet-title" data-spec-sheet>
-        <div class="spec-sheet-head"><span class="sheet-grip" aria-hidden="true"></span><h2 id="spec-sheet-title">همه تخصص‌ها</h2><button type="button" class="spec-sheet-x" data-spec-close aria-label="بستن"><?= icon('x') ?></button></div>
-        <div class="spec-grid five"><?php foreach ($specialtyCards as $s) $specCard($s); ?></div>
-      </dialog>
-    <?php endif; ?>
+    <div class="spec-all" id="spec-all" data-spec-all hidden>
+      <h3>همه تخصص‌ها</h3>
+      <div class="spec-grid cols"><?php foreach ($specialtyCards as $s) $specCard($s); ?></div>
+    </div>
   </section>
 <?php break; case 'available': ?>
   <section class="home-sec" aria-labelledby="h-available">

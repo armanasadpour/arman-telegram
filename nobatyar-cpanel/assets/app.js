@@ -1043,17 +1043,17 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
   document.addEventListener('click', ask, true);
 })();
 
-/* 1.0.13 homepage: «بیشتر» opens every specialty in a bottom sheet (native <dialog>; Esc and backdrop close it). */
+/* 1.0.17 homepage: «همه تخصص‌ها» opens (and closes) the full specialty list right below the grid. */
 (() => {
-  const sheet = document.querySelector('[data-spec-sheet]');
-  const more = document.querySelector('[data-spec-more]');
-  if (!sheet || !more || typeof sheet.showModal !== 'function') return;
-  more.addEventListener('click', () => sheet.showModal());
-  sheet.querySelector('[data-spec-close]').addEventListener('click', () => sheet.close());
-  sheet.addEventListener('click', (e) => {
-    if (e.target === sheet) sheet.close();
+  const btn = document.querySelector('[data-spec-toggle]');
+  const panel = document.querySelector('[data-spec-all]');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', () => {
+    const open = panel.hidden;
+    panel.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    if (open) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
-  sheet.addEventListener('close', () => more.focus());
 })();
 
 /* 1.0.14 homepage «همه پزشکان»: «بیشتر» appends the next batch (doctors-more.php) until none is left. */
