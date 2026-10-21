@@ -61,7 +61,8 @@ $photo = !empty($b['photo_file']) ? '<img src="photo.php?id=' . (int) $b['doctor
 
   <div class="receipt-actions no-print">
     <a class="button" href="patient.php"><?= icon('calendar-check') ?> مشاهده نوبت‌های من</a>
-    <button type="button" class="button secondary" data-print hidden><?= icon('download') ?> ذخیره رسید (PDF)</button>
+    <?php if (in_array($b['status'], ['confirmed', 'completed'], true)): ?><a class="button<?= $fresh ? '' : ' secondary' ?>" href="receipt-ticket.php?id=<?= (int) $b['id'] ?>"><?= icon('download') ?> دانلود رسید (PDF / JPG)</a><?php else: ?>
+    <button type="button" class="button secondary" data-print hidden><?= icon('download') ?> ذخیره رسید (PDF)</button><?php endif; ?>
     <button type="button" class="button secondary" data-share data-share-text="<?= esc($share) ?>" data-share-title="رسید نوبت" hidden><?= icon('share') ?> اشتراک‌گذاری رسید</button>
     <a class="button ghost" href="index.php"><?= icon('home') ?> بازگشت به صفحه اصلی</a>
   </div>

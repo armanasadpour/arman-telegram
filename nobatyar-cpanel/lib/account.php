@@ -23,6 +23,9 @@ function booking_card(array $b, bool $staff = false): string
     }
     $place = array_filter([$b['clinic'] ?? '', $b['service_name'] ?? '']);
     $link = $staff ? '' : '<a class="button ' . ($held ? '' : 'secondary ') . 'small" href="' . ($held ? 'checkout.php' : 'receipt.php') . '?id=' . (int) $b['id'] . '">' . ($held ? 'تکمیل رزرو' : 'رسید و جزئیات') . '</a>';
+    if (!$staff && in_array($b['status'] ?? '', ['confirmed', 'completed'], true)) {
+        $link .= ' <a class="button ghost small" href="receipt-ticket.php?id=' . (int) $b['id'] . '">' . icon('download') . ' دانلود رسید</a>';
+    }
     return '<article class="appt">' .
         '<div class="appt-date" aria-hidden="true"><span>' . esc(jalali_weekday($day)) . '</span><b>' . fa_number($d) . '</b><small>' . $months[$m - 1] . '</small></div>' .
         '<div class="appt-body">' .

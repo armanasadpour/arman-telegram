@@ -1,0 +1,16 @@
+/* 1.0.20: A5 appointment receipt (receipt-ticket.php). */
+.ticket-page{margin:0;background:#eef2f7}
+.ticket-tools{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;padding:16px}
+.ticket-tools .button{margin:0}
+.ticket-tools p{flex-basis:100%;text-align:center;font-size:13px;margin:0;color:var(--muted)}
+.ticket-sheet{width:min(100% - 24px,560px);margin:0 auto 32px;background:#fff;box-shadow:0 12px 40px #15356624}
+.ticket-sheet canvas,.ticket-sheet img{display:block;width:100%;height:auto}
+.ticket-sheet [hidden]{display:none!important}
+@page{size:A5 portrait;margin:0}
+@media print{
+  html,body.ticket-page{margin:0!important;padding:0!important;width:148mm;background:#fff}
+  .ticket-tools{display:none!important}
+  .ticket-sheet{margin:0!important;box-shadow:none;width:148mm!important;height:210mm!important}
+  .ticket-sheet img{width:148mm;height:210mm}
+  .ticket-sheet canvas{display:none!important}
+}
