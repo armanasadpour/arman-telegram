@@ -111,6 +111,7 @@ if ($landing) {
         'available' => $enabled('available') ? home_doctor_cards('available', $city, $count('available')) : [],
         'featured' => $enabled('featured') ? home_doctor_cards('featured', $city, $count('featured')) : [],
         'newest' => $enabled('newest') ? home_doctor_cards('newest', $city, $count('newest')) : [],
+        'allDoctors' => $enabled('all_doctors') ? home_all_doctors($city, 0, $count('all_doctors')) : [[], false],
         'centerCards' => $enabled('centers') && $city ? public_centers_in_city((int) $city['id'], $count('centers')) : ($enabled('centers') ? public_centers_all($count('centers')) : []),
         'faqs' => $enabled('faq') ? faq_list(true, $count('faq')) : [],
         'articles' => $enabled('articles') ? articles_public($count('articles')) : [],

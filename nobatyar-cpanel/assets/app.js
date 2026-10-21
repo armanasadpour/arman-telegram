@@ -1055,3 +1055,30 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
   });
   sheet.addEventListener('close', () => more.focus());
 })();
+
+/* 1.0.14 homepage «همه پزشکان»: «بیشتر» appends the next batch (doctors-more.php) until none is left. */
+(() => {
+  const btn = document.querySelector('[data-docs-more]');
+  const grid = document.querySelector('[data-docs-grid]');
+  if (!btn || !grid) return;
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    fetch('doctors-more.php?offset=' + encodeURIComponent(btn.dataset.offset), { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.text().then((html) => [html, r.headers.get('X-More') === '1']) : Promise.reject()))
+      .then(([html, more]) => {
+        const box = document.createElement('div');
+        box.innerHTML = html;
+        const cards = [...box.children];
+        cards.forEach((c) => grid.appendChild(c));
+        btn.dataset.offset = String(+btn.dataset.offset + cards.length);
+        if (!more || !cards.length) btn.closest('.docs-more').remove();
+        else cards[0].querySelector('a[href]')?.focus({ preventScroll: true });
+      })
+      .catch(() => {})
+      .finally(() => {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+      });
+  });
+})();

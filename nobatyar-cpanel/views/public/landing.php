@@ -4,7 +4,7 @@
  * when it has no real data (no placeholder content is ever shown to visitors).
  * @var bool $preview @var bool $hasDraft @var array $layout @var ?array $city @var array $provinces @var array $capitals
  * @var string $notice @var array $chips @var array $banners @var array $specialtyCards @var array $available @var array $featured
- * @var array $newest @var array $centerCards @var array $faqs @var array $articles @var int $fee @var array $nearby @var bool $showCode
+ * @var array $newest @var array $allDoctors [cards, has more] @var array $centerCards @var array $faqs @var array $articles @var int $fee @var array $nearby @var bool $showCode
  */
 $S = $layout['sections'];
 $cityName = $city['name'] ?? '';
@@ -177,6 +177,16 @@ if ($homeWork): ?>
           <a class="button ghost" href="register.php">پزشک هستید؟ ثبت‌نام کنید</a>
         </div>
       </div>
+    <?php endif; ?>
+  </section>
+<?php break; case 'all_doctors': [$docs, $docsMore] = $allDoctors; if (!$docs) break; ?>
+  <section class="home-sec" aria-labelledby="h-all_doctors">
+    <div class="sec-head"><div><h2 id="h-all_doctors" class="sec-title-icon"><span class="sec-icon"><?= icon('users') ?></span><?= esc($S['all_doctors']['title']) ?></h2><?php if ($S['all_doctors']['subtitle'] !== ''): ?><p><?= esc($S['all_doctors']['subtitle']) ?></p><?php endif; ?></div></div>
+    <div class="doc-grid" data-docs-grid>
+      <?php foreach ($docs as $d) render('public/doctor-card', ['d' => $d, 'showCode' => $showCode]); ?>
+    </div>
+    <?php if ($docsMore): ?>
+      <div class="docs-more"><button type="button" class="button secondary" data-docs-more data-offset="<?= count($docs) ?>"><?= icon('chevron-down') ?> بیشتر</button></div>
     <?php endif; ?>
   </section>
 <?php break; case 'promo': $v = $S['promo']; ?>

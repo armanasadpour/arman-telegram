@@ -44,7 +44,12 @@ $img = fn($f, $fallback) => $f !== '' ? home_image_url($f) : $fallback;
               <input type="hidden" name="s[<?= esc($key) ?>][title]" value=""><input type="hidden" name="s[<?= esc($key) ?>][subtitle]" value="">
               <?php if ($key === 'banners'): ?><p class="muted small">بنرها در «<a href="admin.php?tab=content">اسلایدر و نوار اطلاع‌رسانی</a>» مدیریت می‌شوند.</p><?php endif; ?>
             <?php endif; ?>
-            <?php if ($meta['counts']): ?>
+            <?php if (!empty($meta['paged'])): ?>
+              <div class="count-fields">
+                <label>تعداد پزشک در هر بار نمایش (و با هر «بیشتر»)<input type="number" name="s[<?= esc($key) ?>][desktop]" value="<?= (int) $s['desktop'] ?>" min="1" max="24"></label>
+                <input type="hidden" name="s[<?= esc($key) ?>][mobile]" value="24">
+              </div>
+            <?php elseif ($meta['counts']): ?>
               <div class="count-fields">
                 <label>تعداد کارت در دسکتاپ<input type="number" name="s[<?= esc($key) ?>][desktop]" value="<?= (int) $s['desktop'] ?>" min="1" max="24"></label>
                 <label>تعداد در موبایل<input type="number" name="s[<?= esc($key) ?>][mobile]" value="<?= (int) $s['mobile'] ?>" min="1" max="24"></label>

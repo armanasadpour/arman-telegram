@@ -21,6 +21,7 @@ function home_section_catalog(): array
         'available' => ['label' => 'پزشکان دارای نوبت آزاد', 'title' => 'پزشکان دارای نوبت در شهر شما', 'subtitle' => 'نزدیک‌ترین زمان‌های آزاد پزشکان تأییدشده', 'counts' => true, 'desktop' => 8, 'mobile' => 6],
         'promo' => ['label' => 'بنر تبلیغاتی پزشکان', 'title' => 'پزشک هستید؟', 'subtitle' => 'با نوبت‌یار، مدیریت نوبت‌های مطب خود را ساده‌تر کنید.', 'counts' => false],
         'featured' => ['label' => 'پزشکان منتخب', 'title' => 'پزشکان منتخب شهر', 'subtitle' => '', 'counts' => true, 'desktop' => 8, 'mobile' => 6],
+        'all_doctors' => ['label' => 'همه پزشکان', 'title' => 'همه پزشکان', 'subtitle' => '', 'counts' => true, 'paged' => true, 'desktop' => 10, 'mobile' => 10],
         'newest' => ['label' => 'پزشکان تازه‌عضو', 'title' => 'پزشکان تازه‌عضوشده', 'subtitle' => '', 'counts' => true, 'desktop' => 8, 'mobile' => 6],
         'steps' => ['label' => 'مراحل دریافت نوبت', 'title' => 'چطور از نوبت‌یار نوبت بگیریم؟', 'subtitle' => '', 'counts' => false],
         'centers' => ['label' => 'مراکز درمانی', 'title' => 'مراکز درمانی شهر شما', 'subtitle' => '', 'counts' => true, 'desktop' => 4, 'mobile' => 4],
@@ -204,6 +205,47 @@ function home_doctor_cards(string $mode, ?array $city, int $limit): array
         usort($out, fn($a, $b) => strcmp($a['first_available']['starts_at'], $b['first_available']['starts_at']));
     }
     return array_slice($out, 0, $limit);
+}
+
+/**
+ * «همه پزشکان» on the homepage, one batch at a time (the section's count; «بیشتر» loads the next batch).
+ * Order: Pro doctors first, then the rest; within each, most bookings, then highest rating, then most reviews.
+ * Limited to the visitor's city when it has doctors, otherwise country-wide. Returns [cards, has more].
+ */
+function home_all_doctors(?array $city, int $offset, int $limit): array
+{
+    $cityCond = $city ? ' AND c.id=?' : '';
+    $args = $city ? [(int) $city['id']] : [];
+    // Same rule as doctor_is_pro(): an administrator override first, else the subscription (or everyone when sales are off).
+    // The override is compared as text: MySQL and MariaDB disagree on JSON true/false arithmetic inside COALESCE.
+    $override = "JSON_UNQUOTE(JSON_EXTRACT(COALESCE(d.feature_overrides,'{}'),'$.pro'))";
+    $pro = "CASE WHEN $override IN ('true','1') THEN 1 WHEN $override IN ('false','0') THEN 0 ELSE " . (subscriptions_on() ? '(d.subscription_until IS NOT NULL AND DATE_ADD(d.subscription_until,INTERVAL ' . grace_days() . ' DAY)>=CURDATE())' : '1') . ' END';
+    $sql = "SELECT d.id,d.name,d.photo_file,d.medical_code,d.professional_title,d.subscription_until,d.feature_overrides,sp.name specialty,($pro)+0 is_pro,
+            (SELECT COUNT(*) FROM bookings b JOIN slots s ON s.id=b.slot_id WHERE s.doctor_id=d.id AND b.status IN ('confirmed','completed')) bookings_n,
+            COALESCE(rv.a,0) rating,COALESCE(rv.n,0) reviews_n
+         FROM doctors d JOIN specialties sp ON sp.id=d.specialty_id
+         LEFT JOIN (SELECT doctor_id,AVG(rating) a,COUNT(*) n FROM reviews WHERE status='approved' GROUP BY doctor_id) rv ON rv.doctor_id=d.id
+         WHERE " . visible_doctor_sql() . " AND EXISTS(SELECT 1 FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE cl.doctor_id=d.id AND " . public_clinic_sql() . $cityCond . ")
+         ORDER BY is_pro DESC,bookings_n DESC,rating DESC,reviews_n DESC,d.id
+         LIMIT " . ($limit + 1) . ' OFFSET ' . max(0, $offset);
+    $rows = query($sql, $args)->fetchAll();
+    if ($city && !$rows && $offset === 0) {
+        return home_all_doctors(null, 0, $limit);
+    }
+    $more = count($rows) > $limit;
+    $out = [];
+    foreach (array_slice($rows, 0, $limit) as $r) {
+        $clinicSql = 'SELECT cl.id clinic_id,cl.name clinic_name,cl.address,c.name city FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE cl.doctor_id=? AND ' . public_clinic_sql();
+        $cl = query($clinicSql . $cityCond . ' ORDER BY cl.is_primary DESC,cl.id LIMIT 1', array_merge([(int) $r['id']], $args))->fetch()
+            ?: query($clinicSql . ' ORDER BY cl.is_primary DESC,cl.id LIMIT 1', [(int) $r['id']])->fetch();
+        if (!$cl) {
+            continue;
+        }
+        $r += $cl;
+        $r['first_available'] = first_available((int) $r['clinic_id'], 14);
+        $out[] = $r;
+    }
+    return [$out, $more];
 }
 
 /**
