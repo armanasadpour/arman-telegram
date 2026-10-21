@@ -69,26 +69,48 @@ $wantLabel = pro_catalog()[$want]['label'] ?? '';
 <?php endif; ?>
 
 
-<section class="panel">
-  <h2>پلن‌های اشتراک پرو</h2>
+<section class="panel pro-shop">
+  <div class="pro-hero">
+    <span class="pro-hero-tag"><?= icon('sparkles') ?> اشتراک پرو</span>
+    <h2>بیمار بیشتر، مدیریت ساده‌تر</h2>
+    <p>پزشکان پرو بالاتر در نتایج جستجو دیده می‌شوند، تیک آبی می‌گیرند و با منشی، چک نوبت و گزارش‌ها کار مطب را سریع‌تر پیش می‌برند.</p>
+    <ul class="pro-hero-points">
+      <li><?= icon('verified') ?> تیک آبی کنار نام</li>
+      <li><?= icon('search') ?> بالاتر در جستجو</li>
+      <li><?= icon('calendar-check') ?> چک نوبت و منشی</li>
+    </ul>
+  </div>
   <?php if (!$plans): ?>
     <p class="empty-state">پلن فعالی تعریف نشده است. با مدیر سامانه تماس بگیرید.</p>
   <?php else: ?>
     <form method="post" class="stack">
       <?php form_token('sub_order'); ?>
+      <?php
+      // Monthly equivalent of each plan; the dearest month is the baseline for «صرفه‌جویی».
+      $monthlyOf = fn(array $p) => intdiv((int) $p['price_toman'] * 30, max(1, (int) $p['duration_days']));
+      $topMonthly = max(array_map($monthlyOf, $plans)) ?: 1;
+      $checkedId = (int) (array_values(array_filter($plans, fn($p) => !empty($p['highlight'])))[0]['id'] ?? $plans[0]['id']);
+      ?>
       <div class="plan-grid plan-rail">
-        <?php foreach ($plans as $i => $p): $monthly = intdiv((int) $p['price_toman'] * 30, max(1, (int) $p['duration_days'])); ?>
-          <label class="plan-card<?= $p['highlight'] ? ' featured' : '' ?>">
-            <input type="radio" name="plan_id" value="<?= (int) $p['id'] ?>"<?= checked_attr($i === 0) ?> required>
-            <span class="plan-name"><?= esc($p['name']) ?></span>
-            <strong class="plan-price"><?= esc(toman($p['price_toman'])) ?></strong>
-            <small><?= fa_number($p['duration_days']) ?> روز • معادل ماهانه <?= esc(toman($monthly)) ?></small>
+        <?php foreach ($plans as $p): $monthly = $monthlyOf($p); $save = (int) round((1 - $monthly / $topMonthly) * 100); $daily = intdiv((int) $p['price_toman'], max(1, (int) $p['duration_days'])); ?>
+          <label class="plan-card pc<?= $p['highlight'] ? ' featured' : '' ?>">
+            <input type="radio" name="plan_id" value="<?= (int) $p['id'] ?>"<?= checked_attr((int) $p['id'] === $checkedId) ?> required>
+            <span class="pc-top">
+              <span class="pc-name"><?= esc($p['name']) ?></span>
+              <?php if ($save >= 5): ?><span class="pc-save"><?= fa_number($save) ?>٪ صرفه‌جویی</span><?php endif; ?>
+            </span>
+            <span class="pc-price"><b><?= fa_number(number_format((int) $p['price_toman'], 0, '.', '٬')) ?></b><small>تومان</small></span>
+            <span class="pc-period"><?= fa_number($p['duration_days']) ?> روز<?= (int) $p['duration_days'] > 31 ? ' • ماهانه ' . esc(toman($monthly)) : '' ?></span>
+            <span class="pc-daily"><?= icon('zap') ?> روزی فقط <?= esc(toman($daily)) ?></span>
+            <?php if (plan_features($p) || $p['max_clinics'] || $p['max_secretaries'] || !empty($p['max_services'])): ?>
             <ul>
-              <?php foreach (plan_features($p) as $f): ?><li><?= icon('check') ?><?= esc($f) ?></li><?php endforeach; ?>
-              <?php if ($p['max_clinics']): ?><li><?= icon('building') ?>حداکثر <?= fa_number($p['max_clinics']) ?> مطب فعال</li><?php endif; ?>
-              <?php if ($p['max_secretaries']): ?><li><?= icon('users') ?>حداکثر <?= fa_number($p['max_secretaries']) ?> منشی</li><?php endif; ?>
-              <?php if (!empty($p['max_services'])): ?><li><?= icon('list') ?>حداکثر <?= fa_number($p['max_services']) ?> خدمت</li><?php endif; ?>
+              <?php foreach (plan_features($p) as $f): ?><li><span class="pc-tick"><?= icon('check') ?></span><?= esc($f) ?></li><?php endforeach; ?>
+              <?php if ($p['max_clinics']): ?><li><span class="pc-tick"><?= icon('check') ?></span>حداکثر <?= fa_number($p['max_clinics']) ?> مطب فعال</li><?php endif; ?>
+              <?php if ($p['max_secretaries']): ?><li><span class="pc-tick"><?= icon('check') ?></span>حداکثر <?= fa_number($p['max_secretaries']) ?> منشی</li><?php endif; ?>
+              <?php if (!empty($p['max_services'])): ?><li><span class="pc-tick"><?= icon('check') ?></span>حداکثر <?= fa_number($p['max_services']) ?> خدمت</li><?php endif; ?>
             </ul>
+            <?php endif; ?>
+            <span class="pc-pick"><span class="pc-pick-off">این پلن را می‌خواهم</span><span class="pc-pick-on"><?= icon('check') ?> انتخاب شد</span></span>
           </label>
         <?php endforeach; ?>
       </div>
@@ -106,7 +128,8 @@ $wantLabel = pro_catalog()[$want]['label'] ?? '';
         </label>
         <label>کد تخفیف (اختیاری)<input name="discount_code" maxlength="40" dir="ltr" autocomplete="off"></label>
       </div>
-      <button>صدور پیش‌فاکتور</button>
+      <button class="pc-buy"><?= icon('zap') ?> فعال‌سازی پرو و صدور پیش‌فاکتور</button>
+      <p class="pc-trust"><?= icon('shield') ?> پرداخت امن از درگاه بانکی • فعال‌سازی فوری پس از پرداخت • اطلاعات شما همیشه حفظ می‌شود</p>
     </form>
   <?php endif; ?>
 </section>
