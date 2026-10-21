@@ -176,7 +176,7 @@ $img = fn($f, $fallback) => $f !== '' ? home_image_url($f) : $fallback;
 
 <?php elseif ($view === 'specialties'): /** @var array $rows */ ?>
 <section class="panel">
-  <div class="panel-head"><h2>تخصص‌های صفحه اصلی</h2><span class="muted small">ترتیب همین فهرست، ترتیب نمایش در همه صفحه‌هاست. تصویر و آیکن هر تخصص در <a href="admin.php?tab=specialties">تخصص‌ها و خدمات</a>.</span></div>
+  <div class="panel-head"><h2>تخصص‌های صفحه اصلی</h2><span class="muted small">تخصص‌هایی که پزشک فعال دارند همیشه با آیکن نمایش داده می‌شوند؛ تیک یعنی تخصص حتی بدون پزشک هم (با «به‌زودی») نمایش داده شود. ترتیب همین فهرست، ترتیب نمایش در همه صفحه‌هاست. تصویر و آیکن هر تخصص در <a href="admin.php?tab=specialties">تخصص‌ها و خدمات</a>.</span></div>
   <form method="post">
     <?php form_token('home_specialties'); ?><input type="hidden" name="return_view" value="specialties">
     <ol class="sort-list compact" data-sortable>

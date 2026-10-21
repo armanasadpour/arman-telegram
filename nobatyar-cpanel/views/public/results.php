@@ -26,6 +26,16 @@ $mapQuery = search_query($input, $base);
     <?php if ($cfg['map']): ?><button type="button" class="tool" data-map-toggle aria-pressed="false"><?= icon('map') ?><span data-map-label>نمایش روی نقشه</span></button><?php endif; ?>
   </div>
 
+  <?php if (count($specialties) > 1): $current = array_map('intval', (array) $input['specialty']); ?>
+    <nav class="spec-scroll" aria-label="دسته‌بندی تخصص‌ها">
+      <a class="spec-card spec-all<?= $current ? '' : ' current' ?>" href="index.php?<?= esc(search_query($input, $base, ['specialty' => null, 'page' => null])) ?>"<?= $current ? '' : ' aria-current="page"' ?>><span class="spec-icon"><?= icon('grip') ?></span><strong>همه تخصص‌ها</strong></a>
+      <?php foreach ($specialties as $s): $on = $current === [(int) $s['id']]; ?>
+        <a class="spec-card<?= $on ? ' current' : '' ?>" href="index.php?<?= esc(search_query($input, $base, ['specialty' => $on ? null : [(int) $s['id']], 'page' => null])) ?>"<?= $on ? ' aria-current="page"' : '' ?>>
+          <?= specialty_visual($s, 'spec-icon') ?><strong><?= esc(specialty_display_title($s['name'], $s['level'] ?? null)) ?></strong><small><?= fa_number($s['doctors']) ?> پزشک</small>
+        </a>
+      <?php endforeach; ?>
+    </nav>
+  <?php endif; ?>
   <div class="search-layout">
     <aside class="filter-panel" id="filter-panel" data-sheet="filters" aria-label="فیلترها">
       <div class="sheet-head"><span class="sheet-grip" aria-hidden="true"></span><h2>فیلترها</h2><button type="button" class="sheet-x" data-sheet-close aria-label="بستن"><?= icon('x') ?></button></div>
