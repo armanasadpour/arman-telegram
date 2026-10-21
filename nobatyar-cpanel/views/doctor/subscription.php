@@ -7,35 +7,48 @@ $isPro = doctor_is_pro($id, $d);
 $want = (string) ($_GET['want'] ?? '');
 $wantLabel = pro_catalog()[$want]['label'] ?? '';
 ?>
-<?php if ($open): ?>
-  <section class="panel proforma">
-    <div class="panel-head"><h2>پیش‌فاکتور در انتظار پرداخت</h2><a href="subscription-invoice.php?id=<?= (int) $open['id'] ?>">نمایش و چاپ</a></div>
-    <dl class="facts">
-      <dt>پلن</dt><dd><?= esc($open['plan_name']) ?> (<?= fa_number($open['duration_days']) ?> روز) — <?= esc($kinds[$open['kind']] ?? '') ?></dd>
-      <dt>دوره</dt><dd><bdi><?= esc(jdate($open['period_start'])) ?></bdi> تا <bdi><?= esc(jdate($open['period_end'])) ?></bdi></dd>
-      <dt>مبلغ پلن</dt><dd><?= esc(toman($open['base_toman'])) ?></dd>
-      <?php if ($open['credit_toman'] > 0): ?><dt>اعتبار پلن قبلی</dt><dd>− <?= esc(toman($open['credit_toman'])) ?></dd><?php endif; ?>
-      <?php if ($open['discount_toman'] > 0): ?><dt>تخفیف</dt><dd>− <?= esc(toman($open['discount_toman'])) ?></dd><?php endif; ?>
-      <?php if ($open['vat_toman'] > 0): ?><dt>مالیات بر ارزش افزوده</dt><dd><?= esc(toman($open['vat_toman'])) ?></dd><?php endif; ?>
-      <dt>قابل پرداخت</dt><dd><strong><?= esc(toman($open['payable_toman'])) ?></strong></dd>
-      <dt>اعتبار پیش‌فاکتور</dt><dd>تا <bdi><?= esc(jdate($open['expires_at'], true)) ?></bdi></dd>
+<?php if ($open): $canPay = (int) $open['payable_toman'] === 0 || $gatewayReady || (int) wallet_account('doctor', $id)['balance'] >= (int) $open['payable_toman']; ?>
+  <section class="pf" aria-labelledby="pf-title">
+    <header class="pf-head">
+      <span class="pf-icon"><?= icon('receipt') ?></span>
+      <div class="pf-head-text">
+        <span class="pf-status"><span class="pf-dot"></span> در انتظار پرداخت</span>
+        <h2 id="pf-title">پیش‌فاکتور اشتراک <?= esc($open['plan_name']) ?></h2>
+        <p><?= fa_number($open['duration_days']) ?> روز • <?= esc($kinds[$open['kind']] ?? '') ?></p>
+      </div>
+      <a class="pf-print" href="subscription-invoice.php?id=<?= (int) $open['id'] ?>"><?= icon('print') ?><span>نمایش و چاپ</span></a>
+    </header>
+    <div class="pf-period"><?= icon('calendar') ?><span>دوره اشتراک</span><bdi><?= esc(jdate($open['period_start'])) ?></bdi><?= icon('arrow-left', 'icon pf-arrow') ?><bdi><?= esc(jdate($open['period_end'])) ?></bdi></div>
+    <dl class="pf-lines">
+      <div><dt>مبلغ پلن</dt><dd><?= esc(toman($open['base_toman'])) ?></dd></div>
+      <?php if ($open['credit_toman'] > 0): ?><div class="minus"><dt>اعتبار پلن قبلی</dt><dd>− <?= esc(toman($open['credit_toman'])) ?></dd></div><?php endif; ?>
+      <?php if ($open['discount_toman'] > 0): ?><div class="minus"><dt>تخفیف</dt><dd>− <?= esc(toman($open['discount_toman'])) ?></dd></div><?php endif; ?>
+      <?php if ($open['vat_toman'] > 0): ?><div><dt>مالیات بر ارزش افزوده</dt><dd><?= esc(toman($open['vat_toman'])) ?></dd></div><?php endif; ?>
     </dl>
-    <div class="actions">
-      <?php if ((int) $open['payable_toman'] === 0 || $gatewayReady || (int)wallet_account('doctor',$id)['balance'] >= (int)$open['payable_toman']): ?>
-        <form method="post" class="inline-form"><?php form_token('sub_checkout'); ?><?php if((int)$open['payable_toman']>0) wallet_toggle('doctor',$id); ?><input type="hidden" name="order_id" value="<?= (int) $open['id'] ?>"><button data-pay-button><?= icon('card') ?> <?= (int) $open['payable_toman'] === 0 ? 'فعال‌سازی' : 'پرداخت آنلاین' ?></button></form>
-      <?php else: ?>
-        <p class="notice">درگاه پرداخت آنلاین هنوز توسط مدیر فعال نشده است. می‌توانید مبلغ را به حساب اعلام‌شده پشتیبانی واریز کنید تا مدیر با شماره پیگیری، پرداخت را ثبت کند.</p>
-      <?php endif; ?>
-      <form method="post" class="inline-form" data-confirm="پیش‌فاکتور لغو شود؟ اگر پرداخت بانکی در جریان باشد و بعداً تأیید شود، مبلغ در فهرست بازگشت وجه ثبت خواهد شد."><?php form_token('sub_cancel'); ?><input type="hidden" name="order_id" value="<?= (int) $open['id'] ?>"><button class="secondary">لغو پیش‌فاکتور</button></form>
+    <div class="pf-total">
+      <span>مبلغ قابل پرداخت</span>
+      <strong><b><?= fa_number(number_format((int) $open['payable_toman'], 0, '.', '٬')) ?></b> تومان</strong>
     </div>
+    <p class="pf-expire"><?= icon('clock') ?> این پیش‌فاکتور تا <bdi><?= esc(jdate($open['expires_at'], true)) ?></bdi> معتبر است.</p>
+    <?php if ($canPay): ?>
+      <form method="post" id="pf-pay" class="pf-pay-form"><?php form_token('sub_checkout'); ?><input type="hidden" name="order_id" value="<?= (int) $open['id'] ?>"><?php if ((int) $open['payable_toman'] > 0) wallet_toggle('doctor', $id); ?></form>
+    <?php else: ?>
+      <p class="notice">درگاه پرداخت آنلاین هنوز توسط مدیر فعال نشده است. می‌توانید مبلغ را به حساب اعلام‌شده پشتیبانی واریز کنید تا مدیر با شماره پیگیری، پرداخت را ثبت کند.</p>
+    <?php endif; ?>
+    <div class="pf-actions">
+      <?php if ($canPay): ?><button form="pf-pay" class="pf-pay-btn" data-pay-button><?= (int) $open['payable_toman'] === 0 ? 'فعال‌سازی' : 'پرداخت آنلاین' ?></button><?php endif; ?>
+      <form method="post" class="pf-cancel" data-confirm="پیش‌فاکتور لغو شود؟ اگر پرداخت بانکی در جریان باشد و بعداً تأیید شود، مبلغ در فهرست بازگشت وجه ثبت خواهد شد."><?php form_token('sub_cancel'); ?><input type="hidden" name="order_id" value="<?= (int) $open['id'] ?>"><button class="pf-cancel-btn">لغو پیش‌فاکتور</button></form>
+    </div>
+    <p class="pf-secure"><?= icon('shield') ?> پرداخت امن از درگاه بانکی؛ اشتراک بلافاصله پس از پرداخت فعال می‌شود.</p>
   </section>
 <?php endif; ?>
 
 <?php if ($wantLabel !== '' && !$isPro): ?>
   <p class="notice pro-want"><?= icon('lock') ?> «<?= esc($wantLabel) ?>» با اشتراک پرو فعال می‌شود.</p>
 <?php endif; ?>
-<article class="subscription-card plan-card <?= $isPro ? 'is-pro' : 'is-free' ?>">
-  <div>
+<article class="subscription-card plan-card sub-status <?= $isPro ? 'is-pro' : 'is-free' ?>">
+  <span class="sub-status-icon"><?= icon($isPro ? 'verified' : 'user') ?></span>
+  <div class="sub-status-text">
     <span class="eyebrow">نسخه فعلی</span>
     <h2><?= $isPro ? icon('verified') . ' اشتراک پرو' . ($s['current'] && $s['current']['plan_name'] ? ' — ' . esc($s['current']['plan_name']) : '') : 'نسخه رایگان' ?></h2>
     <p>
@@ -44,6 +57,7 @@ $wantLabel = pro_catalog()[$want]['label'] ?? '';
       <?php endif; ?>
     </p>
   </div>
+  <?php if (!$isPro && $plans && !$open): ?><a class="sub-upgrade" href="doctor-panel.php?doctor=<?= $id ?>&amp;tab=subscription#pro-plans"><?= icon('sparkles') ?> ارتقا به پرو</a><?php endif; ?>
   <?php if ($isPro && $s['until']): ?><div class="days-left"><strong><?= fa_number($s['state'] === 'grace' ? $s['grace_left'] : $s['days_left']) ?></strong><span><?= $s['state'] === 'grace' ? 'روز تا پایان فرجه' : 'روز باقی‌مانده' ?></span></div><?php endif; ?>
 </article>
 
@@ -69,7 +83,7 @@ $wantLabel = pro_catalog()[$want]['label'] ?? '';
 <?php endif; ?>
 
 
-<section class="panel pro-shop">
+<section class="panel pro-shop" id="pro-plans">
   <div class="pro-hero">
     <span class="pro-hero-tag"><?= icon('sparkles') ?> اشتراک پرو</span>
     <h2>بیمار بیشتر، مدیریت ساده‌تر</h2>
@@ -134,35 +148,35 @@ $wantLabel = pro_catalog()[$want]['label'] ?? '';
   <?php endif; ?>
 </section>
 
-<div class="grid-2 align-start">
+<div class="grid-2 align-start sub-history">
   <section class="panel">
-    <h2>فاکتورها و سفارش‌ها</h2>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>شماره</th><th>پلن</th><th>مبلغ</th><th>وضعیت</th><th></th></tr></thead>
-        <tbody>
+    <h2><?= icon('receipt') ?> فاکتورها و سفارش‌ها</h2>
+    <?php if (!$orders): ?>
+      <p class="empty-state">هنوز سفارشی ثبت نشده است.</p>
+    <?php else: ?>
+      <ul class="order-list">
         <?php foreach ($orders as $o): ?>
-          <tr>
-            <td><bdi><?= esc($o['number'] ?? '—') ?></bdi><br><small><bdi><?= esc(jdate($o['paid_at'] ?? $o['created_at'], true)) ?></bdi></small></td>
-            <td><?= esc($o['plan_name']) ?></td>
-            <td><?= esc(toman($o['payable_toman'])) ?></td>
-            <td><span class="badge order-<?= esc($o['status']) ?>"><?= esc(order_status_label($o['status'])) ?></span></td>
-            <td><a href="subscription-invoice.php?id=<?= (int) $o['id'] ?>"><?= $o['status'] === 'paid' ? 'فاکتور' : 'پیش‌فاکتور' ?></a></td>
-          </tr>
+          <li>
+            <span class="order-ico <?= $o['status'] === 'paid' ? 'paid' : '' ?>"><?= icon($o['status'] === 'paid' ? 'check' : 'receipt') ?></span>
+            <span class="order-main"><strong><?= esc($o['plan_name']) ?></strong><small><?php if (!empty($o['number'])): ?><bdi><?= esc($o['number']) ?></bdi> • <?php endif; ?><bdi><?= esc(jdate($o['paid_at'] ?? $o['created_at'], true)) ?></bdi></small></span>
+            <span class="order-side"><b><?= esc(toman($o['payable_toman'])) ?></b><span class="badge order-<?= esc($o['status']) ?>"><?= esc(order_status_label($o['status'])) ?></span></span>
+            <a class="order-link" href="subscription-invoice.php?id=<?= (int) $o['id'] ?>" aria-label="<?= $o['status'] === 'paid' ? 'فاکتور' : 'پیش‌فاکتور' ?>"><?= icon('chevron-left') ?></a>
+          </li>
         <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-    <?php if (!$orders): ?><p class="empty-state">هنوز سفارشی ثبت نشده است.</p><?php endif; ?>
+      </ul>
+    <?php endif; ?>
   </section>
   <section class="panel">
-    <h2>سوابق خرید و تمدید</h2>
-    <ul class="timeline">
-      <?php foreach ($periods as $p): ?>
-        <li><strong><?= esc(subscription_kind_label($p['kind'])) ?><?= $p['plan_name'] ? ' — ' . esc($p['plan_name']) : '' ?></strong>
-          <small><bdi><?= esc(jdate($p['starts_on'])) ?></bdi> تا <bdi><?= esc(jdate($p['ends_on'])) ?></bdi><?= $p['note'] ? ' • ' . esc($p['note']) : '' ?></small></li>
-      <?php endforeach; ?>
-    </ul>
-    <?php if (!$periods): ?><p class="empty-state">سابقه‌ای ثبت نشده است.</p><?php endif; ?>
+    <h2><?= icon('clock') ?> سوابق خرید و تمدید</h2>
+    <?php if (!$periods): ?>
+      <p class="empty-state">سابقه‌ای ثبت نشده است.</p>
+    <?php else: ?>
+      <ol class="sub-timeline">
+        <?php foreach ($periods as $p): ?>
+          <li><strong><?= esc(subscription_kind_label($p['kind'])) ?><?= $p['plan_name'] ? ' — ' . esc($p['plan_name']) : '' ?></strong>
+            <small><bdi><?= esc(jdate($p['starts_on'])) ?></bdi> تا <bdi><?= esc(jdate($p['ends_on'])) ?></bdi><?= $p['note'] ? ' • ' . esc($p['note']) : '' ?></small></li>
+        <?php endforeach; ?>
+      </ol>
+    <?php endif; ?>
   </section>
 </div>
