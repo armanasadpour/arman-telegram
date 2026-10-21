@@ -42,12 +42,12 @@ if ($homeWork): ?>
   </a>
   <a class="signup-card signup-doctor" href="register.php">
     <span class="signup-art"><img src="assets/illustrations/doctors.svg" alt="" width="140" height="110"></span>
-    <strong>ثبت‌نام پزشک</strong><small>مطب شما، همیشه در دسترس</small>
+    <strong>ثبت‌نام پزشک</strong><small>مطبت رو آنلاین کن</small>
     <span class="signup-link">پیوستن پزشکان <?= icon('chevron-left') ?></span>
   </a>
   <a class="signup-card signup-center" href="center-register.php">
     <span class="signup-art"><img src="assets/illustrations/centers.svg" alt="" width="140" height="110"></span>
-    <strong>ثبت‌نام کلینیک</strong><small>مدیریت یکپارچه با اشتراک پرو</small>
+    <strong>ثبت‌نام کلینیک</strong><small>مدیریت هوشمند کلینیک</small>
     <span class="signup-link">پیوستن کلینیک‌ها <?= icon('chevron-left') ?></span>
   </a>
 </section>
