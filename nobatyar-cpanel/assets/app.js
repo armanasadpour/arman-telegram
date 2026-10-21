@@ -1043,17 +1043,40 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
   document.addEventListener('click', ask, true);
 })();
 
-/* 1.0.17 homepage: «همه تخصص‌ها» opens (and closes) the full specialty list right below the grid. */
+/*
+ * 1.0.18 homepage: a specialty card filters «پزشکان دارای نوبت در شهر شما» in place (doctors-more.php?section=available);
+ * «همه تخصص‌ها» shows every specialty again. Without JS the cards stay ordinary links.
+ */
 (() => {
-  const btn = document.querySelector('[data-spec-toggle]');
-  const panel = document.querySelector('[data-spec-all]');
-  if (!btn || !panel) return;
-  btn.addEventListener('click', () => {
-    const open = panel.hidden;
-    panel.hidden = !open;
-    btn.setAttribute('aria-expanded', String(open));
-    if (open) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
+  const cards = [...document.querySelectorAll('[data-spec-filter]')];
+  const grid = document.querySelector('[data-available-grid]');
+  if (!cards.length || !grid) return;
+  const more = grid.closest('section')?.querySelector('.sec-more');
+  const baseMore = more ? more.getAttribute('href') : '';
+  let busy = null;
+  cards.forEach((card) =>
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = card.dataset.specFilter;
+      cards.forEach((c) => {
+        const on = c === card;
+        c.classList.toggle('current', on);
+        c.setAttribute('aria-pressed', String(on));
+      });
+      if (more) more.setAttribute('href', id !== '0' ? baseMore + '&specialty%5B%5D=' + encodeURIComponent(id) : baseMore);
+      if (busy) busy.abort();
+      busy = new AbortController();
+      grid.setAttribute('aria-busy', 'true');
+      fetch('doctors-more.php?section=available&specialty=' + encodeURIComponent(id), { credentials: 'same-origin', signal: busy.signal })
+        .then((r) => (r.ok ? r.text() : Promise.reject()))
+        .then((html) => {
+          grid.innerHTML = html;
+          grid.closest('section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        })
+        .catch(() => {})
+        .finally(() => grid.removeAttribute('aria-busy'));
+    }),
+  );
 })();
 
 /* 1.0.14 homepage «همه پزشکان»: «بیشتر» appends the next batch (doctors-more.php) until none is left. */

@@ -2189,22 +2189,17 @@ input[data-jdate]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://
 .spec-scroll .spec-all .spec-icon{background:var(--bg);color:var(--ink-2)}
 @media (max-width:600px){.spec-scroll{gap:8px}.spec-scroll .spec-card{flex-basis:84px;padding:10px 4px 8px;gap:4px;font-size:12px}.spec-scroll .spec-icon{width:40px;height:40px;border-radius:12px}.spec-scroll .spec-icon .icon{width:20px;height:20px}.spec-scroll .spec-card strong{font-size:11.5px;line-height:1.5}}
 
-/* 1.0.17: homepage specialties — two per row on phones, three on tablets, four on laptops (as «همه پزشکان»),
-   then a «همه تخصص‌ها» card that opens the full list below. */
-.spec-grid.cols{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-.spec-more{font:inherit;cursor:pointer;margin:0;box-shadow:none;position:relative}
+/* 1.0.18: homepage specialty filter — compact five per row; the chosen one is highlighted. */
+.spec-grid.five{grid-template-columns:repeat(5,minmax(0,1fr))}
 .spec-more .spec-icon{background:var(--bg)!important;color:var(--ink-2)!important}
-.spec-chev{position:absolute;top:10px;left:10px;color:var(--muted);transition:transform .2s var(--ease)}
-.spec-chev .icon{width:16px;height:16px}
-.spec-more[aria-expanded=true]{border-color:var(--primary)}
-.spec-more[aria-expanded=true] .spec-chev{transform:rotate(180deg)}
-.spec-all{margin-top:16px;padding:16px;background:#fff;border:1px solid var(--line);border-radius:20px}
-.spec-all[hidden]{display:none}
-.spec-all h3{margin:0 0 12px;font-size:15px}
-.spec-all .spec-card{background:var(--bg)}
+.spec-grid.five .spec-card.current{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-100)}
+.spec-grid.five .spec-card.current strong{color:var(--primary-700)}
 .icon-picker-default{font-size:11px;margin-inline-start:4px}
-@media (max-width:1000px){.spec-grid.cols{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
-@media (max-width:720px){.spec-grid.cols{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.spec-grid.cols .spec-card{padding:14px 8px 12px}.spec-grid.cols .spec-card strong{font-size:13px}.spec-all{padding:12px}}
+[data-available-grid][aria-busy=true]{opacity:.55;transition:opacity .15s}
+.home-sec:has([data-available-grid]){scroll-margin-top:96px}
+.doc-grid-empty{grid-column:1/-1}
+@media (max-width:600px){.spec-grid.five{gap:6px}.spec-grid.five .spec-card{padding:10px 2px 8px;gap:5px;border-radius:12px}.spec-grid.five .spec-icon{width:38px;height:38px;border-radius:11px}.spec-grid.five .spec-icon .icon{width:19px;height:19px}.spec-grid.five .spec-card strong{font-size:10.5px;line-height:1.5}}
+@media (max-width:360px){.spec-grid.five{grid-template-columns:repeat(5,minmax(0,1fr))}}
 
 /* 1.0.14: homepage «همه پزشکان» — two cards per row on phones, four on wide screens, «بیشتر» below. */
 .sec-title-icon{display:flex;align-items:center;gap:10px}

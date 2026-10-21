@@ -139,28 +139,23 @@ if ($homeWork): ?>
 <?php break; case 'specialties': if (!$specialtyCards) break; ?>
   <section class="home-sec" aria-labelledby="h-specialties">
     <?php $head('specialties'); ?>
-    <?php
-    $specCard = function (array $s): void { ?>
-        <a class="spec-card" href="<?= esc(specialty_url((int) $s['id'], $s['name'])) ?>">
+    <?php // 1.0.18: specialties with doctors, then «همه تخصص‌ها»; a tap filters «پزشکان دارای نوبت» below (links work without JS).
+    $withDoctors = array_filter($specialtyCards, fn($s) => (int) $s['doctors'] > 0); ?>
+    <div class="spec-grid five" role="group" aria-label="فیلتر پزشکان بر اساس تخصص">
+      <?php foreach ($withDoctors as $s): ?>
+        <a class="spec-card" href="<?= esc(specialty_url((int) $s['id'], $s['name'])) ?>" data-spec-filter="<?= (int) $s['id'] ?>" aria-pressed="false">
           <?= specialty_visual($s, 'spec-icon') ?><strong><?= esc(specialty_display_title($s['name'], $s['level'] ?? null)) ?></strong>
         </a>
-    <?php };
-    $withDoctors = array_filter($specialtyCards, fn($s) => (int) $s['doctors'] > 0); ?>
-    <div class="spec-grid cols">
-      <?php foreach ($withDoctors as $s) $specCard($s); ?>
-      <button type="button" class="spec-card spec-more" data-spec-toggle aria-expanded="false" aria-controls="spec-all"><span class="spec-icon"><?= icon('grip') ?></span><strong>همه تخصص‌ها</strong><span class="spec-chev"><?= icon('chevron-down') ?></span></button>
-    </div>
-    <div class="spec-all" id="spec-all" data-spec-all hidden>
-      <h3>همه تخصص‌ها</h3>
-      <div class="spec-grid cols"><?php foreach ($specialtyCards as $s) $specCard($s); ?></div>
+      <?php endforeach; ?>
+      <a class="spec-card spec-more current" href="specialties.php" data-spec-filter="0" aria-pressed="true"><span class="spec-icon"><?= icon('grip') ?></span><strong>همه تخصص‌ها</strong></a>
     </div>
   </section>
 <?php break; case 'available': ?>
   <section class="home-sec" aria-labelledby="h-available">
     <?php $head('available', 'index.php?' . http_build_query(['view' => 'doctors', 'sort' => 'first', 'available' => 1, 'scope' => $city ? 'city' : 'all'])); ?>
     <?php if ($available): ?>
-      <div class="rail doc-rail" data-rail>
-        <?php foreach ($available as $i => $d) render('public/doctor-card', ['d' => $d, 'showCode' => $showCode, 'hideMobile' => $i >= $mobile('available')]); ?>
+      <div class="doc-grid" data-available-grid>
+        <?php foreach ($available as $d) render('public/doctor-card', ['d' => $d, 'showCode' => $showCode]); ?>
       </div>
     <?php else: ?>
       <div class="empty-state wide">

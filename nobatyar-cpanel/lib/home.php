@@ -165,14 +165,21 @@ function home_image_url(string $file): string
 
 /* ---------- Data for the sections ---------- */
 
-/** Public doctor cards: approved, active, open subscription, public clinic; one card per doctor. */
-function home_doctor_cards(string $mode, ?array $city, int $limit): array
+/**
+ * Public doctor cards: approved, active, open subscription, public clinic; one card per doctor.
+ * $specialty (with its subspecialties) narrows the list for the homepage specialty filter.
+ */
+function home_doctor_cards(string $mode, ?array $city, int $limit, int $specialty = 0): array
 {
     $where = visible_doctor_sql() . ' AND ' . public_clinic_sql();
     $args = [];
     if ($city) {
         $where .= ' AND c.id=?';
         $args[] = (int) $city['id'];
+    }
+    if ($specialty > 0) {
+        $where .= ' AND (sp.id=? OR sp.parent_id=?)';
+        array_push($args, $specialty, $specialty);
     }
     $order = match ($mode) {
         'featured' => 'd.featured_order,d.id',
