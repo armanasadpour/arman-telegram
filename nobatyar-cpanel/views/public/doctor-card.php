@@ -14,8 +14,7 @@ $first = $d['first_available'] ?? null;
   <h3><a href="<?= esc($url) ?>"><?= esc(doctor_display_name($d['name'])) ?></a><?= pro_badge($d) ?></h3>
   <p class="doc-spec"><?= icon('doctor') ?><?= esc(specialty_display_title($d['specialty'])) ?></p>
   <?php if (!empty($showCode) && !empty($d['medical_code'])): ?><p class="doc-meta">نظام پزشکی: <bdi><?= esc(fa_number($d['medical_code'])) ?></bdi></p><?php endif; ?>
-  <p class="doc-meta"><?= icon('building') ?><span><?= esc($d['clinic_name']) ?> • <?= esc($d['city']) ?></span></p>
-  <p class="doc-meta clamp"><?= icon('pin') ?><span><?= esc(mb_strimwidth((string) $d['address'], 0, 60, '…')) ?></span></p>
+  <p class="doc-meta clamp"><?= icon('pin') ?><span><?= esc(clinic_short_address($d)) ?></span></p>
   <p class="doc-first<?= $first ? '' : ' none' ?>"><?= icon('clock') ?><span><?= $first ? 'اولین نوبت: <bdi>' . esc($first['label']) . '</bdi>' : 'نوبت آزاد در ۱۴ روز آینده ندارد' ?></span></p>
   <a class="button block" href="<?= esc($url) ?>">مشاهده نوبت‌ها</a>
 </article>

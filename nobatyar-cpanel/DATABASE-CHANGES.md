@@ -1,3 +1,7 @@
+# 1.0.19 — مهاجرت ۲۹ (افزایشی، تکرارپذیر)
+
+- `clinics.street_main`، `clinics.street_side`، `clinics.address_extra` (بخش‌های آدرس؛ `clinics.address` همچنان آدرس کامل است). مطب‌های قبلی هنگام نمایش از روی `address` تفکیک می‌شوند.
+
 # 1.0.6 — مهاجرت ۲۸ (افزایشی، تکرارپذیر)
 
 - `working_hours.valid_from` و `working_hours.valid_until` (بازه تاریخ برنامه هفتگی؛ خالی = از اکنون / بدون پایان).

@@ -190,7 +190,7 @@ function home_doctor_cards(string $mode, ?array $city, int $limit, int $specialt
         $where .= ' AND d.featured=1';
     }
     $rows = query(
-        "SELECT d.id,d.name,d.photo_file,d.medical_code,d.professional_title,sp.name specialty,cl.id clinic_id,cl.name clinic_name,cl.address,c.name city
+        "SELECT d.id,d.name,d.photo_file,d.medical_code,d.professional_title,sp.name specialty,cl.id clinic_id,cl.name clinic_name,cl.address,cl.street_main,c.name city,p.name province
          FROM doctors d JOIN specialties sp ON sp.id=d.specialty_id JOIN clinics cl ON cl.doctor_id=d.id JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id
          WHERE $where ORDER BY $order,cl.is_primary DESC,cl.id LIMIT " . ($mode === 'available' ? 60 : $limit * 3),
         $args,
@@ -242,7 +242,7 @@ function home_all_doctors(?array $city, int $offset, int $limit): array
     $more = count($rows) > $limit;
     $out = [];
     foreach (array_slice($rows, 0, $limit) as $r) {
-        $clinicSql = 'SELECT cl.id clinic_id,cl.name clinic_name,cl.address,c.name city FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE cl.doctor_id=? AND ' . public_clinic_sql();
+        $clinicSql = 'SELECT cl.id clinic_id,cl.name clinic_name,cl.address,cl.street_main,c.name city,p.name province FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE cl.doctor_id=? AND ' . public_clinic_sql();
         $cl = query($clinicSql . $cityCond . ' ORDER BY cl.is_primary DESC,cl.id LIMIT 1', array_merge([(int) $r['id']], $args))->fetch()
             ?: query($clinicSql . ' ORDER BY cl.is_primary DESC,cl.id LIMIT 1', [(int) $r['id']])->fetch();
         if (!$cl) {

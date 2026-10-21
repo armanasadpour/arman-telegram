@@ -133,7 +133,24 @@ function clinic_data(array $data): array
         throw new RuntimeException('تلفن مطب را با پیش‌شماره و ۱۱ رقم وارد کنید.');
     }
     [$lat, $lng] = coordinates_from($data);
-    return [field($data, 'clinic_name', 190), $city, field($data, 'address', 2000), $phone, $lat, $lng];
+    if (array_key_exists('street_main', $data)) {
+        // 1.0.19: three address fields; parts typed in the wrong field are moved, never rejected.
+        [$main, $side, $extra] = clinic_address_input($data, $city);
+        if ($main === '') {
+            throw new RuntimeException('خیابان اصلی مطب را وارد کنید.');
+        }
+        $address = address_compose($main, $side, $extra);
+    } else {
+        $address = field($data, 'address', 2000);
+    }
+    return [field($data, 'clinic_name', 190), $city, $address, $phone, $lat, $lng];
+}
+
+/** Normalised [main, side, extra] from the clinic form (the city/province name typed into it is dropped). */
+function clinic_address_input(array $data, ?array $city = null): array
+{
+    $text = fn(string $k, int $max) => is_scalar($data[$k] ?? '') ? mb_substr((string) ($data[$k] ?? ''), 0, $max) : '';
+    return address_parts($text('street_main', 400), $text('street_side', 600), $text('address_extra', 800), [$city['name'] ?? '', $city['province_name'] ?? ($city['province'] ?? '')]);
 }
 function register_doctor(array $data, bool $byAdmin = false): int
 {
@@ -439,6 +456,10 @@ function doctor_set_extra(int $doctor, array $data, bool $byAdmin = false): void
 /** Optional district of a clinic (search filter). Free text, normalized, at most 80 characters. */
 function clinic_set_district(int $clinic, array $data): void
 {
+    if ($clinic > 0 && array_key_exists('street_main', $data)) {
+        [$main, $side, $extra] = clinic_address_input($data, query('SELECT c.name,p.name province_name FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE cl.id=?', [$clinic])->fetch() ?: null);
+        query('UPDATE clinics SET street_main=?,street_side=?,address_extra=? WHERE id=?', [$main, $side ?: null, $extra ?: null, $clinic]);
+    }
     if ($clinic < 1 || !array_key_exists('district', $data)) {
         return;
     }
@@ -478,7 +499,11 @@ function clinic_fields(array $v = [], bool $manualCoords = false): void
     input('نام مطب', 'clinic_name', $v['clinic_name'] ?? ($v['name'] ?? ''));
     location_fields($v);
     input('محله یا محدوده (اختیاری؛ برای فیلتر جستجو، مثلاً «سعادت‌آباد»)', 'district', $v['district'] ?? '', 'text', false, 80);
-    input('آدرس کامل', 'address', $v['address'] ?? '', 'text', true, 2000);
+    // 1.0.19: address in three parts; a stored one-line address is split for editing.
+    [$main, $side, $extra] = array_key_exists('street_main', $v) ? [(string) $v['street_main'], (string) ($v['street_side'] ?? ''), (string) ($v['address_extra'] ?? '')] : (!empty($v['address']) ? clinic_address_parts($v) : ['', '', '']);
+    input('خیابان اصلی (مثلاً خیابان امام خمینی)', 'street_main', $main, 'text', true, 400);
+    input('خیابان فرعی (اختیاری؛ خیابان یا بلوار دوم و سوم)', 'street_side', $side, 'text', false, 600);
+    input('ادامه آدرس (اختیاری؛ مثلاً جنب بانک ملی، روبروی پارک، پلاک و طبقه)', 'address_extra', $extra, 'text', false, 800);
     input('تلفن مطب با پیش‌شماره', 'phone', $v['phone'] ?? '', 'tel', false, 11);
     map_fields($v, $manualCoords);
     textarea_field('ملاحظات مطب (اختیاری؛ بالای صفحه انتخاب زمان نمایش داده می‌شود)', 'notes', $v['notes'] ?? '', 2000, 'مثلاً زمان حضور، نحوه پذیرش، پارکینگ یا پوشش بیمه.');

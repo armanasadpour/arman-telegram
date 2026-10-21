@@ -19,7 +19,7 @@
   };
   const updateReview = () => {
     review.replaceChildren(); review.hidden = false;
-    const rows = isCenter ? [['مرکز',value('center_name')],['نوع',selected('kind')],['تلفن',value('phone')],['شهر',selected('city_id')],['نشانی',value('address')],['مسئول',value('manager_name')],['پروانه',value('license_number')]] : [['پزشک', 'دکتر ' + value('name')], ['تخصص', value('specialty_other') || selected('specialty_id')], ['نظام پزشکی', value('medical_code')], ['شماره همراه', value('mobile')], ['مطب', value('clinic_name')], ['شهر', selected('city_id')], ['آدرس', value('address')], ['نسخه انتخابی', value('plan_choice') === 'pro' ? 'پرو؛ فعال‌سازی پس از تأیید' : 'رایگان']];
+    const rows = isCenter ? [['مرکز',value('center_name')],['نوع',selected('kind')],['تلفن',value('phone')],['شهر',selected('city_id')],['نشانی',value('address')],['مسئول',value('manager_name')],['پروانه',value('license_number')]] : [['پزشک', 'دکتر ' + value('name')], ['تخصص', value('specialty_other') || selected('specialty_id')], ['نظام پزشکی', value('medical_code')], ['شماره همراه', value('mobile')], ['مطب', value('clinic_name')], ['شهر', selected('city_id')], ['آدرس', ['street_main', 'street_side', 'address_extra'].map(value).filter(Boolean).join('، ')], ['نسخه انتخابی', value('plan_choice') === 'pro' ? 'پرو؛ فعال‌سازی پس از تأیید' : 'رایگان']];
     rows.forEach(([label, text]) => {const row = document.createElement('div'), key = document.createElement('span'), val = document.createElement('strong');row.className='dr-review-row';key.textContent=label;val.textContent=text;row.append(key,val);review.append(row);});
   };
   const show = (index, focus = true) => {
