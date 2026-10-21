@@ -9,8 +9,11 @@ $counts = ['all' => count($rows), 'in' => 0, 'wait' => 0];
 foreach ($rows as $r) {
     if (in_array($r['state'], ['arrived', 'in_visit', 'completed'], true)) $counts['in']++;
     elseif ($r['state'] === 'waiting') $counts['wait']++;
+    else $counts['out'] = ($counts['out'] ?? 0) + 1;
 }
-$badge = ['waiting' => 'status-held', 'arrived' => 'status-confirmed', 'in_visit' => 'status-completed', 'completed' => 'status-completed', 'no_show' => 'status-no_show'];
+$badge = ['waiting' => 'status-held', 'arrived' => 'status-confirmed', 'in_visit' => 'status-completed', 'completed' => 'status-completed', 'no_show' => 'status-no_show', 'absent' => 'status-no_show'];
+// Row colour: came (light green) or did not come (light red); others keep the zebra stripes.
+$tone = fn(string $state) => in_array($state, ['arrived', 'in_visit', 'completed'], true) ? 'ck-in' : (in_array($state, ['no_show', 'absent'], true) ? 'ck-out' : '');
 ?>
 <section class="ck">
   <form method="get" action="<?= esc($page) ?>" class="ck-search">
@@ -28,7 +31,7 @@ $badge = ['waiting' => 'status-held', 'arrived' => 'status-confirmed', 'in_visit
     <div class="ck-head">
       <div>
         <h2>نوبت‌های <?= esc(jalali_long($day)) ?></h2>
-        <p class="ck-stats"><span><?= fa_number($counts['all']) ?> نوبت</span><span class="ok"><?= fa_number($counts['in']) ?> مراجعه‌کرده</span><span class="wait"><?= fa_number($counts['wait']) ?> در انتظار</span></p>
+        <p class="ck-stats"><span><?= fa_number($counts['all']) ?> نوبت</span><span class="ok"><?= fa_number($counts['in']) ?> مراجعه‌کرده</span><span class="wait"><?= fa_number($counts['wait']) ?> در انتظار</span><?php if (!empty($counts['out'])): ?><span class="out"><?= fa_number($counts['out']) ?> مراجعه نکرده</span><?php endif; ?></p>
       </div>
       <button type="button" class="button ck-open" data-ck-open><?= icon('calendar-check') ?> چک نوبت</button>
     </div>
@@ -38,13 +41,14 @@ $badge = ['waiting' => 'status-held', 'arrived' => 'status-confirmed', 'in_visit
     <?php else: ?>
       <div class="ck-table-wrap">
         <table class="ck-table">
-          <thead><tr><th>ردیف</th><th>نام بیمار</th><th>کد ملی</th><th>تاریخ و ساعت نوبت</th><th>وضعیت نوبت</th></tr></thead>
+          <thead><tr><th>ردیف</th><th>نام بیمار</th><th>کد ملی</th><th>شماره همراه</th><th>تاریخ و ساعت نوبت</th><th>وضعیت نوبت</th></tr></thead>
           <tbody>
             <?php foreach ($rows as $i => $r): ?>
-              <tr data-ck-row="<?= (int) $r['id'] ?>">
+              <tr data-ck-row="<?= (int) $r['id'] ?>" class="<?= $tone($r['state']) ?>">
                 <td data-label="ردیف"><?= fa_number($i + 1) ?></td>
                 <td data-label="نام بیمار"><strong><?= esc($r['patient_name']) ?></strong></td>
                 <td data-label="کد ملی"><bdi dir="ltr"><?= $r['national_id'] !== '' ? esc(fa_number($r['national_id'])) : '—' ?></bdi></td>
+                <td data-label="شماره همراه"><bdi dir="ltr"><?= $r['phone'] ? esc(fa_number($r['phone'])) : '—' ?></bdi></td>
                 <td data-label="تاریخ و ساعت"><bdi><?= esc(jdate($r['starts_at'], true)) ?></bdi></td>
                 <td data-label="وضعیت"><span class="badge <?= esc($badge[$r['state']] ?? '') ?>" data-ck-state><?= esc($r['state_label']) ?></span></td>
               </tr>

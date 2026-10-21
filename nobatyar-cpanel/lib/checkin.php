@@ -35,6 +35,11 @@ function checkin_rows(int $clinic, string $day): array
         $r['national_id'] = $nid;
         $r['state_label'] = attendance_label($r);
         $r['state'] = $r['status'] === 'confirmed' ? $r['attendance_state'] : $r['status'];
+        if ($r['state'] === 'waiting' && $day < date('Y-m-d')) {
+            // A past day still «در انتظار» means the patient never came.
+            $r['state'] = 'absent';
+            $r['state_label'] = 'مراجعه نکرده';
+        }
     }
     unset($r);
     return $rows;
@@ -71,6 +76,7 @@ function checkin_public(array $r): array
         'revision' => (int) $r['revision'],
         'name' => (string) $r['patient_name'],
         'national_id' => $r['national_id'] !== '' ? fa_number($r['national_id']) : '—',
+        'phone' => $r['phone'] ? fa_number($r['phone']) : '—',
         'when' => jdate($r['starts_at'], true),
         'service' => (string) ($r['service_name'] ?? ''),
         'tracking' => fa_number(tracking_label((string) $r['tracking_code'])),

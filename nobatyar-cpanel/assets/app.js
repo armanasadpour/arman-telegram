@@ -1119,7 +1119,8 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
   const results = dialog.querySelector('[data-ck-results]');
   const msg = dialog.querySelector('[data-ck-msg]');
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
-  const badge = { waiting: 'status-held', arrived: 'status-confirmed', in_visit: 'status-completed', completed: 'status-completed', no_show: 'status-no_show' };
+  const badge = { waiting: 'status-held', arrived: 'status-confirmed', in_visit: 'status-completed', completed: 'status-completed', no_show: 'status-no_show', absent: 'status-no_show' };
+  const tone = (s) => (['arrived', 'in_visit', 'completed'].includes(s) ? 'ck-in' : ['no_show', 'absent'].includes(s) ? 'ck-out' : '');
   const api = (route, body) =>
     fetch('api.php?route=session', { credentials: 'same-origin' })
       .then((r) => r.json())
@@ -1130,6 +1131,7 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
       <div class="ck-card-top"><strong>${esc(r.name)}</strong><span class="badge ${badge[r.state] || ''}">${esc(r.state_label)}</span></div>
       <dl>
         <div><dt>کد ملی</dt><dd><bdi dir="ltr">${esc(r.national_id)}</bdi></dd></div>
+        <div><dt>شماره همراه</dt><dd><bdi dir="ltr">${esc(r.phone)}</bdi></dd></div>
         <div><dt>تاریخ و ساعت</dt><dd><bdi>${esc(r.when)}</bdi></dd></div>
         ${r.service ? `<div><dt>خدمت</dt><dd>${esc(r.service)}</dd></div>` : ''}
         <div><dt>کد رهگیری</dt><dd><bdi dir="ltr">${esc(r.tracking)}</bdi></dd></div>
@@ -1139,8 +1141,10 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
         : `<p class="ck-note">${r.state === 'waiting' ? 'ثبت حضور فقط در روز نوبت ممکن است.' : 'وضعیت این نوبت «' + esc(r.state_label) + '» است.'}</p>`}
     </article>`;
   const syncRow = (r) => {
-    const cell = document.querySelector(`[data-ck-row="${r.id}"] [data-ck-state]`);
+    const row = document.querySelector(`[data-ck-row="${r.id}"]`);
+    const cell = row && row.querySelector('[data-ck-state]');
     if (cell) { cell.textContent = r.state_label; cell.className = 'badge ' + (badge[r.state] || ''); }
+    if (row) row.className = tone(r.state);
   };
   open.addEventListener('click', () => {
     results.innerHTML = '';
