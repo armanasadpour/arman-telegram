@@ -16,8 +16,8 @@
  const g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,'#c5e3ff');g.addColorStop(1,'#eaf5ff');
  circle(-170,-200,820,g);circle(W+310,160,620,'#e7f3ff');circle(W+640,2030,1110,'#edf6ff');circle(-280,2480,680,'#e4f1ff');
  c.fillStyle='#d5eaff';c.beginPath();c.moveTo(0,3160);c.quadraticCurveTo(1000,3900,W,3230);c.lineTo(W,H);c.lineTo(0,H);c.fill();
- if(logo)fit(logo,640,60,1200,340);else{mark(1590,235,2.25);text(data.site,1130,290,170,ink,700,1000);}
- text('ساده‌تر، سریع‌تر، مطمئن‌تر',W/2,430,62,'#737c8d',400);
+ // 1.0.24: an uploaded logo already carries the slogan; it is drawn only under the built-in mark.
+ if(logo)fit(logo,640,60,1200,340);else{mark(1590,235,2.25);text(data.site,1130,290,170,ink,700,1000);text('ساده‌تر، سریع‌تر، مطمئن‌تر',W/2,430,62,'#737c8d',400);}
  c.save();c.shadowColor='#339cff44';c.shadowBlur=55;circle(W/2,865,396,blue);c.restore();circle(W/2,865,374,'white');
  c.save();c.beginPath();c.arc(W/2,865,350,0,Math.PI*2);c.clip();if(photo){const scale=Math.max(700/photo.width,700/photo.height);c.drawImage(photo,W/2-photo.width*scale/2,865-photo.height*scale/2,photo.width*scale,photo.height*scale);}else{c.fillStyle='#e7f2ff';c.fillRect(0,0,W,H);circle(W/2,790,100,'#93bce5');circle(W/2,1110,230,'#93bce5');}c.restore();
  text(data.name,W/2,1440,140,ink,700,1900);text(data.specialty,W/2,1565,80,'#626c7d',400,2130);
