@@ -1042,3 +1042,16 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
   window.geoAskPending = true;
   document.addEventListener('click', ask, true);
 })();
+
+/* 1.0.13 homepage: «بیشتر» opens every specialty in a bottom sheet (native <dialog>; Esc and backdrop close it). */
+(() => {
+  const sheet = document.querySelector('[data-spec-sheet]');
+  const more = document.querySelector('[data-spec-more]');
+  if (!sheet || !more || typeof sheet.showModal !== 'function') return;
+  more.addEventListener('click', () => sheet.showModal());
+  sheet.querySelector('[data-spec-close]').addEventListener('click', () => sheet.close());
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet) sheet.close();
+  });
+  sheet.addEventListener('close', () => more.focus());
+})();

@@ -32,6 +32,7 @@ function admin_dispatch(string $action, array $data, array $files = []): ?string
         'delete_taxonomy' => 'admin_delete_taxonomy',
         'restore_specialty' => fn($d) => specialty_admin_delete(positive_id($d['id'] ?? 0), true),
         'specialty_starter' => fn($d) => specialty_add_starter(),
+        'specialty_default_icon' => 'specialty_default_icon_save',
         'move' => fn($d) => move_sort_order(
             (string) ($d['type'] ?? ''),
             positive_id($d['id'] ?? 0),

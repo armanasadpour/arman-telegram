@@ -207,8 +207,8 @@ function home_doctor_cards(string $mode, ?array $city, int $limit): array
 }
 
 /**
- * Homepage specialties with the number of visible doctors in the city (or country). Every specialty that has
- * doctors is shown (those first); the administrator's homepage ticks add specialties without doctors yet
+ * Homepage specialties with the number of visible doctors in the city (or country), most doctors first. Every
+ * specialty that has doctors is shown; the administrator's homepage ticks add specialties without doctors yet
  * («به‌زودی»). When the city has none at all, the country-wide list is used so the section never vanishes.
  */
 function home_specialties(?array $city, int $limit): array
@@ -222,7 +222,7 @@ function home_specialties(?array $city, int $limit): array
     $rows = query(
         "SELECT s.id,s.name,s.icon,s.image_file,s.level,s.show_on_home,(SELECT COUNT(DISTINCT d.id) FROM doctors d JOIN specialties sp ON sp.id=d.specialty_id JOIN clinics cl ON cl.doctor_id=d.id JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE (sp.id=s.id OR sp.parent_id=s.id) AND " .
             visible_doctor_sql() . ' AND ' . public_clinic_sql() . $cityCond . ") doctors
-         FROM specialties s WHERE s.active=1 AND s.deleted_at IS NULL AND s.level IN ('general','specialty','allied') HAVING doctors>0 OR s.show_on_home=1 ORDER BY doctors>0 DESC,s.sort_order,s.name LIMIT " . max(1, $limit),
+         FROM specialties s WHERE s.active=1 AND s.deleted_at IS NULL AND s.level IN ('general','specialty','allied') HAVING doctors>0 OR s.show_on_home=1 ORDER BY doctors DESC,s.sort_order,s.name LIMIT " . max(1, $limit),
         $args,
     )->fetchAll();
     if ($city && !array_filter($rows, fn($r) => (int) $r['doctors'] > 0)) {

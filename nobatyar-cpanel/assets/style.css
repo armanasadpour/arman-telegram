@@ -2188,3 +2188,21 @@ input[data-jdate]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://
 .spec-scroll .spec-card.current{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-100)}
 .spec-scroll .spec-all .spec-icon{background:var(--bg);color:var(--ink-2)}
 @media (max-width:600px){.spec-scroll{gap:8px}.spec-scroll .spec-card{flex-basis:84px;padding:10px 4px 8px;gap:4px;font-size:12px}.spec-scroll .spec-icon{width:40px;height:40px;border-radius:12px}.spec-scroll .spec-icon .icon{width:20px;height:20px}.spec-scroll .spec-card strong{font-size:11.5px;line-height:1.5}}
+
+/* 1.0.13: homepage specialties — five per row, «بیشتر» opens every category in a bottom sheet. */
+.spec-grid.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.spec-more{font:inherit;cursor:pointer;margin:0;box-shadow:none}
+.spec-more .spec-icon{background:var(--bg)!important;color:var(--ink-2)!important}
+.icon-picker-default{font-size:11px;margin-inline-start:4px}
+.spec-sheet{width:min(720px,100%);max-width:100%;max-height:86dvh;margin:auto auto 0;padding:0 16px calc(16px + env(safe-area-inset-bottom));border:0;border-radius:24px 24px 0 0;background:#fff;color:var(--ink);box-shadow:0 -20px 50px -20px #0f172a59;overflow:auto;overscroll-behavior:contain}
+.spec-sheet::backdrop{background:#0f172a73}
+.spec-sheet[open]{animation:spec-up .28s var(--ease)}
+@keyframes spec-up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.spec-sheet-head{position:sticky;top:0;z-index:1;display:block;text-align:center;padding:10px 44px 12px;margin:0 -16px 12px;background:#fff;border-bottom:1px solid var(--line-2)}
+.spec-sheet-head .sheet-grip{display:block;width:40px;height:4px;margin:0 auto 10px;border-radius:4px;background:#cbd5e1}
+.spec-sheet-head h2{margin:0;font-size:16px;line-height:1.6}
+.spec-sheet .spec-sheet-x{position:absolute;left:12px;top:22px;display:grid;place-items:center;width:34px;height:34px;min-height:0;margin:0;padding:0;border:0;border-radius:10px;background:var(--bg);color:var(--ink-2);box-shadow:none}
+.spec-sheet .spec-sheet-x .icon{width:18px;height:18px}
+@media (min-width:721px){.spec-sheet{margin:auto;border-radius:24px;padding-bottom:20px}}
+@media (max-width:600px){.spec-grid.five{gap:6px}.spec-grid.five .spec-card{padding:10px 2px 8px;gap:5px;border-radius:12px}.spec-grid.five .spec-icon{width:38px;height:38px;border-radius:11px}.spec-grid.five .spec-icon .icon{width:19px;height:19px}.spec-grid.five .spec-card strong{font-size:10.5px;line-height:1.5}.spec-grid.five .spec-card small{display:block;font-size:9.5px}}
+@media (max-width:360px){.spec-grid.five{grid-template-columns:repeat(5,minmax(0,1fr))}}

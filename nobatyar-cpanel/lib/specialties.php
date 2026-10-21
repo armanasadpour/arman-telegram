@@ -166,7 +166,7 @@ function specialties_with_doctors(array $cityIds = []): array
             ' AND sp.deleted_at IS NULL AND ' .
             public_clinic_sql() .
             $cityFilter .
-            " GROUP BY sp.id,sp.name,sp.level,sp.icon,sp.image_file,sp.parent_id ORDER BY FIELD(sp.level,'general','specialty','subspecialty','allied'),sp.sort_order,sp.name",
+            " GROUP BY sp.id,sp.name,sp.level,sp.icon,sp.image_file,sp.parent_id ORDER BY doctors DESC,FIELD(sp.level,'general','specialty','subspecialty','allied'),sp.sort_order,sp.name",
         $args,
     )->fetchAll();
 }
@@ -180,8 +180,36 @@ function specialty_visual(array $s, string $class = 'specialty-icon'): string
             esc(rawurlencode($s['image_file'])) .
             '" alt="" loading="lazy" width="48" height="48">';
     }
-    $icon = !empty($s['icon']) && isset(specialty_icons()[$s['icon']]) ? $s['icon'] : 'stethoscope';
+    $icon = !empty($s['icon']) && isset(specialty_icons()[$s['icon']]) ? $s['icon'] : specialty_default_icon();
     return '<span class="' . esc($class) . '">' . icon('sp-' . $icon) . '</span>';
+}
+
+/** Icon of specialties without their own icon or image (admin: «تخصص‌ها و خدمات» → آیکن پیش‌فرض). */
+function specialty_default_icon(): string
+{
+    static $icon = null;
+    if ($icon === null) {
+        try {
+            $icon = setting('specialty_default_icon', 'stethoscope');
+        } catch (Throwable $e) {
+            $icon = 'stethoscope';
+        }
+        if (!isset(specialty_icons()[$icon])) {
+            $icon = 'stethoscope';
+        }
+    }
+    return $icon;
+}
+
+function specialty_default_icon_save(array $data): string
+{
+    $icon = (string) ($data['icon'] ?? '');
+    if (!isset(specialty_icons()[$icon])) {
+        throw new AuthError('آیکن انتخاب‌شده معتبر نیست.');
+    }
+    settings_save(['specialty_default_icon' => $icon]);
+    audit('specialty.default_icon', null, $icon);
+    return 'آیکن پیش‌فرض تخصص‌ها ذخیره شد.';
 }
 
 /* ---------- Administration ---------- */

@@ -106,7 +106,8 @@ if ($landing) {
         'notice' => setting('home_notice'),
         'chips' => $enabled('hero') ? home_chips($sections['hero']['chips'], $city) : [],
         'banners' => $enabled('banners') ? home_banners() : [],
-        'specialtyCards' => $enabled('specialties') ? home_specialties($city, $count('specialties')) : [],
+        // 1.0.13: five per row, nine + «بیشتر» on the page and every category in the bottom sheet.
+        'specialtyCards' => $enabled('specialties') ? home_specialties($city, 200) : [],
         'available' => $enabled('available') ? home_doctor_cards('available', $city, $count('available')) : [],
         'featured' => $enabled('featured') ? home_doctor_cards('featured', $city, $count('featured')) : [],
         'newest' => $enabled('newest') ? home_doctor_cards('newest', $city, $count('newest')) : [],

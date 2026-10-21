@@ -123,7 +123,7 @@ function admin_action_permission(string $action): string
         $groups = [
             'doctors' => ['create_doctor', 'edit_doctor', 'review', 'clinic', 'delete_clinic', 'slot', 'doctor_suspend', 'doctor_unsuspend', 'doctor_delete'],
             'centers' => ['center_review', 'center_active', 'center_settings'],
-            'catalog' => ['taxonomy', 'delete_taxonomy', 'restore_specialty', 'specialty_starter', 'move', 'booking_config', 'booking_page', 'geo_bulk', 'geo_settings'],
+            'catalog' => ['taxonomy', 'delete_taxonomy', 'restore_specialty', 'specialty_starter', 'specialty_default_icon', 'move', 'booking_config', 'booking_page', 'geo_bulk', 'geo_settings'],
             'users' => ['user_status', 'link_doctor', 'unlink_doctor', 'grant_scope', 'revoke_scope', 'user_suspend', 'user_unsuspend', 'user_delete'],
             'finance' => [
                 'wallet_payout_handle', 'wallet_refund_settings', 'subscription', 'settings', 'revenue_settings', 'fee_rule_save', 'fee_rule_delete', 'refund_handle', 'plan_save',

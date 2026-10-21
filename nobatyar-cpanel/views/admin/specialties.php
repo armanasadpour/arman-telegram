@@ -84,8 +84,9 @@ $icons = specialty_icons();
       </label>
       <fieldset class="icon-picker">
         <legend>آیکن</legend>
+        <label title="پیش‌فرض (از «آیکن پیش‌فرض تخصص‌ها»)"><input type="radio" name="icon" value=""<?= checked_attr(empty($edit['icon'])) ?>><?= icon('sp-' . specialty_default_icon()) ?><span class="icon-picker-default">پیش‌فرض</span></label>
         <?php foreach ($icons as $key => $label): ?>
-          <label title="<?= esc($label) ?>"><input type="radio" name="icon" value="<?= $key ?>"<?= checked_attr(($edit['icon'] ?? 'stethoscope') === $key) ?>><?= icon('sp-' . $key) ?><span class="sr-only"><?= esc($label) ?></span></label>
+          <label title="<?= esc($label) ?>"><input type="radio" name="icon" value="<?= $key ?>"<?= checked_attr(($edit['icon'] ?? '') === $key) ?>><?= icon('sp-' . $key) ?><span class="sr-only"><?= esc($label) ?></span></label>
         <?php endforeach; ?>
       </fieldset>
       <label>یا تصویر اختصاصی (PNG، JPEG یا WebP، حداکثر ۲ مگابایت)
@@ -102,6 +103,19 @@ $icons = specialty_icons();
     </form>
   </section>
 </div>
+<section class="panel">
+  <div class="panel-head"><h2>آیکن پیش‌فرض تخصص‌ها</h2><span class="muted small">برای تخصص‌هایی که آیکن یا تصویر اختصاصی ندارند، در صفحه اصلی، دسته‌بندی‌ها و صفحه پزشک.</span></div>
+  <form method="post" class="stack">
+    <?php form_token('specialty_default_icon'); ?>
+    <fieldset class="icon-picker">
+      <legend class="sr-only">آیکن پیش‌فرض</legend>
+      <?php foreach ($icons as $key => $label): ?>
+        <label title="<?= esc($label) ?>"><input type="radio" name="icon" value="<?= $key ?>"<?= checked_attr(specialty_default_icon() === $key) ?>><?= icon('sp-' . $key) ?><span class="sr-only"><?= esc($label) ?></span></label>
+      <?php endforeach; ?>
+    </fieldset>
+    <div class="actions"><button>ذخیره آیکن پیش‌فرض</button></div>
+  </form>
+</section>
 <section class="panel">
   <div class="panel-head"><h2>خدمات تعریف‌شده پزشکان</h2><span class="muted small">هر پزشک خدمات و مدت آن را در پنل خود تعیین می‌کند؛ این فهرست نمای کلی است.</span></div>
   <?php if (!$services): ?>
