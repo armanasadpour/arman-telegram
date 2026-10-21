@@ -143,7 +143,7 @@ if ($homeWork): ?>
       <?php foreach ($specialtyCards as $i => $s): ?>
         <a class="spec-card<?= $i >= $mobile('specialties') ? ' hide-mobile' : '' ?>" href="<?= esc(specialty_url((int) $s['id'], $s['name'])) ?>">
           <?= specialty_visual($s, 'spec-icon') ?><strong><?= esc(specialty_display_title($s['name'], $s['level'] ?? null)) ?></strong>
-          <small><?= $s['doctors'] ? fa_number($s['doctors']) . ' پزشک' : 'به‌زودی' ?></small>
+          <?php if (!$s['doctors']): ?><small>به‌زودی</small><?php endif; ?>
         </a>
       <?php endforeach; ?>
     </div>

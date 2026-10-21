@@ -31,7 +31,7 @@ $mapQuery = search_query($input, $base);
       <a class="spec-card spec-all<?= $current ? '' : ' current' ?>" href="index.php?<?= esc(search_query($input, $base, ['specialty' => null, 'page' => null])) ?>"<?= $current ? '' : ' aria-current="page"' ?>><span class="spec-icon"><?= icon('grip') ?></span><strong>همه تخصص‌ها</strong></a>
       <?php foreach ($specialties as $s): $on = $current === [(int) $s['id']]; ?>
         <a class="spec-card<?= $on ? ' current' : '' ?>" href="index.php?<?= esc(search_query($input, $base, ['specialty' => $on ? null : [(int) $s['id']], 'page' => null])) ?>"<?= $on ? ' aria-current="page"' : '' ?>>
-          <?= specialty_visual($s, 'spec-icon') ?><strong><?= esc(specialty_display_title($s['name'], $s['level'] ?? null)) ?></strong><small><?= fa_number($s['doctors']) ?> پزشک</small>
+          <?= specialty_visual($s, 'spec-icon') ?><strong><?= esc(specialty_display_title($s['name'], $s['level'] ?? null)) ?></strong>
         </a>
       <?php endforeach; ?>
     </nav>
