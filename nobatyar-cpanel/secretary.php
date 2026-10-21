@@ -12,6 +12,7 @@ $tabs = [
     'patients' => 'بیماران و خانواده',
     'book' => 'ثبت نوبت',
     'queue' => 'صف پذیرش و زمان تقریبی',
+    'checkin' => 'چک نوبت',
     'delays' => 'تأخیر و اطلاع‌رسانی',
     'notifications' => 'اعلان‌ها',
     'audit' => 'گزارش تغییرات',
@@ -243,6 +244,8 @@ try {
         if (!$rows) {
             echo '<p class="empty-state">نوبتی در این بازه وجود ندارد.</p>';
         }
+    } elseif ($tab === 'checkin') {
+        checkin_page($clinic, $clinics, 'secretary.php', ['tab' => 'checkin']);
     } elseif ($tab === 'queue') {
         render('reception/queue', ['clinic' => $clinic, 'c' => $c, 'canManage' => $canManage]);
     } elseif ($tab === 'notifications') {

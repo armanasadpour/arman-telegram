@@ -53,6 +53,7 @@ require_once __DIR__ . '/lib/view.php';
 
 require_once __DIR__ . '/lib/domain.php';
 require_once __DIR__ . '/lib/address.php';
+require_once __DIR__ . '/lib/checkin.php';
 require_once __DIR__ . '/lib/locale.php';
 require_once __DIR__ . '/lib/geo.php';
 require_once __DIR__ . '/lib/specialties.php';

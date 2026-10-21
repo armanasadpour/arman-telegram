@@ -36,6 +36,8 @@ try {
         'geo/nearby' => 'GET',
         'geo/select' => 'POST',
         'geo/locate' => 'POST',
+        'checkin/find' => 'POST',
+        'checkin/confirm' => 'POST',
         'specialties' => 'GET',
         'profile' => 'POST',
         'bookings' => 'GET',
@@ -288,6 +290,25 @@ try {
                 ],
                 cities_nearby(positive_id($_GET['city'] ?? 0)),
             );
+            break;
+        case 'checkin/find':
+            // «چک نوبت»: the clinic's appointments of the chosen day matching a national ID or name.
+            $clinic = positive_id($data['clinic_id'] ?? 0);
+            checkin_scope($clinic);
+            $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($data['date'] ?? '')) ? (string) $data['date'] : parse_jdate(field($data, 'date', 10));
+            $out = array_map('checkin_public', checkin_find($clinic, $day, field($data, 'q', 120)));
+            break;
+        case 'checkin/confirm':
+            // «ثبت حضور»: the reception step «مراجعه‌کرده» (appointment day only; joins the queue).
+            $clinic = positive_id($data['clinic_id'] ?? 0);
+            checkin_scope($clinic, 'bookings');
+            $b = booking_row(positive_id($data['id'] ?? 0));
+            if ((int) $b['clinic_id'] !== $clinic) {
+                throw new AuthError('این نوبت مربوط به این مطب نیست.', 404);
+            }
+            reception_change(['id' => $b['id'], 'revision' => (int) ($data['revision'] ?? 0), 'operation' => 'arrived', 'reason' => 'ثبت حضور با چک نوبت']);
+            $row = array_values(array_filter(checkin_rows($clinic, substr($b['starts_at'], 0, 10)), fn($r) => (int) $r['id'] === (int) $b['id']));
+            $out = ['message' => 'حضور بیمار ثبت شد.', 'row' => $row ? checkin_public($row[0]) : null];
             break;
         case 'geo/locate':
             // Browser position → nearest active city, remembered like a manual choice. Coordinates are not stored.

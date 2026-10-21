@@ -1105,3 +1105,75 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
       });
   });
 })();
+
+/*
+ * 1.0.21 «چک نوبت» (doctor and secretary panels): the popup looks a patient up by national ID or name among the
+ * listed day's appointments (api checkin/find) and «ثبت حضور» records the arrival (checkin/confirm); the list
+ * row is updated in place.
+ */
+(() => {
+  const dialog = document.querySelector('[data-ck-dialog]');
+  const open = document.querySelector('[data-ck-open]');
+  if (!dialog || !open || typeof dialog.showModal !== 'function') return;
+  const form = dialog.querySelector('[data-ck-find]');
+  const results = dialog.querySelector('[data-ck-results]');
+  const msg = dialog.querySelector('[data-ck-msg]');
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+  const badge = { waiting: 'status-held', arrived: 'status-confirmed', in_visit: 'status-completed', completed: 'status-completed', no_show: 'status-no_show' };
+  const api = (route, body) =>
+    fetch('api.php?route=session', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((s) => fetch('api.php?route=' + route, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': s.data.csrf }, body: JSON.stringify(body) }))
+      .then((r) => r.json().then((j) => (r.ok ? j.data : Promise.reject(new Error((j.error && j.error.message) || 'خطا')))));
+  const card = (r) => `
+    <article class="ck-card" data-ck-card="${r.id}">
+      <div class="ck-card-top"><strong>${esc(r.name)}</strong><span class="badge ${badge[r.state] || ''}">${esc(r.state_label)}</span></div>
+      <dl>
+        <div><dt>کد ملی</dt><dd><bdi dir="ltr">${esc(r.national_id)}</bdi></dd></div>
+        <div><dt>تاریخ و ساعت</dt><dd><bdi>${esc(r.when)}</bdi></dd></div>
+        ${r.service ? `<div><dt>خدمت</dt><dd>${esc(r.service)}</dd></div>` : ''}
+        <div><dt>کد رهگیری</dt><dd><bdi dir="ltr">${esc(r.tracking)}</bdi></dd></div>
+      </dl>
+      ${r.can_checkin
+        ? `<button type="button" class="button block" data-ck-confirm="${r.id}" data-revision="${r.revision}">ثبت حضور</button>`
+        : `<p class="ck-note">${r.state === 'waiting' ? 'ثبت حضور فقط در روز نوبت ممکن است.' : 'وضعیت این نوبت «' + esc(r.state_label) + '» است.'}</p>`}
+    </article>`;
+  const syncRow = (r) => {
+    const cell = document.querySelector(`[data-ck-row="${r.id}"] [data-ck-state]`);
+    if (cell) { cell.textContent = r.state_label; cell.className = 'badge ' + (badge[r.state] || ''); }
+  };
+  open.addEventListener('click', () => {
+    results.innerHTML = '';
+    msg.textContent = '';
+    form.reset();
+    dialog.showModal();
+    form.q.focus();
+  });
+  dialog.querySelector('[data-ck-close]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    msg.textContent = 'در حال جستجو…';
+    results.innerHTML = '';
+    api('checkin/find', { clinic_id: +dialog.dataset.clinic, date: dialog.dataset.date, q: form.q.value })
+      .then((rows) => {
+        msg.textContent = rows.length ? (rows.length > 1 ? rows.length.toLocaleString('fa-IR') + ' نوبت پیدا شد.' : '') : 'نوبتی با این مشخصات در این روز پیدا نشد.';
+        results.innerHTML = rows.map(card).join('');
+      })
+      .catch((err) => (msg.textContent = err.message));
+  });
+  results.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-ck-confirm]');
+    if (!btn) return;
+    btn.disabled = true;
+    api('checkin/confirm', { clinic_id: +dialog.dataset.clinic, id: +btn.dataset.ckConfirm, revision: +btn.dataset.revision })
+      .then((res) => {
+        msg.textContent = res.message;
+        if (res.row) {
+          btn.closest('[data-ck-card]').outerHTML = card(res.row);
+          syncRow(res.row);
+        }
+      })
+      .catch((err) => { msg.textContent = err.message; btn.disabled = false; });
+  });
+})();

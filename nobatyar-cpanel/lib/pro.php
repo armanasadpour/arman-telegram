@@ -36,6 +36,7 @@ function pro_catalog(): array
         'waitlist' => ['kind' => 'feature', 'label' => 'صف انتظار برای روزهای پر', 'icon' => 'clock', 'pro' => true],
         'doctor_notice' => ['kind' => 'feature', 'label' => 'اطلاعیه به بیماران (صفحه پزشک و اعلان)', 'icon' => 'megaphone', 'pro' => true],
         'booking_qr' => ['kind' => 'feature', 'label' => 'لینک اختصاصی، QR و پوستر رزرو برای مطب', 'icon' => 'share', 'pro' => true],
+        'checkin' => ['kind' => 'feature', 'label' => 'چک نوبت (تأیید حضور بیمار با کد ملی یا نام)', 'icon' => 'calendar-check', 'pro' => true],
         'reception' => ['kind' => 'feature', 'label' => 'ثبت نوبت تلفنی و حضوری توسط پزشک', 'icon' => 'phone', 'pro' => false],
         'centers' => ['kind' => 'feature', 'label' => 'همکاری با مراکز درمانی', 'icon' => 'building', 'pro' => false],
     ];

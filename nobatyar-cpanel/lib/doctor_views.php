@@ -164,6 +164,13 @@ function doctor_view(string $tab, array $d, array $clinics, ?array $cl): void
                 'services' => $services,
             ]);
             break;
+        case 'checkin':
+            if (!$clinic) {
+                echo '<p class="empty-state">ابتدا یک مطب ثبت کنید.</p>';
+                break;
+            }
+            checkin_page($clinic, $clinics, 'doctor-panel.php', ['doctor' => $id, 'tab' => 'checkin']);
+            break;
         case 'calendar':
         case 'bookings':
         case 'history':

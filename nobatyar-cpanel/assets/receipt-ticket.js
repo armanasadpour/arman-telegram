@@ -74,13 +74,18 @@
     c.restore();
   };
   const brand = (right, y, scale) => {
-    // The site mark (a tick with a dot) at the right edge and the name to its left; used when no logo is uploaded.
-    c.save(); c.translate(right - 45 * scale, y); c.scale(scale, scale);
-    c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = '#3a3a3e'; c.lineWidth = 22;
-    c.beginPath(); c.moveTo(-34, 0); c.lineTo(-6, 28); c.lineTo(40, -22); c.stroke();
-    circle(-4, -46, 14, '#8a8a90');
+    // The site's default logo (no image uploaded): the calendar-plus mark in its tinted box and the site name,
+    // exactly as in the site header.
+    const k = scale, box0 = 64 * k;
+    c.save();
+    c.translate(right - box0, y - box0 / 2 - 6 * k);
+    c.beginPath(); c.roundRect(0, 0, box0, box0, 16 * k); c.fillStyle = '#eff6ff'; c.fill();
+    c.translate(box0 / 2, box0 / 2); c.scale(1.9 * k, 1.9 * k); c.translate(-12, -12);
+    c.strokeStyle = '#2563eb'; c.lineWidth = 1.8; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.stroke(new Path2D('M7 4h10a4 4 0 0 1 4 4v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4zM3 9h18M8 2.5v3.5M16 2.5v3.5M12 12v6M9 15h6'));
     c.restore();
-    text(data.site, right - 105 * scale, y + 28 * scale, 74 * scale, { weight: 700, max: 280 * scale });
+    text(data.site, right - box0 - 16 * k, y + 4 * k, 46 * k, { weight: 700, max: 260 * k });
+    text('سامانه نوبت‌دهی پزشکان', right - box0 - 16 * k, y + 36 * k, 19 * k, { color: soft, max: 260 * k });
   };
 
   try {
@@ -96,8 +101,7 @@
     text('تاریخ صدور: ' + data.issued + '   |   ساعت: ' + data.issuedTime, 982, 210, 17.5, { color: muted });
     if (logo) fit(logo, 72, 60, 400, 170);
     else {
-      brand(470, 140, 1);
-      text('ساده‌تر، سریع‌تر، مطمئن‌تر', 260, 212, 27, { color: soft, align: 'center' });
+      brand(460, 140, 1.25);
     }
     hline(70, 985, 243, '#3a3a3e', null, 1.6);
 
@@ -182,7 +186,7 @@
     c.fillText(data.domain, 934, 1412);
     text('مرجع نوبت‌دهی آنلاین پزشکان', 934, 1442, 15.5, { color: muted });
     if (logo) fit(logo, 72, 1385, 200, 70);
-    else { brand(268, 1418, 0.42); text('ساده‌تر، سریع‌تر، مطمئن‌تر', 170, 1450, 13, { color: soft, align: 'center' }); }
+    else brand(268, 1418, 0.6);
 
     // Outputs
     const jpeg = canvas.toDataURL('image/jpeg', 0.92);
