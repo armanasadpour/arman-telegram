@@ -181,7 +181,7 @@ $img = fn($f, $fallback) => $f !== '' ? home_image_url($f) : $fallback;
 
 <?php elseif ($view === 'specialties'): /** @var array $rows */ ?>
 <section class="panel">
-  <div class="panel-head"><h2>تخصص‌های صفحه اصلی</h2><span class="muted small">تخصص‌هایی که پزشک فعال دارند همیشه با آیکن نمایش داده می‌شوند؛ تیک یعنی تخصص حتی بدون پزشک هم (با «به‌زودی») نمایش داده شود. ترتیب همین فهرست، ترتیب نمایش در همه صفحه‌هاست. تصویر و آیکن هر تخصص در <a href="admin.php?tab=specialties">تخصص‌ها و خدمات</a>.</span></div>
+  <div class="panel-head"><h2>تخصص‌های صفحه اصلی</h2><span class="muted small">همه تخصص‌های فعال در صفحه اصلی نمایش داده می‌شوند: اول تخصص‌هایی با بیشترین پزشک، سپس به ترتیب همین فهرست. برای پنهان کردن یک تخصص، آن را در «تخصص‌ها و خدمات» غیرفعال کنید. تصویر و آیکن هر تخصص در <a href="admin.php?tab=specialties">تخصص‌ها و خدمات</a>.</span></div>
   <form method="post">
     <?php form_token('home_specialties'); ?><input type="hidden" name="return_view" value="specialties">
     <ol class="sort-list compact" data-sortable>
@@ -190,7 +190,7 @@ $img = fn($f, $fallback) => $f !== '' ? home_image_url($f) : $fallback;
           <input type="hidden" name="order[]" value="<?= (int) $s['id'] ?>">
           <span class="grip" aria-hidden="true"><?= icon('grip') ?></span>
           <?= specialty_visual($s) ?>
-          <label class="check sort-main"><input type="checkbox" name="show[]" value="<?= (int) $s['id'] ?>"<?= checked_attr((int) $s['show_on_home'] === 1) ?>> <?= esc($s['name']) ?><?= $s['active'] ? '' : ' <small class="muted">(غیرفعال)</small>' ?></label>
+          <span class="sort-main"><?= esc($s['name']) ?><?= $s['active'] ? '' : ' <small class="muted">(غیرفعال؛ نمایش داده نمی‌شود)</small>' ?></span>
           <span class="sort-buttons">
             <button type="button" class="icon-button" data-move="up" aria-label="بالا"><?= icon('arrow-up') ?></button>
             <button type="button" class="icon-button" data-move="down" aria-label="پایین"><?= icon('arrow-down') ?></button>

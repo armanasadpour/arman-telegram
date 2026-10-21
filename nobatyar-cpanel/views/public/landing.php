@@ -143,7 +143,6 @@ if ($homeWork): ?>
     $specCard = function (array $s): void { ?>
         <a class="spec-card" href="<?= esc(specialty_url((int) $s['id'], $s['name'])) ?>">
           <?= specialty_visual($s, 'spec-icon') ?><strong><?= esc(specialty_display_title($s['name'], $s['level'] ?? null)) ?></strong>
-          <?php if (!$s['doctors']): ?><small>به‌زودی</small><?php endif; ?>
         </a>
     <?php };
     $more = count($specialtyCards) > 10; ?>
