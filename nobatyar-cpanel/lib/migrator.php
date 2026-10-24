@@ -37,6 +37,7 @@ function migration_steps(): array
         28 => ['028.php', 'migrate_v28'],
         29 => ['029.php', 'migrate_v29'],
         30 => ['030.php', 'migrate_v30'],
+        31 => ['031.php', 'migrate_v31'],
     ];
 }
 

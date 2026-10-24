@@ -323,14 +323,12 @@ function admin_view_data(string $tab, string $error): array
             ];
         case 'announcements':
         case 'sms_send':
-            // 1.0.27: both pages target the same audiences; a city segment is counted once its city is chosen.
-            $keys = array_diff(array_keys(announcement_audiences()), ['doctors_city']);
+            // 1.0.29: both pages target the same audiences, optionally limited to one city.
             return $data + [
                 'rows' => $tab === 'announcements' ? query('SELECT a.*,ad.name admin_name,ad.email admin_email FROM admin_announcements a LEFT JOIN admins ad ON ad.id=a.created_by_admin ORDER BY a.id DESC LIMIT 50')->fetchAll() : [],
                 'audiences' => announcement_audiences(),
-                'segments' => bulk_sms_segments(),
                 'provinces' => provinces_list(),
-                'counts' => array_combine($keys, array_map(fn($k) => (int) query('SELECT COUNT(*) FROM (' . announcement_audience_sql($k) . ') x', [0])->fetchColumn(), $keys)),
+                'counts' => array_map('announcement_audience_count', array_combine(array_keys(announcement_audiences()), array_keys(announcement_audiences()))),
             ];
         case 'general':
             return $data + [

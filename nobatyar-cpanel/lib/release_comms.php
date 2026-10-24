@@ -10,25 +10,19 @@ function admin_manual_sms(array $data): string {
     $ok=sms_enqueue('manual_message',$row['mobile'],['token10'=>$row['name'],'token20'=>$body],'manual:'.admin_current()['id'].':'.$key);
     audit('sms.manual',(int)$m[2],$m[1]);return $ok?'پیام در صف ارسال قرار گرفت؛ نتیجه در گزارش پیامک قابل مشاهده است.':'پیام قبلاً در صف ثبت شده یا شماره گیرنده معتبر نیست.';
 }
-/** Doctor segments a bulk SMS can target (1.0.27); the same recipients as the matching announcement audiences. */
-function bulk_sms_segments(): array
-{
-    return ['doctors' => 'همه پزشکان', 'doctors_pro' => 'پزشکان پرو', 'doctors_free' => 'پزشکان عادی', 'doctors_city' => 'پزشکان یک شهر'];
-}
-
-/** Queues the administrator's text for every doctor of a segment; each doctor receives it once per request. */
+/** Queues the administrator's text for every user of an audience (1.0.29: the announcement groups, optionally one city). */
 function admin_bulk_sms(array $data): string
 {
     admin_require('communications');
-    $segment = (string) ($data['segment'] ?? '');
     $body = field($data, 'message', 1000);
     $key = field($data, 'request_key', 40);
-    if (!preg_match('/^[a-f0-9]{32}$/', $key) || !isset(bulk_sms_segments()[$segment])) {
-        throw new AuthError('گروه گیرندگان را انتخاب کنید.');
+    if (!preg_match('/^[a-f0-9]{32}$/', $key)) {
+        throw new AuthError('درخواست نامعتبر است؛ صفحه را تازه کنید.');
     }
-    $city = (int) ($data['city_id'] ?? 0);
-    if ($segment === 'doctors_city' && (!$city || !query('SELECT 1 FROM cities WHERE id=?', [$city])->fetchColumn())) {
-        throw new AuthError('شهر پزشکان را انتخاب کنید.');
+    try {
+        $audience = announcement_audience_input($data, 'segment');
+    } catch (RuntimeException $e) {
+        throw new AuthError($e->getMessage());
     }
     $tpl = sms_template('manual_message');
     if (!$tpl || !$tpl['enabled'] || $tpl['delivery_mode'] !== 'text') {
@@ -37,12 +31,12 @@ function admin_bulk_sms(array $data): string
     if (!sms_enabled() && !sms_dev_mode()) {
         throw new AuthError('سرویس پیامک غیرفعال است.');
     }
-    $ids = query(announcement_audience_sql($segment, $city) . ' LIMIT 5001', [0])->fetchAll(PDO::FETCH_COLUMN);
+    $ids = query(announcement_audience_sql($audience) . ' LIMIT 20001', [0])->fetchAll(PDO::FETCH_COLUMN);
     if (!$ids) {
-        throw new AuthError('در این گروه پزشک فعالی وجود ندارد.');
+        throw new AuthError('در این گروه کاربر فعالی وجود ندارد.');
     }
-    if (count($ids) > 5000) {
-        throw new AuthError('گروه بزرگ‌تر از ۵۰۰۰ نفر است؛ گروه کوچک‌تری انتخاب کنید.');
+    if (count($ids) > 20000) {
+        throw new AuthError('گروه بزرگ‌تر از ۲۰٬۰۰۰ نفر است؛ یک شهر یا گروه کوچک‌تری انتخاب کنید.');
     }
     throttle('admin_bulk_sms', 10, 3600);
     $n = 0;
@@ -51,9 +45,9 @@ function admin_bulk_sms(array $data): string
             $n += (int) sms_enqueue('manual_message', (string) $u['mobile'], ['token10' => (string) $u['name'], 'token20' => $body], 'bulk:' . $key . ':' . $u['id'], ['user_id' => (int) $u['id']]);
         }
     }
-    audit('sms.bulk', $city ?: null, $segment . ':' . $n);
+    audit('sms.bulk', null, $audience . ':' . $n);
     return $n
-        ? 'پیامک برای ' . fa_number($n) . ' پزشک در صف ارسال قرار گرفت؛ نتیجه در گزارش پیامک قابل مشاهده است.'
+        ? 'پیامک برای ' . fa_number($n) . ' نفر در صف ارسال قرار گرفت؛ نتیجه در گزارش پیامک قابل مشاهده است.'
         : 'پیامک قبلاً در صف ثبت شده یا شماره معتبری در این گروه نیست.';
 }
 function sms_recipient(string $kind,int $id): ?array {

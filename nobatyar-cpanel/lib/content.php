@@ -167,37 +167,56 @@ function home_banners(): array
 function announcement_audiences(): array
 {
     return [
-        'all' => 'همه کاربران فعال',
+        'all' => 'همه کاربران',
+        'booked' => 'کاربرانی که حداقل یک نوبت گرفته‌اند',
         'patients' => 'بیماران',
-        'doctors' => 'پزشکان دارای حساب',
-        'secretaries' => 'منشی‌ها',
-        'centers' => 'مدیران و کارکنان مراکز',
+        'doctors' => 'همه پزشکان',
         'doctors_pro' => 'پزشکان پرو',
         'doctors_free' => 'پزشکان عادی',
-        'doctors_city' => 'پزشکان یک شهر',
+        'doctors_new' => 'پزشکان تازه‌ثبت‌نام (در انتظار تأیید)',
+        'doctors_noschedule' => 'پزشکان بدون تقویم نوبت',
+        'secretaries' => 'منشی‌ها',
+        'centers' => 'مدیران و کارکنان مراکز',
     ];
 }
 
 /**
- * 1.0.27: the stored audience of a city segment is «dcity:<city id>»; returns [key, city id].
- * A bare «doctors_city» is completed with the posted city.
+ * 1.0.29: a stored audience is «key» or «key@city id»; 1.0.27's «dcity:<id>» means doctors of a city.
+ * Returns [key, city id or 0].
  */
-function announcement_audience_parse(string $audience, int $city = 0): array
+function announcement_audience_parse(string $audience): array
 {
     if (preg_match('/^dcity:([0-9]{1,10})$/', $audience, $m)) {
-        return ['doctors_city', (int) $m[1]];
+        return ['doctors', (int) $m[1]];
     }
-    return [$audience, $audience === 'doctors_city' ? $city : 0];
+    if (preg_match('/^([a-z_]{1,30})@([0-9]{1,10})$/', $audience, $m)) {
+        return [$m[1], (int) $m[2]];
+    }
+    return [$audience, 0];
 }
 
-/** Readable label of a stored audience, including the city name of a city segment. */
+/** Builds the stored audience from a form: a known group plus an optional existing city. */
+function announcement_audience_input(array $d, string $field = 'audience'): string
+{
+    $key = (string) ($d[$field] ?? '');
+    if (!isset(announcement_audiences()[$key])) {
+        throw new RuntimeException('گروه گیرندگان را انتخاب کنید.');
+    }
+    $city = !empty($d['by_city']) ? (int) ($d['city_id'] ?? 0) : 0;
+    if (!empty($d['by_city']) && (!$city || !query('SELECT 1 FROM cities WHERE id=?', [$city])->fetchColumn())) {
+        throw new RuntimeException('شهر گیرندگان را انتخاب کنید.');
+    }
+    return $city ? $key . '@' . $city : $key;
+}
+
+/** Readable label of a stored audience, with the city name when it is limited to one city. */
 function announcement_audience_label(string $audience): string
 {
     [$key, $city] = announcement_audience_parse($audience);
     $label = announcement_audiences()[$key] ?? '';
-    if ($key === 'doctors_city' && $city) {
-        $c = city_row($city) ?? query('SELECT c.name,p.name province_name FROM cities c JOIN provinces p ON p.id=c.province_id WHERE c.id=?', [$city])->fetch();
-        $label = 'پزشکان شهر ' . ($c ? $c['name'] . ' (' . $c['province_name'] . ')' : '—');
+    if ($city) {
+        $c = query('SELECT c.name,p.name province_name FROM cities c JOIN provinces p ON p.id=c.province_id WHERE c.id=?', [$city])->fetch();
+        $label .= ' — شهر ' . ($c ? $c['name'] . ' (' . $c['province_name'] . ')' : '—');
     }
     return $label;
 }
@@ -207,44 +226,53 @@ function announcement_status_labels(): array
     return ['queued' => 'در صف ارسال', 'sending' => 'در حال ارسال', 'sent' => 'ارسال شد', 'cancelled' => 'لغو شد'];
 }
 
-/** Recipient SQL for an audience: active user ids greater than ?, ascending. */
-function announcement_audience_sql(string $audience, int $city = 0): string
+/**
+ * Recipient SQL for an audience: active user ids greater than ?, ascending.
+ * A user belongs to a city through the city chosen on the site, a booking at a clinic there,
+ * a doctor profile or clinic there, or work as a secretary in a clinic there.
+ */
+function announcement_audience_sql(string $audience): string
 {
-    $base = 'SELECT u.id FROM users u WHERE u.active=1 AND u.id>? AND ';
-    [$key, $city] = announcement_audience_parse($audience, $city);
-    if ($key === 'doctors_city' && $city <= 0) {
-        throw new RuntimeException('شهر پزشکان را انتخاب کنید.');
-    }
-    return match ($key) {
-        'all' => $base . '1=1',
-        'patients' => $base . "EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='patient')",
-        'doctors' => $base . 'EXISTS(SELECT 1 FROM doctor_accounts a WHERE a.user_id=u.id)',
-        'secretaries' => $base . "EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='secretary')",
-        'centers' => $base . '(EXISTS(SELECT 1 FROM centers c WHERE c.owner_user_id=u.id) OR EXISTS(SELECT 1 FROM center_staff s WHERE s.user_id=u.id AND s.active=1))',
-        // 1.0.27 doctor segments: the doctor's account owner; a doctor works in a city through its profile or any active clinic.
-        'doctors_pro', 'doctors_free' => $base . 'EXISTS(SELECT 1 FROM doctor_accounts a JOIN doctors d ON d.id=a.doctor_id WHERE a.user_id=u.id AND d.deleted_at IS NULL AND (' . doctor_pro_sql('d') . ')=' . ($key === 'doctors_pro' ? 1 : 0) . ')',
-        'doctors_city' => $base . 'EXISTS(SELECT 1 FROM doctor_accounts a JOIN doctors d ON d.id=a.doctor_id WHERE a.user_id=u.id AND d.deleted_at IS NULL AND (d.city_id=' . $city . ' OR EXISTS(SELECT 1 FROM clinics cl WHERE cl.doctor_id=d.id AND cl.active=1 AND cl.city_id=' . $city . ')))',
+    [$key, $city] = announcement_audience_parse($audience);
+    $doctor = fn(string $cond) => 'EXISTS(SELECT 1 FROM doctor_accounts a JOIN doctors d ON d.id=a.doctor_id WHERE a.user_id=u.id AND d.deleted_at IS NULL' . ($cond !== '' ? ' AND ' . $cond : '') . ')';
+    $where = match ($key) {
+        'all' => '1=1',
+        'booked' => "EXISTS(SELECT 1 FROM bookings b WHERE b.patient_user_id=u.id AND b.status IN ('confirmed','completed','no_show','cancelled'))",
+        'patients' => "EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='patient')",
+        'doctors' => $doctor(''),
+        'doctors_pro', 'doctors_free' => $doctor('(' . doctor_pro_sql('d') . ')=' . ($key === 'doctors_pro' ? 1 : 0)),
+        'doctors_new' => $doctor("d.review_status='pending'"),
+        // Approved but with no weekly program still in force and no upcoming time slot.
+        'doctors_noschedule' => $doctor(
+            "d.review_status='approved' AND NOT EXISTS(SELECT 1 FROM working_hours w JOIN clinics wc ON wc.id=w.clinic_id WHERE wc.doctor_id=d.id AND wc.active=1 AND w.active=1 AND (w.valid_until IS NULL OR w.valid_until>=CURDATE()))" .
+                ' AND NOT EXISTS(SELECT 1 FROM slots s WHERE s.doctor_id=d.id AND s.starts_at>NOW())',
+        ),
+        'secretaries' => "EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='secretary')",
+        'centers' => '(EXISTS(SELECT 1 FROM centers c WHERE c.owner_user_id=u.id) OR EXISTS(SELECT 1 FROM center_staff s WHERE s.user_id=u.id AND s.active=1))',
         default => throw new RuntimeException('گروه گیرندگان معتبر نیست.'),
-    } . ' ORDER BY u.id';
+    };
+    if ($city) {
+        $where .= " AND (u.city_id=$city
+            OR EXISTS(SELECT 1 FROM bookings cb JOIN slots cs ON cs.id=cb.slot_id JOIN clinics cc ON cc.id=cs.clinic_id WHERE cb.patient_user_id=u.id AND cc.city_id=$city)
+            OR EXISTS(SELECT 1 FROM doctor_accounts ca JOIN doctors cd ON cd.id=ca.doctor_id WHERE ca.user_id=u.id AND (cd.city_id=$city OR EXISTS(SELECT 1 FROM clinics cl WHERE cl.doctor_id=cd.id AND cl.active=1 AND cl.city_id=$city)))
+            OR EXISTS(SELECT 1 FROM staff_scopes ss JOIN clinics sc ON sc.id=ss.clinic_id WHERE ss.user_id=u.id AND sc.city_id=$city))";
+    }
+    return 'SELECT u.id FROM users u WHERE u.active=1 AND u.deleted_at IS NULL AND u.id>? AND ' . $where . ' ORDER BY u.id';
+}
+
+/** Number of active users in a stored audience. */
+function announcement_audience_count(string $audience): int
+{
+    return (int) query('SELECT COUNT(*) FROM (' . announcement_audience_sql($audience) . ') x', [0])->fetchColumn();
 }
 
 function announce_create(array $d): string
 {
-    $audience = (string) ($d['audience'] ?? '');
-    if (!isset(announcement_audiences()[$audience])) {
-        throw new RuntimeException('گروه گیرندگان را انتخاب کنید.');
-    }
-    if ($audience === 'doctors_city') {
-        $city = (int) ($d['city_id'] ?? 0);
-        if (!$city || !query('SELECT 1 FROM cities WHERE id=?', [$city])->fetchColumn()) {
-            throw new RuntimeException('شهر پزشکان را انتخاب کنید.');
-        }
-        $audience = 'dcity:' . $city;
-    }
+    $audience = announcement_audience_input($d);
     $title = field($d, 'title', 120);
     $body = field($d, 'body', 1000);
     $url = safe_link((string) ($d['url'] ?? ''));
-    $total = (int) query('SELECT COUNT(*) FROM (' . announcement_audience_sql($audience) . ') x', [0])->fetchColumn();
+    $total = announcement_audience_count($audience);
     if (!$total) {
         throw new RuntimeException('در این گروه کاربر فعالی وجود ندارد.');
     }

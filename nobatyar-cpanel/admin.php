@@ -87,6 +87,13 @@ if ($allowed && $tab === 'security' && isset($_GET['download'])) {
     }
 }
 
+if ($allowed && $tab === 'announcements' && isset($_GET['audience_counts'])) {
+    // 1.0.29: recipient counts of every audience, for all cities or one city.
+    $city = (int) ($_GET['city'] ?? 0);
+    $keys = array_keys(announcement_audiences());
+    json_response(['counts' => array_combine($keys, array_map(fn($k) => announcement_audience_count($city > 0 ? $k . '@' . $city : $k), $keys))]);
+}
+
 if ($allowed && $tab === 'dashboard' && isset($_GET['new_doctors'])) {
     json_response(['doctors' => admin_new_doctors()]);
 }

@@ -171,15 +171,30 @@
   }
 })();
 
-/* 1.0.27: the city fields of the «پزشکان یک شهر» audience appear (and become required) only when it is chosen. */
+/* 1.0.29: «فقط یک شهر» shows (and requires) the province and city; the counts on the cards follow the chosen city. */
 (() => {
   document.querySelectorAll('[data-audience-picker]').forEach((picker) => {
     const city = picker.querySelector('[data-audience-city]');
-    if (!city) return;
+    const select = city && city.querySelector('select[name=city_id]');
+    if (!city || !select) return;
+    const fa = (n) => new Intl.NumberFormat('fa').format(n);
+    const counts = (id) => fetch(picker.dataset.countsUrl + '&city=' + encodeURIComponent(id || 0), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || !data.counts) return;
+        picker.querySelectorAll('[data-audience-count]').forEach((el) => {
+          const n = data.counts[el.dataset.audienceCount];
+          if (n !== undefined) el.textContent = fa(n) + ' نفر';
+        });
+      })
+      .catch(() => {});
+    let last = '0';
     const sync = () => {
-      const on = !!picker.querySelector('input[type=radio][value=doctors_city]:checked');
+      const on = !!picker.querySelector('input[name=by_city][value="1"]:checked');
       city.hidden = !on;
       city.querySelectorAll('select').forEach((s) => { s.required = on; });
+      const id = on && select.value ? select.value : '0';
+      if (id !== last) { last = id; counts(id); }
     };
     picker.addEventListener('change', sync);
     sync();

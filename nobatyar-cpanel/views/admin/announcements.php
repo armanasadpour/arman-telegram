@@ -3,7 +3,7 @@ $statuses = announcement_status_labels(); ?>
 <div class="grid-2 align-start">
   <section class="panel">
     <h2>اطلاعیه و اعلان جدید</h2>
-    <p class="muted small">اطلاعیه به‌صورت اعلان داخل حساب کاربران ثبت می‌شود و برای کسانی که اعلان مرورگر و دسته «اطلاعیه» را فعال کرده‌اند، Push هم ارسال می‌شود. برای پیامک از «ارسال پیامک» استفاده کنید؛ پزشکان یک شهر، پزشکان پرو و پزشکان عادی هم آنجا قابل انتخاب‌اند. گروه‌های بزرگ در چند مرحله با Cron ارسال می‌شوند.</p>
+    <p class="muted small">اطلاعیه به‌صورت اعلان داخل حساب کاربران ثبت می‌شود و برای کسانی که اعلان مرورگر و دسته «اطلاعیه» را فعال کرده‌اند، Push هم ارسال می‌شود. برای پیامک به همین گروه‌ها از «ارسال پیامک» استفاده کنید. گروه‌های بزرگ در چند مرحله با Cron ارسال می‌شوند.</p>
     <form method="post" class="stack" data-confirm="اطلاعیه برای همه کاربران گروه انتخاب‌شده ارسال شود؟ این کار قابل بازگشت نیست.">
       <?php form_token('announce_create'); ?>
       <?php render('admin/audience_picker', ['name' => 'audience', 'options' => $audiences, 'counts' => $counts, 'provinces' => $provinces, 'selected' => (string) ($post['audience'] ?? ''), 'post' => $post]); ?>
