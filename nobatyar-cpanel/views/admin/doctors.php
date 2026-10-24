@@ -84,13 +84,23 @@ if (!empty($notFound)): ?>
             <button class="secondary"><?= icon('lock') ?> تعلیق پزشک</button>
           </form>
         <?php endif; ?>
-        <?php if (admin_sensitive()): ?>
+        <?php if (admin_sensitive() && empty($d['deleted_at'])): ?>
           <form method="post" class="stack danger-zone" data-confirm="پزشک حذف شود؟ این کار برگشت‌پذیر نیست.">
             <?php form_token('doctor_delete'); ?>
             <input type="hidden" name="doctor_id" value="<?= (int) $d['id'] ?>">
             <p class="small"><strong>حذف پزشک:</strong> پروفایل از سامانه برداشته می‌شود، دسترسی حساب پزشک و منشی‌ها قطع و شماره و کد نظام پزشکی آزاد می‌شود. سوابق نوبت‌های گذشته برای گزارش‌ها می‌ماند.<?= $futureN ? ' <strong>' . fa_number($futureN) . ' نوبت آینده لغو می‌شود</strong>، به بیماران پیامک و اعلان می‌رود و کارمزد پرداخت‌شده برای استرداد ثبت می‌شود.' : '' ?></p>
             <label>برای تأیید بنویسید «حذف»<input name="confirm" required autocomplete="off"></label>
             <button class="danger"><?= icon('trash') ?> حذف پزشک</button>
+          </form>
+        <?php endif; ?>
+        <?php if (admin_sensitive()): $walletBal = (int) (query("SELECT balance FROM wallets WHERE owner_type='doctor' AND owner_id=?", [$d['id']])->fetchColumn() ?: 0); ?>
+          <form method="post" class="stack danger-zone purge-zone" data-confirm="پزشک برای همیشه حذف شود؟ هیچ راه بازگشتی وجود ندارد.">
+            <?php form_token('doctor_purge'); ?>
+            <input type="hidden" name="doctor_id" value="<?= (int) $d['id'] ?>">
+            <p class="small"><strong>حذف دائمی پزشک:</strong> پزشک و همه اطلاعاتش برای همیشه از پایگاه داده پاک می‌شود: پروفایل و عکس، مطب‌ها، برنامه کاری، خدمات، همه نوبت‌ها و سوابق مراجعه، نظرها، اشتراک‌ها، کدهای تخفیف و کیف پول. حساب کاربری متصل به‌عنوان حساب بیمار باقی می‌ماند و تراکنش‌های بانکی برای حسابداری حفظ می‌شود.<?= empty($d['deleted_at']) && $futureN ? ' <strong>' . fa_number($futureN) . ' نوبت آینده ابتدا لغو و به بیماران اطلاع داده می‌شود.</strong>' : '' ?></p>
+            <?php if ($walletBal !== 0): ?><p class="error">کیف پول این پزشک <?= esc(toman($walletBal)) ?> موجودی دارد؛ پیش از حذف دائمی آن را تسویه کنید.</p><?php endif; ?>
+            <label>برای تأیید بنویسید «<?= esc(DOCTOR_PURGE_WORD) ?>»<input name="confirm" required autocomplete="off"></label>
+            <button class="danger"><?= icon('trash') ?> حذف دائمی پزشک</button>
           </form>
         <?php endif; ?>
       </details>
@@ -176,6 +186,7 @@ if (!empty($notFound)): ?>
     <?php foreach ($labels as $value => $label): ?>
       <a href="admin.php?tab=doctors&amp;status=<?= esc($value) ?>"<?= $f['status'] === $value ? ' class="current"' : '' ?>><?= esc($label) ?> <span><?= fa_number($statusCounts[$value] ?? 0) ?></span></a>
     <?php endforeach; ?>
+    <?php if (!empty($statusCounts['deleted'])): ?><a href="admin.php?tab=doctors&amp;status=deleted"<?= $f['status'] === 'deleted' ? ' class="current"' : '' ?>>حذف‌شده <span><?= fa_number($statusCounts['deleted']) ?></span></a><?php endif; ?>
   </nav>
   <form method="get" class="filter-bar">
     <input type="hidden" name="tab" value="doctors">

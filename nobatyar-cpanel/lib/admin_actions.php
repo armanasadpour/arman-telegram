@@ -95,6 +95,7 @@ function admin_dispatch(string $action, array $data, array $files = []): ?string
         'doctor_suspend' => 'admin_doctor_suspend',
         'doctor_unsuspend' => 'admin_doctor_unsuspend',
         'doctor_delete' => 'admin_doctor_delete',
+        'doctor_purge' => 'admin_doctor_purge',
         'notify_settings' => 'admin_notify_settings',
         'push_regenerate' => function () {
             [$pem, $point] = p256_generate();

@@ -57,7 +57,8 @@ if (is_post() && $_POST === [] && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > upda
         }
         $message = admin_dispatch($action, $_POST, $_FILES);
         flash($message ?? 'تغییرات ذخیره شد.');
-        redirect(admin_return_url($tab));
+        // The doctor's own page no longer exists after a permanent delete.
+        redirect($action === 'doctor_purge' ? 'admin.php?tab=doctors&status=deleted' : admin_return_url($tab));
     } catch (Throwable $e) {
         $error = error_message($e);
     }

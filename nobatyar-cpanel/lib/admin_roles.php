@@ -121,7 +121,7 @@ function admin_action_permission(string $action): string
     static $map = null;
     if ($map === null) {
         $groups = [
-            'doctors' => ['create_doctor', 'edit_doctor', 'review', 'clinic', 'delete_clinic', 'slot', 'doctor_suspend', 'doctor_unsuspend', 'doctor_delete'],
+            'doctors' => ['create_doctor', 'edit_doctor', 'review', 'clinic', 'delete_clinic', 'slot', 'doctor_suspend', 'doctor_unsuspend', 'doctor_delete', 'doctor_purge'],
             'centers' => ['center_review', 'center_active', 'center_settings'],
             'catalog' => ['taxonomy', 'delete_taxonomy', 'restore_specialty', 'specialty_starter', 'specialty_default_icon', 'move', 'booking_config', 'booking_page', 'geo_bulk', 'geo_settings'],
             'users' => ['user_status', 'link_doctor', 'unlink_doctor', 'grant_scope', 'revoke_scope', 'user_suspend', 'user_unsuspend', 'user_delete'],

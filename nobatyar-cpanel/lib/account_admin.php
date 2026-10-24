@@ -129,6 +129,100 @@ function admin_doctor_unsuspend(array $data): ?string
     return 'تعلیق پزشک برداشته شد و پروفایل دوباره منتشر شد.';
 }
 
+const DOCTOR_PURGE_WORD = 'حذف دائمی';
+
+/**
+ * 1.0.26 «حذف دائمی پزشک»: removes the doctor and everything tied to it (clinics, schedule, services, slots,
+ * bookings with their events, reviews, notifications and payment intents, staff access, queues, waitlist, center
+ * links, discount codes, subscriptions, the wallet and the photo). The linked user account stays as a patient
+ * account. Bank transactions stay in the ledger with the doctor link cleared, so the books still balance.
+ * Refused while the doctor's wallet holds money or a payout is pending. A doctor not yet removed is first retired
+ * with admin_doctor_delete() (future bookings cancelled, patients told, fees queued for refund).
+ */
+function admin_doctor_purge(array $data): string
+{
+    if (!admin_sensitive()) {
+        throw new AuthError('حذف دائمی فقط برای مالک سامانه و مدیر اجرایی مجاز است.', 403);
+    }
+    if (trim((string) ($data['confirm'] ?? '')) !== DOCTOR_PURGE_WORD) {
+        throw new AuthError('برای حذف دائمی، عبارت «' . DOCTOR_PURGE_WORD . '» را در کادر تأیید بنویسید.');
+    }
+    $id = positive_id($data['doctor_id'] ?? 0);
+    $d = query('SELECT * FROM doctors WHERE id=?', [$id])->fetch();
+    if (!$d) {
+        throw new AuthError('پزشک پیدا نشد.', 404);
+    }
+    $wallet = query("SELECT * FROM wallets WHERE owner_type='doctor' AND owner_id=?", [$id])->fetch();
+    if ($wallet && (int) $wallet['balance'] !== 0) {
+        throw new AuthError('کیف پول این پزشک ' . toman($wallet['balance']) . ' موجودی دارد؛ ابتدا آن را تسویه کنید، سپس حذف دائمی کنید.', 409);
+    }
+    if ($wallet && query("SELECT id FROM wallet_payouts WHERE wallet_id=? AND status='pending' LIMIT 1", [$wallet['id']])->fetch()) {
+        throw new AuthError('درخواست واریز در انتظار برای این پزشک وجود دارد؛ ابتدا آن را رسیدگی کنید.', 409);
+    }
+    if (!$d['deleted_at']) {
+        admin_doctor_delete(['doctor_id' => $id, 'confirm' => ACCOUNT_DELETE_WORD]);
+    }
+    $photo = (string) ($d['photo_file'] ?? '');
+    db_transaction(function () use ($id, $wallet) {
+        lock_doctor($id);
+        $in = fn(array $ids) => $ids ? implode(',', array_map('intval', $ids)) : '0';
+        $clinics = $in(query('SELECT id FROM clinics WHERE doctor_id=?', [$id])->fetchAll(PDO::FETCH_COLUMN));
+        $slots = $in(query("SELECT id FROM slots WHERE doctor_id=? OR clinic_id IN ($clinics)", [$id])->fetchAll(PDO::FETCH_COLUMN));
+        $bookings = $in(query("SELECT id FROM bookings WHERE slot_id IN ($slots)")->fetchAll(PDO::FETCH_COLUMN));
+        $codes = $in(query('SELECT id FROM discount_codes WHERE doctor_id=?', [$id])->fetchAll(PDO::FETCH_COLUMN));
+        $delays = $in(query("SELECT id FROM reception_delays WHERE clinic_id IN ($clinics)")->fetchAll(PDO::FETCH_COLUMN));
+        // Bank transactions are the platform's books: kept, only detached from the doctor.
+        query('UPDATE payment_transactions SET doctor_id=NULL WHERE doctor_id=?', [$id]);
+        query('UPDATE center_announcements SET doctor_id=NULL WHERE doctor_id=?', [$id]);
+        foreach ([
+            "DELETE FROM appointment_events WHERE doctor_id=$id OR booking_id IN ($bookings)",
+            "DELETE FROM center_announcement_recipients WHERE booking_id IN ($bookings)",
+            "DELETE FROM reception_delay_recipients WHERE booking_id IN ($bookings) OR delay_id IN ($delays)",
+            "DELETE FROM notifications WHERE booking_id IN ($bookings)",
+            "DELETE FROM payments WHERE booking_id IN ($bookings)",
+            "DELETE FROM payment_intents WHERE booking_id IN ($bookings)",
+            "DELETE FROM reviews WHERE doctor_id=$id OR booking_id IN ($bookings)",
+            "DELETE FROM sms_messages WHERE booking_id IN ($bookings)",
+            "DELETE FROM waitlist_entries WHERE doctor_id=$id OR clinic_id IN ($clinics)",
+            "DELETE FROM bookings WHERE id IN ($bookings)",
+            "DELETE FROM slots WHERE id IN ($slots)",
+            "DELETE FROM reception_delays WHERE id IN ($delays)",
+            "UPDATE reception_patients SET parent_id=NULL WHERE clinic_id IN ($clinics)",
+            "DELETE FROM reception_patients WHERE clinic_id IN ($clinics)",
+            "DELETE FROM clinic_queues WHERE clinic_id IN ($clinics)",
+            "DELETE FROM clinic_free_cache WHERE clinic_id IN ($clinics)",
+            "DELETE FROM schedule_blocks WHERE doctor_id=$id OR clinic_id IN ($clinics)",
+            "DELETE FROM staff_scopes WHERE clinic_id IN ($clinics)",
+            "DELETE FROM working_hours WHERE clinic_id IN ($clinics)",
+            "DELETE FROM clinics WHERE id IN ($clinics)",
+            "DELETE FROM discount_redemptions WHERE code_id IN ($codes)",
+            "UPDATE subscription_orders SET discount_code_id=NULL WHERE discount_code_id IN ($codes)",
+            "UPDATE bookings SET discount_code_id=NULL WHERE discount_code_id IN ($codes)",
+            "DELETE FROM discount_codes WHERE id IN ($codes)",
+            "DELETE FROM subscriptions WHERE doctor_id=$id",
+            "DELETE FROM subscription_orders WHERE doctor_id=$id",
+            "DELETE FROM center_doctors WHERE doctor_id=$id",
+            "DELETE FROM doctor_accounts WHERE doctor_id=$id",
+            "DELETE FROM doctor_services WHERE doctor_id=$id",
+            "DELETE FROM doctor_profile_views WHERE doctor_id=$id",
+        ] as $sql) {
+            query($sql);
+        }
+        if ($wallet) {
+            foreach (['wallet_entries', 'wallet_banks', 'wallet_payouts'] as $t) {
+                query("DELETE FROM $t WHERE wallet_id=?", [$wallet['id']]);
+            }
+            query('DELETE FROM wallets WHERE id=?', [$wallet['id']]);
+        }
+        query('DELETE FROM doctors WHERE id=?', [$id]);
+        audit('doctor.purge', $id, 'حذف دائمی');
+    });
+    if ($photo !== '' && preg_match('/^[A-Za-z0-9._-]+$/', $photo)) {
+        @unlink(__DIR__ . '/../private/photos/' . $photo);
+    }
+    return 'پزشک «' . doctor_bare_name((string) $d['name']) . '» برای همیشه حذف شد؛ مطب‌ها، برنامه، نوبت‌ها و سوابق او پاک شد و تراکنش‌های بانکی برای حسابداری باقی ماند.';
+}
+
 function admin_doctor_delete(array $data): string
 {
     account_delete_check($data);

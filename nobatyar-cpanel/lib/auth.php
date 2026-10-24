@@ -500,6 +500,7 @@ function audit_label(string $action): string
         'doctor.suspend' => 'تعلیق پزشک',
         'doctor.unsuspend' => 'رفع تعلیق پزشک',
         'doctor.delete' => 'حذف پزشک',
+        'doctor.purge' => 'حذف دائمی پزشک',
         'pro.catalog' => 'تغییر امکانات نسخه پرو',
         'specialty.starter' => 'افزودن فهرست پیشنهادی تخصص‌ها',
         'doctor.claim_requested' => 'درخواست اتصال پروفایل پزشک',

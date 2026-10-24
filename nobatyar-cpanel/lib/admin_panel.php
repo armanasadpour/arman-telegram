@@ -396,17 +396,22 @@ function admin_doctors_data(): array
         'city' => (int) ($_GET['city'] ?? 0),
         'subscription' => (string) ($_GET['subscription'] ?? ''),
     ];
+    $deletedView = $filters['status'] === 'deleted';
     if (!isset(doctor_status_labels()[$filters['status']])) {
         $filters['status'] = '';
     }
-    $where = ['d.deleted_at IS NULL']; // rc.21: deleted doctors are not listed
+    // rc.21: deleted doctors are not listed; 1.0.26: «حذف‌شده» lists only them (for «حذف دائمی»).
+    $where = [$deletedView ? 'd.deleted_at IS NOT NULL' : 'd.deleted_at IS NULL'];
+    if ($deletedView) {
+        $filters['status'] = 'deleted';
+    }
     $args = [];
     if ($filters['q'] !== '') {
         $q = fa_normalize($filters['q']);
         $where[] = '(d.name LIKE ? OR d.mobile LIKE ? OR d.medical_code LIKE ?)';
         array_push($args, '%' . $q . '%', '%' . $q . '%', '%' . ltrim($q, '0') . '%');
     }
-    if ($filters['status']) {
+    if ($filters['status'] && !$deletedView) {
         $where[] = 'd.review_status=?';
         $args[] = $filters['status'];
     }
@@ -445,7 +450,7 @@ function admin_doctors_data(): array
                 ($page - 1) * 30,
             $args,
         )->fetchAll(),
-        'statusCounts' => query('SELECT review_status,COUNT(*) n FROM doctors GROUP BY review_status')->fetchAll(PDO::FETCH_KEY_PAIR),
+        'statusCounts' => query('SELECT review_status,COUNT(*) n FROM doctors WHERE deleted_at IS NULL GROUP BY review_status')->fetchAll(PDO::FETCH_KEY_PAIR) + ['deleted' => (int) query('SELECT COUNT(*) FROM doctors WHERE deleted_at IS NOT NULL')->fetchColumn()],
     ];
 }
 
