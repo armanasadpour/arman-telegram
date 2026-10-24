@@ -558,3 +558,34 @@ a.ad-kpi:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--a
 .bulk-sms-note{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--info-bg);color:var(--ad-text-2);font-size:.85rem}
 .bulk-sms-note .icon{flex:none;color:var(--info);margin-top:2px}
 @media (max-width:560px){.audience-grid{grid-template-columns:1fr 1fr}.audience-option{padding:10px;gap:8px}.audience-icon{width:32px;height:32px}}
+
+/* 1.0.28 «new doctor» popup */
+.nd-overlay{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:nd-fade .2s ease-out}
+.nd-overlay[hidden]{display:none}
+body.nd-open{overflow:hidden}
+.nd-overlay .nd-modal{position:relative;box-sizing:border-box;width:min(440px,100%);max-height:calc(100vh - 32px);overflow:auto;margin:0;padding:28px 22px 20px;border-radius:24px;background:var(--ad-panel-solid);border:1px solid var(--ad-border);box-shadow:0 30px 80px -20px rgba(15,23,42,.55);animation:nd-pop .35s cubic-bezier(.2,1.3,.4,1)}
+.admin-page .nd-overlay button.nd-close{box-shadow:none;position:absolute;top:12px;left:12px;display:grid;place-items:center;width:34px;height:34px;padding:0;border-radius:50%;border:0;background:var(--ad-hover);color:var(--ad-muted);cursor:pointer}
+.admin-page .nd-overlay button.nd-close:hover{color:var(--ad-text)}
+.nd-close .icon{width:18px;height:18px}
+.nd-head{text-align:center}
+.nd-bell{position:relative;display:inline-grid;place-items:center;width:68px;height:68px;margin-bottom:10px;border-radius:22px;background:linear-gradient(135deg,#4f8dff,#2563eb);color:#fff;box-shadow:0 14px 30px -12px rgba(37,99,235,.8)}
+.nd-bell .icon{width:32px;height:32px;animation:nd-ring 1.6s ease-in-out .3s 2;transform-origin:50% 10%}
+.nd-bell b{position:absolute;top:-6px;left:-6px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#ef4444;color:#fff;font-size:.8rem;line-height:24px;box-shadow:0 0 0 3px var(--ad-panel-solid)}
+.nd-head h2{margin:0 0 4px;font-size:1.2rem;color:var(--ad-text)}
+.nd-head p{margin:0;color:var(--ad-muted);font-size:.88rem}
+.nd-overlay .nd-list{list-style:none;grid-template-columns:minmax(0,1fr);margin:18px 0 0;padding:0;display:grid;gap:8px}
+.nd-overlay .nd-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--ad-border);border-radius:16px;background:var(--ad-panel-2);color:inherit;text-decoration:none;transition:border-color .15s,transform .15s}
+.nd-item:hover{border-color:var(--ad-accent);transform:translateY(-1px)}
+.nd-avatar{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,rgba(31,174,122,.18),rgba(31,174,122,.08));color:var(--s3);font-weight:800;font-size:1.15rem}
+.nd-text{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.nd-text strong{color:var(--ad-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nd-text small{color:var(--ad-muted);font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nd-time{flex:none;padding:3px 8px;border-radius:999px;background:var(--ad-accent-soft);color:var(--ad-accent-ink);font-size:.72rem}
+.nd-actions{display:flex;gap:8px;margin-top:18px}
+.nd-actions>*{flex:1;justify-content:center;text-align:center;margin:0}
+@keyframes nd-fade{from{opacity:0}}
+@keyframes nd-pop{from{opacity:0;transform:translateY(16px) scale(.94)}}
+@keyframes nd-ring{0%,100%{transform:rotate(0)}15%{transform:rotate(14deg)}30%{transform:rotate(-12deg)}45%{transform:rotate(8deg)}60%{transform:rotate(-5deg)}75%{transform:rotate(2deg)}}
+@media (max-width:480px){.nd-overlay{align-items:end;padding:0}.nd-overlay .nd-modal{width:100%;border-radius:24px 24px 0 0;animation-name:nd-up}.nd-actions{flex-direction:column}}
+@keyframes nd-up{from{transform:translateY(100%)}}
+@media (prefers-reduced-motion:reduce){.nd-overlay,.nd-modal,.nd-bell .icon{animation:none}}

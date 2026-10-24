@@ -535,3 +535,56 @@ function dashboard_export(string $kind): never
         ),
     );
 }
+
+/* ---------- 1.0.28: «new doctor» popup on the dashboard ---------- */
+
+/** Doctor sign-ups waiting for review that the current administrator has not seen yet. */
+function admin_new_doctors(): array
+{
+    $a = admin_current();
+    if (!$a || !admin_can('doctors')) {
+        return [];
+    }
+    $rows = query(
+        "SELECT d.id,d.name,d.created_at,sp.name specialty,c.name city,p.name province FROM doctors d LEFT JOIN specialties sp ON sp.id=d.specialty_id
+         LEFT JOIN cities c ON c.id=d.city_id LEFT JOIN provinces p ON p.id=c.province_id
+         WHERE d.id>? AND d.review_status='pending' AND d.deleted_at IS NULL ORDER BY d.id DESC LIMIT 20",
+        [(int) ($a['seen_doctor_id'] ?? 0)],
+    )->fetchAll();
+    return array_map(fn($d) => [
+        'id' => (int) $d['id'],
+        'name' => (string) $d['name'],
+        'specialty' => (string) ($d['specialty'] ?? ''),
+        'place' => implode('، ', array_filter([(string) ($d['city'] ?? ''), (string) ($d['province'] ?? '')])),
+        'when' => admin_time_ago((string) $d['created_at']),
+        'url' => 'admin.php?tab=doctors&doctor=' . (int) $d['id'],
+    ], $rows);
+}
+
+/** Marks sign-ups up to $id as seen by the current administrator. */
+function admin_new_doctors_seen(int $id): void
+{
+    $a = admin_current();
+    if ($a && $id > 0) {
+        query('UPDATE admins SET seen_doctor_id=GREATEST(seen_doctor_id,LEAST(?,(SELECT COALESCE(MAX(id),0) FROM doctors))) WHERE id=?', [$id, (int) $a['id']]);
+    }
+}
+
+function admin_time_ago(string $at): string
+{
+    $s = max(0, time() - strtotime($at));
+    return match (true) {
+        $s < 60 => 'همین الان',
+        $s < 3600 => fa_number(intdiv($s, 60)) . ' دقیقه پیش',
+        $s < 86400 => fa_number(intdiv($s, 3600)) . ' ساعت پیش',
+        default => jdate($at, true),
+    };
+}
+
+
+function json_response(array $data): never
+{
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    exit(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE));
+}

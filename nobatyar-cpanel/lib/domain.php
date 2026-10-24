@@ -188,7 +188,8 @@ function register_doctor(array $data, bool $byAdmin = false): int
                 throw new RuntimeException('شماره حساب تأییدشده را وارد کنید.');
             }
             query('INSERT INTO doctor_accounts(doctor_id,user_id) VALUES(?,?)', [$id, $u['id']]);
-            admin_event('registration','درخواست عضویت پزشک','درخواست جدید برای بررسی ثبت شد.','doctor:'.$id,'admin.php?tab=doctors&doctor='.$id);
+            // 1.0.28: the push names the doctor; the dashboard also shows a «new doctor» popup.
+            admin_event('registration', 'پزشک جدید ثبت‌نام کرد', $name . ' — ' . $spec['name'] . '، ' . $city['name'] . '. برای بررسی و تأیید بزنید.', 'doctor:' . $id, 'admin.php?tab=doctors&doctor=' . $id, true);
             query("INSERT IGNORE INTO user_roles(user_id,role) VALUES(?,'doctor')", [$u['id']]);
         }
         query(

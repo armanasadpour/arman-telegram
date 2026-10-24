@@ -65,8 +65,10 @@ function admin_notice_prefs(int $admin): array {
     $json=query('SELECT preferences FROM admin_notice_preferences WHERE admin_id=?',[$admin])->fetchColumn();
     return (is_string($json)?json_decode($json,true):[]) ?: array_fill_keys(array_keys(admin_notice_events()),1);
 }
-function admin_event(string $event,string $title,string $body,string $key,string $url='admin.php'): void {
+function admin_event(string $event,string $title,string $body,string $key,string $url='admin.php',bool $now=false): void {
     if(!push_available())return;
+    // 1.0.28: urgent events go out right after the response instead of waiting for the next Cron run.
+    if($now)admin_push_after_response();
     foreach(query("SELECT id FROM admins WHERE active=1 AND role IN ('owner','manager')")->fetchAll(PDO::FETCH_COLUMN) as $aid){
         if(empty(admin_notice_prefs((int)$aid)[$event]))continue;
         foreach(query('SELECT id FROM admin_push_devices WHERE admin_id=? AND active=1',[$aid])->fetchAll(PDO::FETCH_COLUMN) as $sid){
@@ -74,6 +76,15 @@ function admin_event(string $event,string $title,string $body,string $key,string
             query('INSERT IGNORE INTO admin_push_queue(device_id,event_key,payload) VALUES(?,?,?)',[$sid,mb_substr($event.':'.$key,0,120),$payload]);
         }
     }
+}
+function admin_push_after_response(): void {
+    static $registered=false;
+    if($registered)return;
+    $registered=true;
+    register_shutdown_function(function(){
+        if(function_exists('fastcgi_finish_request'))fastcgi_finish_request();
+        try{admin_push_dispatch();}catch(Throwable $e){error_log('nobatyar admin push: '.$e->getMessage());}
+    });
 }
 function admin_push_dispatch(): string {
     if(!push_available())return 'اعلان مرورگر غیرفعال است.';

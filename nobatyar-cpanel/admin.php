@@ -50,6 +50,11 @@ if (is_post() && $_POST === [] && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > upda
             logout_admin();
             redirect('admin.php');
         }
+        if ($action === 'new_doctors_seen' && admin()) {
+            // 1.0.28: the dashboard popup marks the doctor sign-ups it showed as seen.
+            admin_new_doctors_seen((int) ($_POST['upto'] ?? 0));
+            json_response(['ok' => true]);
+        }
         if ($action === 'gateway_test') {
             admin_require('gateways');
             // A real, small payment by the administrator proves the credentials end to end.
@@ -80,6 +85,10 @@ if ($allowed && $tab === 'security' && isset($_GET['download'])) {
         http_response_code(403);
         $error = error_message($e);
     }
+}
+
+if ($allowed && $tab === 'dashboard' && isset($_GET['new_doctors'])) {
+    json_response(['doctors' => admin_new_doctors()]);
 }
 
 if ($allowed && $tab === 'dashboard' && in_array($export, ['xlsx', 'geo'], true)) {

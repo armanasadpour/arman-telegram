@@ -65,6 +65,23 @@ $todo = array_values(array_filter($todo, fn($t) => empty($t['hide'])));
 $todoOpen = array_sum(array_column($todo, 'n'));
 $txStatus = fn(string $s) => ['verified' => 'tx-verified', 'failed' => 'tx-failed', 'cancelled' => 'tx-cancelled', 'refund_due' => 'tx-refund_due', 'refunded' => 'tx-refunded', 'redirected' => 'tx-redirected'][$s] ?? '';
 ?>
+<?php if (admin_can('doctors')): /* 1.0.28 «new doctor» popup, filled by admin.js */ ?>
+<div class="nd-overlay" data-new-doctors data-csrf="<?= esc(csrf()) ?>" hidden>
+  <section class="nd-modal" role="dialog" aria-modal="true" aria-labelledby="nd-title">
+    <button type="button" class="nd-close icon-button" data-nd-close aria-label="بستن"><?= icon('x') ?></button>
+    <div class="nd-head">
+      <span class="nd-bell"><?= icon('bell') ?><b data-nd-count></b></span>
+      <h2 id="nd-title" data-nd-title>پزشک جدید ثبت‌نام کرد</h2>
+      <p>درخواست عضویت برای بررسی و تأیید شما ثبت شده است.</p>
+    </div>
+    <ul class="nd-list" data-nd-list></ul>
+    <div class="nd-actions">
+      <a class="button" data-nd-review href="admin.php?tab=doctors&amp;status=pending"><?= icon('doctor') ?> بررسی درخواست‌ها</a>
+      <button type="button" class="secondary" data-nd-seen>متوجه شدم</button>
+    </div>
+  </section>
+</div>
+<?php endif; ?>
 <div class="dash">
 
 <section class="ad-kpis" aria-label="شاخص‌های اصلی">

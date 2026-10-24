@@ -185,3 +185,67 @@
     sync();
   });
 })();
+
+/* 1.0.28: «new doctor» popup on the dashboard. Checks on load and every 45 seconds; «متوجه شدم» or opening a
+   request marks them seen for this administrator, the close button only hides them until the next new sign-up. */
+(() => {
+  const box = document.querySelector('[data-new-doctors]');
+  if (!box || !window.fetch) return;
+  const list = box.querySelector('[data-nd-list]');
+  const baseTitle = document.title;
+  let shown = 0;
+  let latest = 0;
+  const closed = () => { try { return Number(sessionStorage.getItem('nd-closed') || 0); } catch (e) { return 0; } };
+  const fa = (n) => new Intl.NumberFormat('fa').format(n);
+  const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
+  const hide = () => { box.hidden = true; document.body.classList.remove('nd-open'); document.title = baseTitle; };
+  const seen = () => {
+    const body = new FormData();
+    body.append('csrf', box.dataset.csrf);
+    body.append('action', 'new_doctors_seen');
+    body.append('upto', String(latest));
+    return fetch('admin.php', { method: 'POST', body, credentials: 'same-origin', headers: { Accept: 'application/json' } }).catch(() => {});
+  };
+  const show = (rows) => {
+    latest = rows[0].id;
+    list.replaceChildren(...rows.map((d) => {
+      const li = node('li');
+      const a = node('a', 'nd-item');
+      a.href = d.url;
+      a.append(node('span', 'nd-avatar', d.name.replace(/^دکتر\s+/, '').trim().charAt(0) || '؟'));
+      const text = node('span', 'nd-text');
+      text.append(node('strong', '', d.name), node('small', '', [d.specialty, d.place].filter(Boolean).join(' · ')));
+      a.append(text, node('time', 'nd-time', d.when));
+      a.addEventListener('click', (e) => { e.preventDefault(); seen().finally(() => { location.href = d.url; }); });
+      li.append(a);
+      return li;
+    }));
+    box.querySelector('[data-nd-count]').textContent = fa(rows.length);
+    box.querySelector('[data-nd-title]').textContent = rows.length > 1 ? fa(rows.length) + ' پزشک جدید ثبت‌نام کردند' : 'پزشک جدید ثبت‌نام کرد';
+    box.hidden = false;
+    document.body.classList.add('nd-open');
+    document.title = '(' + fa(rows.length) + ') پزشک جدید — ' + baseTitle;
+    // A tab in the background also gets a system notification when the administrator allowed them.
+    if (shown && document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('پزشک جدید ثبت‌نام کرد', { body: rows[0].name + (rows[0].specialty ? ' — ' + rows[0].specialty : ''), icon: 'assets/icon.svg', tag: 'new-doctor-' + latest }); } catch (e) {}
+    }
+    shown = latest;
+  };
+  const check = () => fetch('admin.php?tab=dashboard&new_doctors=1', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      const rows = (data && data.doctors) || [];
+      if (!rows.length) { if (!box.hidden) hide(); return; }
+      if (rows[0].id === shown && !box.hidden) return;
+      if (rows[0].id <= closed()) return;
+      show(rows);
+    })
+    .catch(() => {});
+  box.querySelector('[data-nd-close]').addEventListener('click', () => { try { sessionStorage.setItem('nd-closed', String(latest)); } catch (e) {} hide(); });
+  box.addEventListener('click', (e) => { if (e.target === box) box.querySelector('[data-nd-close]').click(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !box.hidden) box.querySelector('[data-nd-close]').click(); });
+  box.querySelector('[data-nd-seen]').addEventListener('click', () => { seen(); hide(); });
+  box.querySelector('[data-nd-review]').addEventListener('click', (e) => { e.preventDefault(); const href = e.currentTarget.href; seen().finally(() => { location.href = href; }); });
+  check();
+  setInterval(check, 45000);
+})();
