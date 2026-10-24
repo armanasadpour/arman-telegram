@@ -165,6 +165,38 @@ function home_image_url(string $file): string
 
 /* ---------- Data for the sections ---------- */
 
+/** SQL (1/0) for «Pro» like doctor_is_pro(): the administrator's override, else the subscription (everyone when sales are off). */
+function doctor_pro_sql(string $alias = 'd'): string
+{
+    // The override is compared as text: MySQL and MariaDB disagree on JSON true/false arithmetic inside COALESCE.
+    $override = "JSON_UNQUOTE(JSON_EXTRACT(COALESCE($alias.feature_overrides,'{}'),'$.pro'))";
+    return "CASE WHEN $override IN ('true','1') THEN 1 WHEN $override IN ('false','0') THEN 0 ELSE " .
+        (subscriptions_on() ? "($alias.subscription_until IS NOT NULL AND DATE_ADD($alias.subscription_until,INTERVAL " . grace_days() . ' DAY)>=CURDATE())' : '1') . ' END';
+}
+
+/**
+ * 1.0.27 homepage ranking: Pro first, then most bookings, then most reviews, then the rest.
+ * Returns [doctor id => [pro, bookings, reviews]].
+ */
+function doctor_rank_stats(array $ids): array
+{
+    $ids = array_values(array_unique(array_map('intval', $ids)));
+    if (!$ids) {
+        return [];
+    }
+    $out = [];
+    foreach (query(
+        'SELECT d.id,(' . doctor_pro_sql() . ")+0 pro,
+            (SELECT COUNT(*) FROM bookings b JOIN slots s ON s.id=b.slot_id WHERE s.doctor_id=d.id AND b.status IN ('confirmed','completed')) bookings_n,
+            (SELECT COUNT(*) FROM reviews r WHERE r.doctor_id=d.id AND r.status='approved') reviews_n
+         FROM doctors d WHERE d.id IN (" . placeholders($ids) . ')',
+        $ids,
+    )->fetchAll() as $r) {
+        $out[(int) $r['id']] = [(int) $r['pro'], (int) $r['bookings_n'], (int) $r['reviews_n']];
+    }
+    return $out;
+}
+
 /**
  * Public doctor cards: approved, active, open subscription, public clinic; one card per doctor.
  * $specialty (with its subspecialties) narrows the list for the homepage specialty filter.
@@ -209,31 +241,38 @@ function home_doctor_cards(string $mode, ?array $city, int $limit, int $specialt
         $out[] = $r;
     }
     if ($mode === 'available') {
-        usort($out, fn($a, $b) => strcmp($a['first_available']['starts_at'], $b['first_available']['starts_at']));
+        // 1.0.27: Pro by bookings, then reviews; then regular doctors the same way; the earlier free time breaks ties.
+        $rank = doctor_rank_stats(array_column($out, 'id'));
+        usort($out, function ($a, $b) use ($rank) {
+            $x = $rank[(int) $a['id']] ?? [0, 0, 0];
+            $y = $rank[(int) $b['id']] ?? [0, 0, 0];
+            return [$y, $a['first_available']['starts_at']] <=> [$x, $b['first_available']['starts_at']];
+        });
     }
     return array_slice($out, 0, $limit);
 }
 
 /**
  * «همه پزشکان» on the homepage, one batch at a time (the section's count; «بیشتر» loads the next batch).
- * Order: Pro doctors first, then the rest; within each, most bookings, then highest rating, then most reviews.
+ * Order (1.0.27): doctors with a free time first; then Pro before regular; within each, most bookings, then most
+ * reviews.
  * Limited to the visitor's city when it has doctors, otherwise country-wide. Returns [cards, has more].
  */
 function home_all_doctors(?array $city, int $offset, int $limit): array
 {
     $cityCond = $city ? ' AND c.id=?' : '';
     $args = $city ? [(int) $city['id']] : [];
-    // Same rule as doctor_is_pro(): an administrator override first, else the subscription (or everyone when sales are off).
-    // The override is compared as text: MySQL and MariaDB disagree on JSON true/false arithmetic inside COALESCE.
-    $override = "JSON_UNQUOTE(JSON_EXTRACT(COALESCE(d.feature_overrides,'{}'),'$.pro'))";
-    $pro = "CASE WHEN $override IN ('true','1') THEN 1 WHEN $override IN ('false','0') THEN 0 ELSE " . (subscriptions_on() ? '(d.subscription_until IS NOT NULL AND DATE_ADD(d.subscription_until,INTERVAL ' . grace_days() . ' DAY)>=CURDATE())' : '1') . ' END';
+    $pro = doctor_pro_sql();
+    // Fresh «first free time» for the clinics in scope, so «has a free time» is current.
+    clinic_free_ensure(query('SELECT cl.id FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE ' . public_clinic_sql() . $cityCond, $args)->fetchAll(PDO::FETCH_COLUMN), 120);
     $sql = "SELECT d.id,d.name,d.photo_file,d.medical_code,d.professional_title,d.subscription_until,d.feature_overrides,sp.name specialty,($pro)+0 is_pro,
             (SELECT COUNT(*) FROM bookings b JOIN slots s ON s.id=b.slot_id WHERE s.doctor_id=d.id AND b.status IN ('confirmed','completed')) bookings_n,
-            COALESCE(rv.a,0) rating,COALESCE(rv.n,0) reviews_n
+            COALESCE(rv.a,0) rating,COALESCE(rv.n,0) reviews_n,
+            EXISTS(SELECT 1 FROM clinics fcl JOIN clinic_free_cache f ON f.clinic_id=fcl.id WHERE fcl.doctor_id=d.id AND f.first_at>NOW()) has_free
          FROM doctors d JOIN specialties sp ON sp.id=d.specialty_id
          LEFT JOIN (SELECT doctor_id,AVG(rating) a,COUNT(*) n FROM reviews WHERE status='approved' GROUP BY doctor_id) rv ON rv.doctor_id=d.id
          WHERE " . visible_doctor_sql() . " AND EXISTS(SELECT 1 FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE cl.doctor_id=d.id AND " . public_clinic_sql() . $cityCond . ")
-         ORDER BY is_pro DESC,bookings_n DESC,rating DESC,reviews_n DESC,d.id
+         ORDER BY has_free DESC,is_pro DESC,bookings_n DESC,reviews_n DESC,d.id
          LIMIT " . ($limit + 1) . ' OFFSET ' . max(0, $offset);
     $rows = query($sql, $args)->fetchAll();
     if ($city && !$rows && $offset === 0) {

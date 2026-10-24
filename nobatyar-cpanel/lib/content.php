@@ -172,7 +172,34 @@ function announcement_audiences(): array
         'doctors' => 'پزشکان دارای حساب',
         'secretaries' => 'منشی‌ها',
         'centers' => 'مدیران و کارکنان مراکز',
+        'doctors_pro' => 'پزشکان پرو',
+        'doctors_free' => 'پزشکان عادی',
+        'doctors_city' => 'پزشکان یک شهر',
     ];
+}
+
+/**
+ * 1.0.27: the stored audience of a city segment is «dcity:<city id>»; returns [key, city id].
+ * A bare «doctors_city» is completed with the posted city.
+ */
+function announcement_audience_parse(string $audience, int $city = 0): array
+{
+    if (preg_match('/^dcity:([0-9]{1,10})$/', $audience, $m)) {
+        return ['doctors_city', (int) $m[1]];
+    }
+    return [$audience, $audience === 'doctors_city' ? $city : 0];
+}
+
+/** Readable label of a stored audience, including the city name of a city segment. */
+function announcement_audience_label(string $audience): string
+{
+    [$key, $city] = announcement_audience_parse($audience);
+    $label = announcement_audiences()[$key] ?? '';
+    if ($key === 'doctors_city' && $city) {
+        $c = city_row($city) ?? query('SELECT c.name,p.name province_name FROM cities c JOIN provinces p ON p.id=c.province_id WHERE c.id=?', [$city])->fetch();
+        $label = 'پزشکان شهر ' . ($c ? $c['name'] . ' (' . $c['province_name'] . ')' : '—');
+    }
+    return $label;
 }
 
 function announcement_status_labels(): array
@@ -181,15 +208,22 @@ function announcement_status_labels(): array
 }
 
 /** Recipient SQL for an audience: active user ids greater than ?, ascending. */
-function announcement_audience_sql(string $audience): string
+function announcement_audience_sql(string $audience, int $city = 0): string
 {
     $base = 'SELECT u.id FROM users u WHERE u.active=1 AND u.id>? AND ';
-    return match ($audience) {
+    [$key, $city] = announcement_audience_parse($audience, $city);
+    if ($key === 'doctors_city' && $city <= 0) {
+        throw new RuntimeException('شهر پزشکان را انتخاب کنید.');
+    }
+    return match ($key) {
         'all' => $base . '1=1',
         'patients' => $base . "EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='patient')",
         'doctors' => $base . 'EXISTS(SELECT 1 FROM doctor_accounts a WHERE a.user_id=u.id)',
         'secretaries' => $base . "EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='secretary')",
         'centers' => $base . '(EXISTS(SELECT 1 FROM centers c WHERE c.owner_user_id=u.id) OR EXISTS(SELECT 1 FROM center_staff s WHERE s.user_id=u.id AND s.active=1))',
+        // 1.0.27 doctor segments: the doctor's account owner; a doctor works in a city through its profile or any active clinic.
+        'doctors_pro', 'doctors_free' => $base . 'EXISTS(SELECT 1 FROM doctor_accounts a JOIN doctors d ON d.id=a.doctor_id WHERE a.user_id=u.id AND d.deleted_at IS NULL AND (' . doctor_pro_sql('d') . ')=' . ($key === 'doctors_pro' ? 1 : 0) . ')',
+        'doctors_city' => $base . 'EXISTS(SELECT 1 FROM doctor_accounts a JOIN doctors d ON d.id=a.doctor_id WHERE a.user_id=u.id AND d.deleted_at IS NULL AND (d.city_id=' . $city . ' OR EXISTS(SELECT 1 FROM clinics cl WHERE cl.doctor_id=d.id AND cl.active=1 AND cl.city_id=' . $city . ')))',
         default => throw new RuntimeException('گروه گیرندگان معتبر نیست.'),
     } . ' ORDER BY u.id';
 }
@@ -199,6 +233,13 @@ function announce_create(array $d): string
     $audience = (string) ($d['audience'] ?? '');
     if (!isset(announcement_audiences()[$audience])) {
         throw new RuntimeException('گروه گیرندگان را انتخاب کنید.');
+    }
+    if ($audience === 'doctors_city') {
+        $city = (int) ($d['city_id'] ?? 0);
+        if (!$city || !query('SELECT 1 FROM cities WHERE id=?', [$city])->fetchColumn()) {
+            throw new RuntimeException('شهر پزشکان را انتخاب کنید.');
+        }
+        $audience = 'dcity:' . $city;
     }
     $title = field($d, 'title', 120);
     $body = field($d, 'body', 1000);

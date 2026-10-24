@@ -131,7 +131,7 @@ function admin_action_permission(string $action): string
                 'subscription_settings', 'pro_catalog', 'doctor_features', 'center_grant', 'center_order', 'center_offline',
             ],
             'gateways' => ['gateway_save', 'gateway_enable', 'gateway_roles', 'gateway_test', 'gateway_logo'],
-            'communications' => ['manual_sms', 'sms_settings', 'sms_templates', 'sms_test', 'sms_account', 'notify_settings', 'push_regenerate', 'announce_create', 'announce_cancel'],
+            'communications' => ['manual_sms', 'bulk_sms', 'sms_settings', 'sms_templates', 'sms_test', 'sms_account', 'notify_settings', 'push_regenerate', 'announce_create', 'announce_cancel'],
             'content' => ['banner_save', 'banner_delete', 'banner_move', 'home_content', 'home_draft', 'home_publish', 'home_discard', 'home_featured', 'home_featured_order', 'home_specialties', 'faq_save', 'faq_delete', 'faq_order', 'page_save', 'footer_save', 'drawer_banner_save', 'article_save', 'article_delete', 'search_settings', 'search_cache', 'review_moderate'],
             'support' => ['ticket_reply', 'ticket_update'],
             'system' => ['cron_run', 'general_settings'],

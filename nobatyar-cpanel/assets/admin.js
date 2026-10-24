@@ -170,3 +170,18 @@
     document.querySelectorAll('[data-count]').forEach((el) => io.observe(el));
   }
 })();
+
+/* 1.0.27: the city fields of the «پزشکان یک شهر» audience appear (and become required) only when it is chosen. */
+(() => {
+  document.querySelectorAll('[data-audience-picker]').forEach((picker) => {
+    const city = picker.querySelector('[data-audience-city]');
+    if (!city) return;
+    const sync = () => {
+      const on = !!picker.querySelector('input[type=radio][value=doctors_city]:checked');
+      city.hidden = !on;
+      city.querySelectorAll('select').forEach((s) => { s.required = on; });
+    };
+    picker.addEventListener('change', sync);
+    sync();
+  });
+})();

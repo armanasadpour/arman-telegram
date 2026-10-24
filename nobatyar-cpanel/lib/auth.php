@@ -587,6 +587,7 @@ function audit_label(string $action): string
         'content.banner' => 'ذخیره بنر',
         'content.banner_delete' => 'حذف بنر',
         'announcement.create' => 'ارسال اطلاعیه سراسری',
+        'sms.bulk' => 'ارسال پیامک گروهی پزشکان',
         'announcement.cancel' => 'لغو اطلاعیه سراسری',
         'home.draft' => 'ذخیره پیش‌نویس صفحه اصلی',
         'home.publish' => 'انتشار صفحه اصلی',

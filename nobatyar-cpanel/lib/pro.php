@@ -34,7 +34,7 @@ function pro_catalog(): array
         'daily_summary_sms' => ['kind' => 'feature', 'label' => 'پیامک خلاصه نوبت‌ها در پایان روز', 'icon' => 'sms', 'pro' => true],
         'monthly_report' => ['kind' => 'feature', 'label' => 'گزارش عملکرد و آمار بازدید پروفایل', 'icon' => 'chart', 'pro' => true],
         'waitlist' => ['kind' => 'feature', 'label' => 'صف انتظار برای روزهای پر', 'icon' => 'clock', 'pro' => true],
-        'doctor_notice' => ['kind' => 'feature', 'label' => 'اطلاعیه به بیماران (صفحه پزشک و اعلان)', 'icon' => 'megaphone', 'pro' => true],
+        'doctor_notice' => ['kind' => 'feature', 'label' => 'اطلاعیه در صفحه پزشک', 'icon' => 'megaphone', 'pro' => true],
         'booking_qr' => ['kind' => 'feature', 'label' => 'لینک اختصاصی، QR و پوستر رزرو برای مطب', 'icon' => 'share', 'pro' => true],
         'checkin' => ['kind' => 'feature', 'label' => 'چک نوبت (تأیید حضور بیمار با کد ملی یا نام)', 'icon' => 'calendar-check', 'pro' => true],
         'reception' => ['kind' => 'feature', 'label' => 'ثبت نوبت تلفنی و حضوری توسط پزشک', 'icon' => 'phone', 'pro' => false],
@@ -362,7 +362,7 @@ function doctor_notice(array $d): string
     return doctor_has((int) $d['id'], 'doctor_notice', $d) ? (string) $d['notice_text'] : '';
 }
 
-/** Saves the announcement; optionally notifies patients with confirmed bookings until the end date. */
+/** Saves the announcement shown on the doctor's page; doctors no longer message patients directly (1.0.27). */
 function doctor_notice_save(int $doctorId, array $data): string
 {
     doctor_actor($doctorId, 'owner', 0, true);
@@ -374,23 +374,7 @@ function doctor_notice_save(int $doctorId, array $data): string
     }
     query('UPDATE doctors SET notice_text=?,notice_until=? WHERE id=?', [$text !== '' ? $text : null, $text !== '' ? $until : null, $doctorId]);
     event_record($doctorId, 'doctor.notice', ['until' => $until, 'length' => mb_strlen($text)]);
-    if ($text === '' || empty($data['notify_patients'])) {
-        return $text === '' ? 'اطلاعیه برداشته شد.' : 'اطلاعیه در صفحه شما نمایش داده می‌شود.';
-    }
-    throttle('doctor_notice_send', 10, 86400);
-    $d = query('SELECT name FROM doctors WHERE id=?', [$doctorId])->fetch();
-    $rows = query(
-        "SELECT b.id,b.patient_user_id FROM bookings b JOIN slots s ON s.id=b.slot_id WHERE s.doctor_id=? AND b.status='confirmed' AND s.starts_at>=NOW() AND s.starts_at<=? AND b.patient_user_id IS NOT NULL LIMIT 3000",
-        [$doctorId, ($until ?? date('Y-m-d', strtotime('+30 days'))) . ' 23:59:59'],
-    )->fetchAll();
-    $n = 0;
-    foreach ($rows as $r) {
-        if (notice_once('dnotice:' . $doctorId . ':' . $r['id'] . ':' . substr(hash('sha256', $text), 0, 16))) {
-            notify_user((int) $r['patient_user_id'], 'اطلاعیه ' . $d['name'], $text, (int) $r['id'], 'announcement', 'doctor.php?id=' . $doctorId);
-            $n++;
-        }
-    }
-    return 'اطلاعیه منتشر شد و برای ' . fa_number($n) . ' بیمار دارای نوبت اعلان فرستاده شد.';
+    return $text === '' ? 'اطلاعیه برداشته شد.' : 'اطلاعیه در صفحه شما نمایش داده می‌شود.';
 }
 
 /** Per-doctor administrator overrides; absent keys inherit the plan. */

@@ -441,6 +441,8 @@ function reception_claim(string $code): int
 }
 function reception_delay(array $data): int
 {
+    // 1.0.27: only the platform administrator messages patients; the delay broadcast is retired.
+    throw new AuthError('اطلاع‌رسانی پیامک و اعلان به بیماران فقط از سوی مدیریت سامانه انجام می‌شود.');
     $clinic = positive_id($data['clinic_id'] ?? 0);
     $c = reception_scope($clinic, 'bookings');
     $start = parse_jdate(field($data, 'starts_at', 30), true);

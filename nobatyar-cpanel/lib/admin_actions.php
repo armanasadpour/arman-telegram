@@ -28,6 +28,7 @@ function admin_dispatch(string $action, array $data, array $files = []): ?string
         'wallet_payout_handle'=>'wallet_payout_handle',
         'wallet_refund_settings'=>'wallet_refund_settings',
         'manual_sms'=>'admin_manual_sms',
+        'bulk_sms'=>'admin_bulk_sms',
         'taxonomy' => fn($d) => admin_save_taxonomy($d, $files),
         'delete_taxonomy' => 'admin_delete_taxonomy',
         'restore_specialty' => fn($d) => specialty_admin_delete(positive_id($d['id'] ?? 0), true),

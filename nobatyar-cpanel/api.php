@@ -19,9 +19,6 @@ try {
         'reception/calendar' => 'GET',
         'reception/reserve' => 'POST',
         'reception/change' => 'POST',
-        'reception/delay' => 'POST',
-        'reception/contact' => 'POST',
-        'reception/sms' => 'POST',
         'session' => 'GET',
         'auth/request' => 'POST',
         'auth/verify' => 'POST',
@@ -111,18 +108,6 @@ try {
         case 'reception/change':
             reception_change($data);
             $out = ['message' => 'تغییر ثبت شد.'];
-            break;
-        case 'reception/delay':
-            $out = ['id' => reception_delay($data)];
-            break;
-        case 'reception/contact':
-            reception_contact($data);
-            $out = ['message' => 'تماس ثبت شد.'];
-            break;
-        case 'reception/sms':
-            throttle('reception_sms', 100, 3600);
-            reception_sms(positive_id($data['id'] ?? 0));
-            $out = ['message' => 'سرویس پیامک درخواست را پذیرفت؛ تحویل به گوشی تأیید نشده است.'];
             break;
         case 'patient/family':
             $out = query(

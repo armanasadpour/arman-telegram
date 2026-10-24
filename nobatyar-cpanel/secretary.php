@@ -13,7 +13,6 @@ $tabs = [
     'book' => 'ثبت نوبت',
     'queue' => 'صف پذیرش و زمان تقریبی',
     'checkin' => 'چک نوبت',
-    'delays' => 'تأخیر و اطلاع‌رسانی',
     'notifications' => 'اعلان‌ها',
     'audit' => 'گزارش تغییرات',
 ];
@@ -81,8 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'reserve') {
             $id = reception_reserve($data);
             redirect('secretary-receipt.php?id=' . $id);
-        } elseif ($action === 'delay') {
-            reception_delay($data);
         } elseif ($action === 'call_next') {
             $n = queue_call_next($clinic);
             $_SESSION['flash'] = $n ? 'شماره ' . fa_number($n) . ' به اتاق پزشک فراخوانده شد.' : 'کسی در صف انتظار نیست.';
@@ -95,11 +92,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             reception_estimate($data);
             $_SESSION['flash'] = 'زمان تقریبی ثبت و به بیمار اطلاع داده شد.';
             redirect('secretary.php?clinic=' . $clinic . '&tab=queue');
-        } elseif ($action === 'contact') {
-            reception_contact($data);
-        } elseif ($action === 'sms') {
-            throttle('reception_sms', 100, 3600);
-            reception_sms(positive_id($data['id'] ?? 0));
         } else {
             throw new AuthError('عملیات نامعتبر است.');
         }
@@ -110,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 $panelTabs = $tabs;
-if (!$canManage) { unset($panelTabs['book'], $panelTabs['delays']); }
+if (!$canManage) { unset($panelTabs['book']); }
 set_panel_navigation('secretary.php', $panelTabs, $tab, (int)$c['doctor_id'], $clinic, 'پنل منشی');
 layout_start('پنل منشی');
 echo '<div class="workspace-heading"><div><span class="eyebrow">پذیرش و هماهنگی مطب</span><h1>پنل منشی</h1><p>' .
@@ -432,89 +424,6 @@ try {
             }
             echo '</select></label><label>روش ثبت<select name="channel"><option value="phone">تلفنی</option><option value="in_person">حضوری</option></select></label><button>ثبت زمان دستی</button></form></article>';
         }
-    } elseif ($tab === 'delays') {
-        reception_scope($clinic, 'bookings');
-        echo '<article class="card"><h2>اعلام تأخیر پزشک</h2><p>زمان نوبت‌ها جابه‌جا نمی‌شود. برای نوبت‌های قطعی بازه، اعلان داخلی و فهرست پیگیری ساخته می‌شود. برای بیمار بدون حساب متصل، پیامک یا تماس لازم است.</p><form method="post">';
-        form_token('delay');
-        input('شروع بازه شمسی', 'starts_at', jdate(date('Y-m-d H:i:s'), true), 'text', true, 190, 'data-jdate="time"');
-        input('پایان بازه شمسی', 'ends_at', jdate(date('Y-m-d H:i:s', time() + 3600), true), 'text', true, 190, 'data-jdate="time"');
-        input('دقیقه تأخیر', 'minutes', '30', 'number');
-        input('علت', 'reason', '');
-        echo '<label class="check"><input type="checkbox" name="send_sms" value="1"> پیامک تأخیر هم برای همه بیماران این بازه در صف ارسال قرار گیرد (با رعایت تنظیمات بیمار و فعال‌بودن الگو)</label><p class="muted">زمان تقریبی مراجعه هر نوبت به اندازه تأخیر جلو می‌رود و در پنل بیمار نمایش داده می‌شود.</p>';
-        echo '<button>ثبت تأخیر و ایجاد اعلان‌ها</button></form></article><h2>پیگیری اطلاع‌رسانی</h2>';
-        $page = max(1, min(100000, (int) ($_GET['page'] ?? 1)));
-        $rows = query(
-            'SELECT r.*,d.minutes,d.starts_at,d.reason,b.patient_name,b.patient_user_id FROM reception_delay_recipients r JOIN reception_delays d ON d.id=r.delay_id JOIN bookings b ON b.id=r.booking_id JOIN slots s ON s.id=b.slot_id WHERE d.clinic_id=?' .
-                ($canHistory ? '' : ' AND s.starts_at>=CURDATE()') .
-                ' ORDER BY r.id DESC LIMIT 51 OFFSET ' .
-                ($page - 1) * 50,
-            [$clinic],
-        )->fetchAll();
-        $hasNext = count($rows) > 50;
-        $rows = array_slice($rows, 0, 50);
-        foreach ($rows as $r) {
-            echo '<article class="card"><h3>' .
-                esc($r['patient_name']) .
-                ' • ' .
-                fa_number($r['minutes']) .
-                ' دقیقه</h3><p>' .
-                esc(jdate($r['starts_at'], true) . ' • ' . $r['reason']) .
-                '</p><p>موبایل: ' .
-                esc(fa_number($r['mobile'])) .
-                ' • اعلان بیمار: ' .
-                ($r['patient_user_id'] ? 'در حساب ثبت شد' : 'حساب متصل ندارد') .
-                '</p><p>پیامک: ' .
-                ([
-                    'pending' => 'ارسال نشده',
-                    'sending' => 'در حال ارسال یا نیازمند پیگیری',
-                    'sent' => 'پذیرفته‌شده توسط سرویس؛ تحویل تأیید نشده',
-                    'unknown' => 'نامشخص؛ پیگیری از پنل پیامک',
-                ][$r['sms_state']] ??
-                    'نامشخص') .
-                '</p>';
-            if (
-                $r['sms_state'] === 'pending' &&
-                sms_config()['enabled'] &&
-                setting('delay_sms_template') !== ''
-            ) {
-                echo '<form method="post">';
-                form_token('sms');
-                echo '<input type="hidden" name="id" value="' .
-                    $r['id'] .
-                    '"><button>ارسال پیامک تأخیر</button></form>';
-            }
-            if ($r['contacted_at']) {
-                echo '<p class="notice">تماس ثبت‌شده: ' .
-                    esc(jdate($r['contacted_at'], true) . ' • ' . $r['contact_note']) .
-                    '</p>';
-            } else {
-                echo '<form method="post">';
-                form_token('contact');
-                echo '<input type="hidden" name="id" value="' . $r['id'] . '">';
-                input('توضیح تماس', 'note', '');
-                echo '<label><input type="checkbox" name="contacted" value="1" required> شخصاً بیمار یا سرپرست را مطلع کردم</label><button class="secondary">ثبت نتیجه تماس</button></form>';
-            }
-            echo '</article>';
-        }
-        if (!$rows) {
-            echo '<p class="empty-state">موردی برای پیگیری نیست.</p>';
-        }
-        echo '<nav class="no-print">';
-        if ($page > 1) {
-            echo '<a class="button secondary" href="secretary.php?clinic=' .
-                $clinic .
-                '&tab=delays&page=' .
-                ($page - 1) .
-                '">صفحه قبل</a>';
-        }
-        if ($hasNext) {
-            echo '<a class="button secondary" href="secretary.php?clinic=' .
-                $clinic .
-                '&tab=delays&page=' .
-                ($page + 1) .
-                '">صفحه بعد</a>';
-        }
-        echo '</nav>';
     } elseif ($tab === 'audit') {
         $rows = query(
             "SELECT e.*,u.name actor FROM appointment_events e LEFT JOIN users u ON u.id=e.actor_user_id LEFT JOIN bookings b ON b.id=e.booking_id LEFT JOIN slots s ON s.id=b.slot_id WHERE e.doctor_id=? AND (s.clinic_id=? OR JSON_UNQUOTE(JSON_EXTRACT(e.details,'$.clinic_id'))=?)" .
