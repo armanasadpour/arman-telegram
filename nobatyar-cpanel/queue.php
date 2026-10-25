@@ -28,7 +28,7 @@ layout_start('صف ' . $c['name'], ['body_class' => 'queue-display']);
 ?>
 <section class="queue-board" aria-live="polite">
   <header>
-    <h1><?= esc($c['doctor']) ?></h1>
+    <h1><?= esc(doctor_display_name((string) $c['doctor'])) ?></h1>
     <p><?= esc($c['name']) ?> • <bdi><?= esc(fa_number(date('H:i'))) ?></bdi></p>
   </header>
   <div class="queue-current">

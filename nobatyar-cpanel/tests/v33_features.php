@@ -10,6 +10,7 @@ if ($c['database'] !== 'nobatyar_test_http') {
 }
 ob_start();
 require __DIR__ . '/../core.php';
+require_once __DIR__ . '/../lib/admin_panel.php';
 ob_end_clean();
 $checks = 0;
 function t(bool $ok, string $label): void
@@ -33,9 +34,11 @@ function rejects(callable $fn, string $label, string $contains = ''): void
 }
 query('DELETE FROM request_limits');
 query('DELETE FROM auth_rate_limits');
+query("DELETE FROM reviews WHERE comment='برخورد خوب'"); // a previous run of this file
+query("DELETE FROM settings WHERE `key` LIKE 'backup_offsite%' OR `key` IN ('secret.backup_zip_password','secret.backup_ftp_password')");
 
 // ---------- Saved doctors ----------
-$doctor = (int) query('SELECT d.id FROM doctors d JOIN specialties sp ON sp.id=d.specialty_id WHERE ' . visible_doctor_sql() . ' AND EXISTS(SELECT 1 FROM clinics cl WHERE cl.doctor_id=d.id AND cl.active=1) ORDER BY d.id LIMIT 1')->fetchColumn();
+$doctor = (int) query('SELECT d.id FROM doctors d JOIN specialties sp ON sp.id=d.specialty_id WHERE ' . visible_doctor_sql() . ' AND EXISTS(SELECT 1 FROM clinics cl JOIN cities c ON c.id=cl.city_id JOIN provinces p ON p.id=c.province_id WHERE cl.doctor_id=d.id AND ' . public_clinic_sql() . ') ORDER BY d.id LIMIT 1')->fetchColumn();
 $hidden = (int) query("SELECT id FROM doctors WHERE review_status<>'approved' OR active=0 ORDER BY id LIMIT 1")->fetchColumn();
 $patient = (int) query("SELECT u.id FROM users u WHERE u.active=1 AND NOT EXISTS(SELECT 1 FROM doctor_accounts a WHERE a.user_id=u.id) ORDER BY u.id LIMIT 1")->fetchColumn();
 t($doctor > 0 && $patient > 0, 'fixtures: a public doctor and a patient');
@@ -43,7 +46,7 @@ $_SESSION = ['user_id' => $patient, 'user_version' => (int) query('SELECT sessio
 query('DELETE FROM favorite_doctors WHERE user_id=?', [$patient]);
 t(favorite_toggle($doctor) === true && favorite_saved($patient, $doctor), 'heart saves the doctor');
 $cards = favorite_cards($patient);
-t(count($cards) === 1 && (int) $cards[0]['id'] === $doctor && isset($cards[0]['clinic_id'], $cards[0]['first_available']), 'saved list returns a doctor card with clinic and first free time');
+t(count($cards) === 1 && (int) $cards[0]['id'] === $doctor && isset($cards[0]['clinic_id']) && array_key_exists('first_available', $cards[0]), 'saved list returns a doctor card with clinic and first free time');
 t(favorite_toggle($doctor) === false && !favorite_saved($patient, $doctor) && favorite_cards($patient) === [], 'second tap removes it');
 if ($hidden) {
     rejects(fn() => favorite_toggle($hidden), 'a hidden or unapproved doctor cannot be saved', 'پیدا نشد');
