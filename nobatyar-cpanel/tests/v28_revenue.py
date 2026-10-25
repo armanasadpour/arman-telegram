@@ -141,8 +141,9 @@ try:
     check('دریافتی (بدون مالیات)' in html, 'payments report column without VAT')
 
     # ---------- Back on: subscription rules return ----------
-    html = submit(admin, 'admin.php?tab=settings', dict(action='revenue_settings', subscriptions_enabled='1', invoice_vat_percent='0'))[1]
-    check('فروش اشتراک فعال شد' in html, 'subscription sales turned back on')
+    submit(admin, 'admin.php?tab=settings', dict(action='revenue_settings', invoice_vat_percent='0'))
+    submit(admin, 'admin.php?tab=subscriptions&view=settings', dict(action='subscription_settings', subscription_sales_form='1', subscriptions_enabled='1', subscription_grace_days='7', subscription_trial_days='14', subscription_warning_thresholds='7,3,1', proforma_valid_hours='48'))
+    check(scalar("SELECT value FROM settings WHERE `key`='subscriptions_enabled'") == '1', 'subscription sales turned back on')
     status, html = get(d, f'doctor-panel.php?doctor={DOCTOR}&tab=subscription')
     check(status == 200 and 'tab=subscription' in get(d, f'doctor-panel.php?doctor={DOCTOR}')[1], 'doctor panel: subscription menu back')
     status, html = get(client(), f'doctor.php?id={DOCTOR}')
