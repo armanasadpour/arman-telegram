@@ -303,7 +303,7 @@ function cron_daily_summary(): string
             'token' => fa_number((int) $t['n']),
             'token2' => $first,
             'token3' => fa_number((int) $day['done']),
-            'token10' => (string) $d['name'],
+            'token10' => doctor_display_name((string) $d['name']),
             'token20' => fa_number((int) $day['cancelled']),
         ], 'daily-summary:' . $d['id'] . ':' . $today, ['doctor_id' => (int) $d['id']]);
         notify_doctor((int) $d['id'], 'خلاصه نوبت‌های فردا', 'فردا ' . fa_number((int) $t['n']) . ' نوبت قطعی دارید' . ($t['first'] ? '؛ اولین نوبت ساعت ' . $first : '') . '. امروز: ' . fa_number((int) $day['done']) . ' نوبت، ' . fa_number((int) $day['cancelled']) . ' لغو.');

@@ -148,6 +148,7 @@ function admin_dispatch(string $action, array $data, array $files = []): ?string
             return 'اولین نوبت آزاد ' . fa_number($n) . ' مطب دوباره محاسبه شد.';
         },
         'review_moderate' => fn($d) => review_moderate(positive_id($d['id'] ?? 0), (string) ($d['status'] ?? '')),
+        'review_reply_moderate' => fn($d) => review_reply_moderate(positive_id($d['id'] ?? 0), (string) ($d['status'] ?? '')),
         'drawer_banner_save' => function ($d) use ($files) {
             drawer_banner_save($d, $files);
             audit('home.drawer_banner');
@@ -167,6 +168,8 @@ function admin_dispatch(string $action, array $data, array $files = []): ?string
         'admin_save' => 'admin_account_save',
         'backup_create' => fn() => 'پشتیبان ساخته شد: ' . backup_create('manual'),
         'backup_delete' => fn($d) => backup_delete((string) ($d['name'] ?? '')),
+        'backup_offsite' => 'backup_offsite_save',
+        'backup_offsite_test' => fn() => backup_offsite_test(),
         'backup_upload' => fn() => 'فایل پشتیبان بارگذاری شد: ' . backup_upload($files['backup'] ?? []),
         'update_upload' => function () use ($files) {
             $p = update_receive($files['package'] ?? []);

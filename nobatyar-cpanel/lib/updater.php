@@ -351,8 +351,7 @@ function update_flag(): string
 function update_verify_owner_password(string $password): void
 {
     admin_require('admins');
-    $a = query('SELECT password_hash FROM admins WHERE id=?', [(int) ($_SESSION['admin_id'] ?? 0)])->fetch();
-    if (!$a || !password_verify($password, $a['password_hash'])) {
+    if (!admin_password_confirm($password)) {
         audit('update.denied');
         throw new AuthError('رمز عبور شما اشتباه است.');
     }

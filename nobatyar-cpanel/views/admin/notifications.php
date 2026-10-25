@@ -27,7 +27,7 @@ $ready = fn(string $e) => sms_template_ready($templates[$e]??null);
         <?php input('تعداد نفرات مطلع‌شده در هر نوبت بررسی', 'waitlist_batch', setting('waitlist_batch', '3'), 'number', true, 2); ?>
         <?php input('سقف درخواست فعال هر بیمار', 'waitlist_max_entries', setting('waitlist_max_entries', '5'), 'number', true, 2); ?>
       </div>
-      <p class="muted small">الگوی «زمان آزاد برای صف انتظار»: <?= $ready('waitlist_available') ? '<span class="badge status-confirmed">فعال</span>' : '<span class="badge">تنظیم نشده</span>' ?> • «تغییر زمان تقریبی مراجعه»: <?= $ready('visit_time_changed') ? '<span class="badge status-confirmed">فعال</span>' : '<span class="badge">تنظیم نشده</span>' ?> • «تأخیر پزشک»: <?= $ready('delay') ? '<span class="badge status-confirmed">فعال</span>' : '<span class="badge">تنظیم نشده</span>' ?>. الگوها در بخش «پیامک و ورود» تعریف می‌شوند.</p>
+      <p class="muted small">الگوی «زمان آزاد برای صف انتظار»: <?= $ready('waitlist_available') ? '<span class="badge status-confirmed">فعال</span>' : '<span class="badge">تنظیم نشده</span>' ?> • «تغییر زمان تقریبی مراجعه»: <?= $ready('visit_time_changed') ? '<span class="badge status-confirmed">فعال</span>' : '<span class="badge">تنظیم نشده</span>' ?>. الگوها در بخش «پیامک و ورود» تعریف می‌شوند.</p>
       <h3>اعلان مرورگر (Web Push)</h3>
       <label class="check"><input type="checkbox" name="push_enabled" value="1"<?= checked_attr(setting('push_enabled', '1') === '1') ?>> اعلان مرورگر فعال باشد</label>
       <?php input('ایمیل تماس برای سرویس‌های اعلان (VAPID)', 'push_contact', setting('push_contact', ''), 'email', false, 190); ?>

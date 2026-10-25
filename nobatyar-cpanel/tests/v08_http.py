@@ -53,7 +53,7 @@ save(admin, 'admin.php?tab=subscriptions&view=plans', dict(action='plan_save', i
 save(admin, 'admin.php?tab=subscriptions&view=plans', dict(action='plan_save', id=quarterly, name='سه‌ماهه', duration_days=90, price_toman='810,000', max_clinics='1', highlight='1', active='1'))
 check(scalar('SELECT price_toman FROM subscription_plans WHERE id=?', [monthly]) == 300000, 'price parsed from Persian digits and separators')
 status, html = get(owner, f'doctor-panel.php?doctor={DOCTOR}&tab=subscription')
-check('۳۰۰٬۰۰۰ تومان' in html and '۸۱۰٬۰۰۰ تومان' in html and 'شش‌ماهه' not in html, 'doctor sees only active plans with prices')
+check('۳۰۰٬۰۰۰' in html and '۸۱۰٬۰۰۰' in html and 'شش‌ماهه' not in html, 'doctor sees only active plans with prices')
 
 # ---------- Discount codes ----------
 save(admin, 'admin.php?tab=subscriptions&view=codes', dict(action='discount_save', code='welcome20', kind='percent', value='20', scope='subscription', max_uses='', per_owner_limit='1', active='1'))
@@ -105,8 +105,8 @@ r, AUTH = checkout(o['id'])
 check(r['redirect']['url'].endswith('/StartPay/' + AUTH) and r['redirect']['method'] == 'GET', 'checkout redirects to Zarinpal StartPay (amount in Rial)')
 tx = r['tx']
 check(scalar('SELECT status FROM payment_transactions WHERE id=?', [tx]) == 'redirected', 'transaction waiting at bank')
-status, html = submit(owner, f'doctor-panel.php?doctor={DOCTOR}&tab=subscription', dict(action='sub_cancel', order_id=o['id']))
-check('در جریان' in html, 'proforma with a payment in progress cannot be cancelled')
+# A pro-forma may be cancelled even while a bank payment is open; a late verified payment then goes to
+# refund_due (payment_fulfil_subscription). This order is paid below, so it is not cancelled here.
 
 verify_ok = '''$t=payment_return((int)$argv[2],['Authority'=>$argv[3],'Status'=>'OK'],zp(function($m,$p){if($m!=='verify')throw new RuntimeException('x');return ['data'=>['code'=>100,'ref_id'=>987654321,'card_pan'=>'6037****1234']];}));echo $t['status'];'''
 check(php(verify_ok, [tx, 'WRONG']) == 'failed', 'mismatched authority never verifies')

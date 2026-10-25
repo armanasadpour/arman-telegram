@@ -1,5 +1,5 @@
 <?php
-/** @var array $checks @var array $backups @var bool $canBackup @var bool $auto @var string $keep @var array $securityLog @var array $errorLog @var array $events */
+/** @var array $checks @var array $backups @var bool $canBackup @var bool $auto @var string $keep @var array $securityLog @var array $errorLog @var array $events @var ?array $offsite */
 $state = ['ok' => ['check', 'درست'], 'warn' => ['alert', 'نیاز به توجه'], 'fail' => ['x', 'مشکل']];
 $size = fn(int $b) => $b >= 1048576 ? fa_number(number_format($b / 1048576, 1)) . ' مگابایت' : fa_number(max(1, (int) round($b / 1024))) . ' کیلوبایت';
 ?>
@@ -47,6 +47,38 @@ $size = fn(int $b) => $b >= 1048576 ? fa_number(number_format($b / 1048576, 1)) 
       <button class="secondary">ذخیره تنظیمات پشتیبان</button>
     </form>
   </section>
+  <?php if ($offsite): $o = $offsite; /* 1.0.30 off-server backup */ ?>
+  <section class="panel offsite-panel" data-offsite>
+    <h2><?= icon('shield') ?> پشتیبان خارج از سرور</h2>
+    <p class="muted small">پس از هر پشتیبان خودکار روزانه، یک نسخه رمزدار (ZIP با رمزنگاری AES-256) به ایمیل یا سرور دیگری فرستاده می‌شود تا اگر هاست از دسترس خارج شد، اطلاعات از دست نرود. فایل با 7-Zip یا WinRAR و همین رمز باز می‌شود؛ رمز را جایی امن یادداشت کنید، بدون آن بازیابی ممکن نیست.</p>
+    <?php if ($o['last']): ?>
+      <p class="offsite-last <?= $o['last']['ok'] ? 'ok' : 'fail' ?>"><?= icon($o['last']['ok'] ? 'check' : 'alert') ?><span><?= esc($o['last']['message']) ?> <bdi class="muted"><?= esc(jdate($o['last']['at'], true)) ?></bdi></span></p>
+    <?php endif; ?>
+    <form method="post" class="stack">
+      <?php form_token('backup_offsite'); ?>
+      <label>روش ارسال<select name="mode" data-offsite-mode><?php foreach (backup_offsite_modes() as $k => $l): ?><option value="<?= $k ?>"<?= selected_attr($o['mode'] === $k) ?>><?= esc($l) ?></option><?php endforeach; ?></select></label>
+      <?php input('رمز فایل پشتیبان (حداقل ۱۰ نویسه)', 'zip_password', '', 'password', false, 100, 'autocomplete="new-password"' . ($o['has_zip_password'] ? ' placeholder="ذخیره شده؛ برای تغییر، رمز جدید وارد کنید"' : '')); ?>
+      <div data-offsite-for="email"<?= $o['mode'] === 'email' ? '' : ' hidden' ?>>
+        <?php input('نشانی ایمیل مقصد', 'email', $o['email'], 'email', false, 190, 'dir="ltr"'); ?>
+        <p class="muted small">حجم هر ایمیل حداکثر ۲۰ مگابایت است؛ برای دیتابیس بزرگ‌تر روش FTP را انتخاب کنید.</p>
+      </div>
+      <div data-offsite-for="ftp" class="form-grid"<?= $o['mode'] === 'ftp' ? '' : ' hidden' ?>>
+        <?php input('نشانی سرور (بدون ftp://)', 'ftp_host', $o['ftp_host'], 'text', false, 253, 'dir="ltr" placeholder="backup.example.com"'); ?>
+        <?php input('درگاه', 'ftp_port', (string) $o['ftp_port'], 'number', false, 5, 'dir="ltr"'); ?>
+        <?php input('نام کاربری FTP', 'ftp_user', $o['ftp_user'], 'text', false, 120, 'dir="ltr" autocomplete="off"'); ?>
+        <?php input('رمز FTP', 'ftp_password', '', 'password', false, 200, 'autocomplete="new-password"' . ($o['has_ftp_password'] ? ' placeholder="ذخیره شده"' : '')); ?>
+        <?php input('پوشه مقصد (اختیاری)', 'ftp_dir', $o['ftp_dir'], 'text', false, 200, 'dir="ltr" placeholder="backups/nobatyar"'); ?>
+        <label class="check"><input type="checkbox" name="ftp_tls" value="1"<?= checked_attr($o['ftp_tls']) ?>> اتصال امن (FTPS) — توصیه می‌شود</label>
+      </div>
+      <div class="button-row">
+        <button><?= icon('check') ?> ذخیره</button>
+      </div>
+    </form>
+    <?php if ($o['mode'] !== 'off'): ?>
+      <form method="post" class="inline-form"><?php form_token('backup_offsite_test'); ?><button class="secondary"><?= icon('send') ?> ارسال آزمایشی آخرین پشتیبان</button></form>
+    <?php endif; ?>
+  </section>
+  <?php endif; ?>
   <section class="panel">
     <h2>بازیابی</h2>
     <p class="muted small">بازیابی، کل اطلاعات فعلی را با محتوای فایل جایگزین می‌کند. پیش از آن، خودکار یک پشتیبان «پیش از بازیابی» ساخته می‌شود. فقط پشتیبان همین نسخه دیتابیس پذیرفته می‌شود. پس از بازیابی همه کاربران و مدیران باید دوباره وارد شوند.</p>

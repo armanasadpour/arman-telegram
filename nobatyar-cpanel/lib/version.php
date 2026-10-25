@@ -7,4 +7,4 @@ declare(strict_types=1);
  */
 const APP_VERSION = '1.0.29';
 const APP_VERSION_FA = '۱.۰.۲۹';
-const SCHEMA_VERSION = 31;
+const SCHEMA_VERSION = 33;

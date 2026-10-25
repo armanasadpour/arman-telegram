@@ -132,10 +132,10 @@ function admin_action_permission(string $action): string
             ],
             'gateways' => ['gateway_save', 'gateway_enable', 'gateway_roles', 'gateway_test', 'gateway_logo'],
             'communications' => ['manual_sms', 'bulk_sms', 'sms_settings', 'sms_templates', 'sms_test', 'sms_account', 'notify_settings', 'push_regenerate', 'announce_create', 'announce_cancel'],
-            'content' => ['banner_save', 'banner_delete', 'banner_move', 'home_content', 'home_draft', 'home_publish', 'home_discard', 'home_featured', 'home_featured_order', 'home_specialties', 'faq_save', 'faq_delete', 'faq_order', 'page_save', 'footer_save', 'drawer_banner_save', 'article_save', 'article_delete', 'search_settings', 'search_cache', 'review_moderate'],
+            'content' => ['banner_save', 'banner_delete', 'banner_move', 'home_content', 'home_draft', 'home_publish', 'home_discard', 'home_featured', 'home_featured_order', 'home_specialties', 'faq_save', 'faq_delete', 'faq_order', 'page_save', 'footer_save', 'drawer_banner_save', 'article_save', 'article_delete', 'search_settings', 'search_cache', 'review_moderate', 'review_reply_moderate'],
             'support' => ['ticket_reply', 'ticket_update'],
             'system' => ['cron_run', 'general_settings'],
-            'admins' => ['admin_save', 'admin_status', 'admin_reset_password', 'update_upload', 'update_cancel', 'update_apply', 'update_rollback', 'backup_create', 'backup_delete', 'backup_upload', 'backup_restore', 'backup_settings'],
+            'admins' => ['admin_save', 'admin_status', 'admin_reset_password', 'update_upload', 'update_cancel', 'update_apply', 'update_rollback', 'backup_create', 'backup_delete', 'backup_upload', 'backup_restore', 'backup_settings', 'backup_offsite', 'backup_offsite_test'],
         ];
         $map = [];
         foreach ($groups as $perm => $actions) {
@@ -241,11 +241,25 @@ function admin_reset_password(int $id, string $password): string
     return 'رمز عبور تغییر کرد و نشست‌های قبلی آن حساب بسته شد.';
 }
 
+/**
+ * 1.0.30: confirms the signed-in administrator's password for sensitive steps (own password, backups, updates).
+ * Limited per account so a taken-over session cannot guess the password.
+ */
+function admin_password_confirm(string $password): bool
+{
+    $me = admin_current();
+    if (!$me) {
+        return false;
+    }
+    rate_limit('admin_password_confirm:' . (int) $me['id'], 10, 900);
+    return password_verify($password, $me['password_hash']);
+}
+
 /** Any administrator may change their own password after confirming the current one. */
 function admin_change_own_password(string $current, string $new): string
 {
     $me = admin_current();
-    if (!$me || !password_verify($current, $me['password_hash'])) {
+    if (!$me || !admin_password_confirm($current)) {
         throw new RuntimeException('رمز عبور فعلی اشتباه است.');
     }
     admin_password_valid($new);

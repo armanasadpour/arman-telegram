@@ -191,7 +191,8 @@ check('قوانین لغو نوبت و بازگشت کارمزد' in co, 'cancel
 check('کد تخفیف دارید؟' in co and 'فقط روی کارمزد رزرو اعمال' in co, 'discount box applies to the booking fee only')
 php("test_gateway_off();")
 status, co = get(p, f'checkout.php?id={bid}')
-check('درگاه پرداخت فعالی وجود ندارد' in co and 'name="gateway"' not in co and re.search(r'form="pay-form" disabled', co), 'no usable gateway: no gateway listed, pay button disabled')
+# Since the wallet (1.0.0) the pay button stays available: a wallet balance can still pay the fee.
+check('درگاه بانکی فعال نیست' in co and 'name="gateway"' not in co, 'no usable gateway: no gateway listed, wallet offered instead')
 status, html = submit(p, f'checkout.php?id={bid}', dict(action='pay', gateway='zarinpal'))
 check(scalar('SELECT status FROM bookings WHERE id=?', [bid]) == 'held' and scalar("SELECT COUNT(*) FROM payment_transactions WHERE purpose='booking' AND reference_id=? AND status IN ('paid','verified')", [bid]) == 0, 'paying without a usable gateway never marks anything paid')
 
@@ -212,7 +213,7 @@ status, rc = submit(p, f'checkout.php?id={bid2}', dict(action='confirm'))
 check(scalar('SELECT status FROM bookings WHERE id=?', [bid2]) == 'confirmed', 'free booking confirmed')
 check('نوبت شما با موفقیت ثبت شد' in rc and 'success-mark' in rc and 'class="receipt"' in rc, 'success page after confirming')
 code = scalar('SELECT tracking_code FROM bookings WHERE id=?', [bid2])
-check(code in rc and 'مریم رضایی' in rc and 'مشاهده نوبت‌های من' in rc and 'data-print' in rc and 'data-share' in rc and 'بازگشت به صفحه اصلی' in rc, 'receipt: tracking code, patient and the four actions')
+check(code in rc and 'مریم رضایی' in rc and 'مشاهده نوبت‌های من' in rc and ('receipt-ticket.php' in rc or 'data-print' in rc) and 'data-share' in rc and 'بازگشت به صفحه اصلی' in rc, 'receipt: tracking code, patient and the four actions')
 check('<script>' not in rc, 'receipt has no inline script')
 db("UPDATE bookings SET confirmed_at=DATE_SUB(NOW(),INTERVAL 1 DAY) WHERE id=?", [bid2])
 status, rc = get(p, f'receipt.php?id={bid2}')

@@ -77,7 +77,7 @@ try:
         if kind == 'pro':
             check(html.count('class="plan-col') == 2 and 'name="plan_choice" value="free"' in html and 'name="plan_choice" value="pro"' in html, 'registration: Free and Pro side by side')
             check('تیک آبی کنار نام پزشک' in html and 'دریافت اکسل نوبت‌های روز' in html and 'بدون منشی' in html and '۱ مطب' in html, 'plan columns built from the catalog (Pro items, free limits)')
-        data = dict(csrf=token(c, 'register.php'), plan_choice=kind, name=f'دکتر {kind} آزمونپلن', medical_code=str(int(MOB[kind][-6:]) + 700000),
+        data = dict(csrf=token(c, 'register.php'), plan_choice=kind, name=f'{kind} آزمونپلن', medical_code=str(int(MOB[kind][-6:]) + 700000),
                     specialty_id=spec[0]['id'] if spec else '', specialty_other='' if spec else 'عمومی', gender='', bio='', clinic_name=f'مطب {kind}',
                     province_id=city['province_id'], city_id=city['id'], district='', address='خیابان آزمون پلاک ۱۲', phone='', latitude='', longitude='',
                     notes='', website='', consent='1')

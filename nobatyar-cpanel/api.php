@@ -56,6 +56,7 @@ try {
         'booking/confirm' => 'POST',
         'booking/payment' => 'POST',
         'doctors/search' => 'GET',
+        'favorite/toggle' => 'POST',
     ];
     if (!isset($allowed[$route])) {
         throw new AuthError('مسیر پیدا نشد.', 404);
@@ -275,6 +276,11 @@ try {
                 ],
                 cities_nearby(positive_id($_GET['city'] ?? 0)),
             );
+            break;
+        case 'favorite/toggle':
+            // 1.0.30: heart on the doctor's page; the list is in «حساب من» → «پزشکان ذخیره‌شده».
+            $saved = favorite_toggle(positive_id($data['doctor_id'] ?? 0));
+            $out = ['saved' => $saved, 'message' => $saved ? 'پزشک در فهرست ذخیره‌شده‌های شما قرار گرفت.' : 'پزشک از فهرست ذخیره‌شده‌ها برداشته شد.'];
             break;
         case 'checkin/find':
             // «چک نوبت»: the clinic's appointments of the chosen day matching a national ID or name.

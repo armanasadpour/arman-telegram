@@ -11,7 +11,7 @@ foreach ($presences as $p) {
 <?php foreach ($links as $l): ?>
   <article class="card link-card">
     <div class="between">
-      <h2><?= icon('doctor') ?> <?= esc($l['doctor_name']) ?> <small class="muted"><?= esc($l['specialty']) ?></small></h2>
+      <h2><?= icon('doctor') ?> <?= esc(doctor_display_name((string) $l['doctor_name'])) ?> <small class="muted"><?= esc($l['specialty']) ?></small></h2>
       <span class="badge <?= $l['status'] === 'active' ? 'status-confirmed' : (in_array($l['status'], ['invited', 'requested'], true) ? 'status-held' : '') ?>"><?= esc(link_status_labels()[$l['status']]) ?></span>
     </div>
     <ul class="perm-chips">

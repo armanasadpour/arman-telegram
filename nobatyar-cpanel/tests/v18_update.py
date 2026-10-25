@@ -61,7 +61,7 @@ def version_php(v, fa, schema):
 
 
 SCHEMA = int(re.search(r'SCHEMA_VERSION = (\d+)', LIVE_VERSION).group(1))
-NEW = version_php('1.0.0-rc.99', 'نسخه آزمون ۹۹', SCHEMA)
+NEW = version_php('99.0.0', 'نسخه آزمون ۹۹', SCHEMA)
 
 
 def upload(c, data, name='nobatyar-cpanel-test.zip'):
@@ -128,7 +128,7 @@ rejected(package({'lib/version.php': NEW}, manifest_edit=lambda m: m['files'].__
 rejected(package({'lib/version.php': NEW}, manifest_edit=lambda m: m['files'].__setitem__('missing.php', '0' * 64)), 'ناقص', 'listed file missing from the ZIP')
 rejected(package({'lib/version.php': NEW, 'config.php': '<?php return [];'}), 'config.php', 'package carrying config.php')
 rejected(package({'lib/version.php': version_php('0.9.0', 'قدیمی', SCHEMA)}), 'قدیمی‌تر', 'older version (downgrade)')
-rejected(package({'lib/version.php': version_php('1.0.0-rc.99', 'آزمون', SCHEMA - 1)}), 'پایین‌تر', 'lower database step')
+rejected(package({'lib/version.php': version_php('99.0.0', 'آزمون', SCHEMA - 1)}), 'پایین‌تر', 'lower database step')
 link = zipfile.ZipInfo('nobatyar-cpanel/assets/link.txt')
 link.create_system = 3
 link.external_attr = (0o120777 << 16)
@@ -147,7 +147,7 @@ check('config.php، پوشه private' in html and 'نصب به‌روزرسان�
 
 # Wrong password: nothing happens.
 status, html = submit(owner, 'admin.php?tab=update', dict(action='update_apply', password='wrong-password'))
-check('رمز عبور شما اشتباه است' in html and 'rc.99' not in (ROOT / 'lib' / 'version.php').read_text() and not (ROOT / 'private' / 'updating.flag').exists(), 'wrong password: no change')
+check('رمز عبور شما اشتباه است' in html and '99.0.0' not in (ROOT / 'lib' / 'version.php').read_text() and not (ROOT / 'private' / 'updating.flag').exists(), 'wrong password: no change')
 
 # ---------- Install ----------
 backups_before = len(list((ROOT / 'private' / 'backups').glob('*preupdate*'))) if (ROOT / 'private' / 'backups').exists() else 0
@@ -157,7 +157,7 @@ r = owner.open(req)
 html = r.read().decode()
 check('upgrade.php?finish=' in r.url and 'به‌روزرسانی انجام شد' in html, 'install, then the database step in a fresh request')
 check('نسخه آزمون ۹۹' in html, 'success page reports the new version (new code loaded)')
-check("APP_VERSION = '1.0.0-rc.99'" in (ROOT / 'lib' / 'version.php').read_text() and (ROOT / 'assets' / 'update-marker.txt').read_text() == 'marker rc.99', 'new and changed files installed')
+check("APP_VERSION = '99.0.0'" in (ROOT / 'lib' / 'version.php').read_text() and (ROOT / 'assets' / 'update-marker.txt').read_text() == 'marker rc.99', 'new and changed files installed')
 check(sha(ROOT / 'config.php') == config_hash and (key_hash is None or sha(ROOT / 'private' / 'app.key') == key_hash), 'config.php and private/app.key untouched')
 ht = (ROOT / '.htaccess').read_text()
 check('# rc.99 test rule' in ht and 'cPanel-generated handler' in ht and ht.count('BEGIN cPanel-generated handler') == 1, '.htaccess replaced while the host PHP handler block is kept')
@@ -188,9 +188,9 @@ flag.unlink()
 
 # ---------- Rollback ----------
 status, html = get(owner, 'admin.php?tab=update')
-check('بازگرداندن نسخه قبلی' in html and '1.0.0-rc.99' in html and 'سابقه به‌روزرسانی' in html, 'rollback offered with the history')
+check('بازگرداندن نسخه قبلی' in html and '99.0.0' in html and 'سابقه به‌روزرسانی' in html, 'rollback offered with the history')
 status, html = submit(owner, 'admin.php?tab=update', dict(action='update_rollback', password='nope'))
-check("rc.99" in (ROOT / 'lib' / 'version.php').read_text(), 'rollback needs the owner password')
+check("99.0.0" in (ROOT / 'lib' / 'version.php').read_text(), 'rollback needs the owner password')
 status, html = submit(owner, 'admin.php?tab=update', dict(action='update_rollback', password='Test-password-012345'))
 check((ROOT / 'lib' / 'version.php').read_text() == LIVE_VERSION and not (ROOT / 'assets' / 'update-marker.txt').exists(), 'rollback restores the previous files and removes new ones')
 check((ROOT / '.htaccess').read_text() == LIVE_HTACCESS.rstrip() + '\n\n' + CPANEL, '.htaccess restored as it was')

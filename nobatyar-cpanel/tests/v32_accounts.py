@@ -94,7 +94,7 @@ spec = db('SELECT id FROM specialties WHERE active=1 AND deleted_at IS NULL ORDE
 for t in ['doctor_accounts a JOIN doctors d ON d.id=a.doctor_id', 'clinics a JOIN doctors d ON d.id=a.doctor_id', 'appointment_events a JOIN doctors d ON d.id=a.doctor_id']:
     db(f'DELETE a FROM {t} WHERE d.mobile=?', [D_MOB])
 db('DELETE FROM doctors WHERE mobile=?', [D_MOB])
-html = submit(dc, 'register.php', dict(name='دکتر حذف آزمون', medical_code='998877', specialty_id=spec, specialty_other='', gender='male', bio='',
+html = submit(dc, 'register.php', dict(name='حذف آزمون', medical_code='998877', specialty_id=spec, specialty_other='', gender='male', bio='',
                                        clinic_name='مطب حذف', province_id=city['province_id'], city_id=city['id'], district='', address='نشانی آزمون',
                                        phone='', latitude='', longitude='', notes='', website='', consent='1', plan_choice='free'))[1]
 did = scalar('SELECT id FROM doctors WHERE mobile=?', [D_MOB])
@@ -140,7 +140,7 @@ check(scalar('SELECT status FROM bookings WHERE id=?', [pb]) == 'cancelled' and 
 check(get(client(), f'doctor.php?id={did}')[0] == 404 and f'doctor={did}"' not in get(owner, 'admin.php?tab=doctors')[1], 'deleted doctor hidden from the site and the admin list')
 check(not db('SELECT 1 FROM doctor_accounts WHERE doctor_id=?', [did]) and not db('SELECT 1 FROM staff_scopes WHERE clinic_id=?', [dcl]), "doctor account link and secretaries' access removed")
 status, html = get(dc, 'doctor-panel.php')
-check('درخواست عضویت پزشک' in html and 'work-strip' not in get(dc, 'index.php')[1], 'former doctor account: registration form again, no panel shortcut')
+check('ثبت‌نام پزشک' in html and 'work-strip' not in get(dc, 'index.php')[1], 'former doctor account: registration form again, no panel shortcut')
 
 # ---------- Permissions: support may suspend, not delete ----------
 db("DELETE FROM admins WHERE email='rc21-support@example.test'")

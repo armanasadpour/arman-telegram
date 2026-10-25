@@ -21,7 +21,7 @@ $table = function (array $rows, string $label): void { ?>
   <?php if (!$s['branch_id']): ?>
     <label>شعبه<select name="branch"><option value="0">همه</option><?php foreach ($branches as $b): ?><option value="<?= (int) $b['id'] ?>"<?= selected_attr($f['branch'] === (int) $b['id']) ?>><?= esc($b['name']) ?></option><?php endforeach; ?></select></label>
   <?php endif; ?>
-  <label>پزشک<select name="doctor"><option value="0">همه</option><?php foreach ($doctors as $d): ?><option value="<?= (int) $d['id'] ?>"<?= selected_attr($f['doctor'] === (int) $d['id']) ?>><?= esc($d['name']) ?></option><?php endforeach; ?></select></label>
+  <label>پزشک<select name="doctor"><option value="0">همه</option><?php foreach ($doctors as $d): ?><option value="<?= (int) $d['id'] ?>"<?= selected_attr($f['doctor'] === (int) $d['id']) ?>><?= esc(doctor_display_name((string) $d['name'])) ?></option><?php endforeach; ?></select></label>
   <button><?= icon('filter') ?> نمایش</button>
   <a class="button secondary" href="center.php?<?= esc(http_build_query($query + ['export' => 'xlsx'])) ?>"><?= icon('download') ?> خروجی اکسل</a>
 </form>

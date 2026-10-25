@@ -39,12 +39,13 @@ check(count($php) > 80, 'source tree scanned (' . count($php) . ' files)');
 $entry = array_filter($php, fn($k) => !str_contains($k, '/'), ARRAY_FILTER_USE_KEY);
 $missing = [];
 foreach ($entry as $name => $src) {
-    if (preg_match('/is_post\(\)|\$_POST/', $src) && !str_contains($src, 'verify_csrf') && !in_array($name, ['pay-return.php', 'payment-callback.php', 'api.php'], true)) {
+    if (preg_match('/is_post\(\)|\$_POST/', $src) && !str_contains($src, 'verify_csrf') && !in_array($name, ['pay-return.php', 'payment-callback.php', 'api.php', 'admin-push.php'], true)) {
         $missing[] = $name;
     }
 }
 check(!$missing, 'every form handler verifies the CSRF token ' . implode(',', $missing));
 check(str_contains($php['api.php'], "hash_equals(\$_SESSION['csrf']"), 'API checks the CSRF header on writes');
+check(str_contains($php['admin-push.php'], "hash_equals(\$_SESSION['csrf'], \$csrfHeader)"), 'administrator push settings check the CSRF header');
 
 // XSS: views never print request input directly; no inline script or event-handler attributes.
 $raw = [];
@@ -52,7 +53,7 @@ foreach ($php as $name => $src) {
     if (preg_match_all('/<\?=\s*\$_(GET|POST|REQUEST|COOKIE|SERVER)/', $src, $m)) {
         $raw[] = $name;
     }
-    if (preg_match('/<script(?![^>]*\b(src=|type="application\/ld\+json"))[^>]*>/i', $src) || preg_match('/\son(click|load|error|submit|change|input)\s*=\s*["\']/i', $src)) {
+    if (preg_match('/<script(?![^>]*\b(src=|type="application\/(ld\+)?json"))[^>]*>/i', $src) || preg_match('/\son(click|load|error|submit|change|input)\s*=\s*["\']/i', $src)) {
         $raw[] = $name . ' (inline script)';
     }
 }

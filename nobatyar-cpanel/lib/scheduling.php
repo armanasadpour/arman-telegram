@@ -189,9 +189,9 @@ function booking_sms(int $booking, string $event): void
             'token' => preg_match('/^[0-9]{12}$/', (string) $b['tracking_code']) ? $b['tracking_code'] : substr($b['tracking_code'], 0, 8),
             'token2' => $date,
             'token3' => $time,
-            'token10' => $b['doctor'],
+            'token10' => doctor_display_name((string) $b['doctor']),
         ],
-        'booking_cancelled', 'booking_rescheduled' => ['token' => $date, 'token2' => $time, 'token10' => $b['doctor']],
+        'booking_cancelled', 'booking_rescheduled' => ['token' => $date, 'token2' => $time, 'token10' => doctor_display_name((string) $b['doctor'])],
         default => null,
     };
     if ($tokens === null) {

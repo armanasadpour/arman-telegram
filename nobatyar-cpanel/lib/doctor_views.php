@@ -226,6 +226,9 @@ function doctor_view(string $tab, array $d, array $clinics, ?array $cl): void
         case 'centers':
             render('doctor/centers', ['d' => $d] + doctor_center_data($id));
             break;
+        case 'reviews':
+            render('doctor/reviews', ['reviews' => doctor_panel_reviews($id)]);
+            break;
         case 'report':
             if (!doctor_has($id, 'monthly_report', $d)) {
                 echo pro_feature_card($id, 'monthly_report', 'تعداد نوبت، نرخ عدم مراجعه، ساعت‌های پرتقاضا، بازدید پروفایل و تبدیل بازدید به نوبت در ۳۰ روز اخیر.');

@@ -34,7 +34,7 @@ for m in MOB:
 
 
 def form(mobile, **over):
-    data = dict(name='دکتر تخصص rc16', medical_code=str(int(mobile[-6:]) + 500000), specialty_id='', specialty_other='', gender='',
+    data = dict(name='تخصص rc16', medical_code=str(int(mobile[-6:]) + 500000), specialty_id='', specialty_other='', gender='',
                 bio='', clinic_name='مطب rc16', province_id=city['province_id'], city_id=city['id'], district='',
                 address='خیابان آزمون پلاک ۳', phone='', latitude='', longitude='', notes='', website='', consent='1')
     data.update(over)

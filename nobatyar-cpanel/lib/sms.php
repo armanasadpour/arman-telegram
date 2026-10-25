@@ -47,12 +47,6 @@ function sms_events(): array
             'sample' => ['token' => '۱۴۰۵/۰۷/۲۴', 'token2' => '۱۱:۰۰', 'token10' => 'دکتر نمونه'],
             'suggested' => 'زمان نوبت شما نزد %token10 به %token ساعت %token2 تغییر کرد.',
         ],
-        'delay' => [
-            'label' => 'تأخیر پزشک',
-            'tokens' => ['token' => 'دقیقه تأخیر', 'token2' => 'تاریخ نوبت', 'token3' => 'ساعت نوبت'],
-            'sample' => ['token' => '۲۰', 'token2' => '۱۴۰۵/۰۷/۲۳', 'token3' => '۱۰:۳۰'],
-            'suggested' => 'نوبت %token2 ساعت %token3 حدود %token دقیقه با تأخیر انجام می‌شود.',
-        ],
         'booking_reminder' => [
             'label' => 'یادآوری پیش از نوبت',
             'tokens' => ['token' => 'تاریخ شمسی', 'token2' => 'ساعت (یا زمان تقریبی)', 'token10' => 'نام پزشک', 'token20' => 'نام مطب'],

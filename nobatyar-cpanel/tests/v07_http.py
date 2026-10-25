@@ -126,7 +126,7 @@ check('بین ۳ تا ۱۰ رقم' in html, 'medical code length validated')
 status, html = get(admin, f'admin.php?tab=doctors&status=approved&specialty={used}&province={hormozgan}')
 check(status == 200 and 'نتایج' in html, 'admin doctor filters')
 status, html = get(admin, 'admin.php?tab=doctors&q=' + urllib.parse.quote(mc))
-check('پروفایل و مطب‌ها' in html, 'admin search by medical code')
+check(status == 200 and f'doctor={DOCTOR}' in html, 'admin search by medical code')
 
 confirmed_before = scalar("SELECT COUNT(*) FROM bookings b JOIN slots s ON s.id=b.slot_id WHERE s.doctor_id=? AND b.status='confirmed'", [DOCTOR])
 path = f'admin.php?tab=doctors&doctor={DOCTOR}'
@@ -146,6 +146,8 @@ status, html = get(client(), f'doctor.php?id={DOCTOR}&clinic={CLINIC}')
 check('data-map-view' in html and 'google.com/maps/search' in html, 'clinic map and navigation links shown')
 
 # ---------- SMS settings, encryption, templates ----------
+# Enabling SMS needs an active login template (managed in «الگوهای پیامک» since rc.22).
+db("INSERT INTO sms_templates(event,template,enabled) VALUES('login','loginTpl',1) ON DUPLICATE KEY UPDATE template='loginTpl',enabled=1")
 save(admin, 'admin.php?tab=sms', dict(action='sms_settings', api_key='Abc123Def456Ghi789Jkl0', template='loginTpl', daily_limit=500, otp_ttl_seconds=240, otp_resend_seconds=90, otp_max_attempts=4, otp_phone_hourly=5, otp_ip_15min=50, otp_ip_distinct_hourly=5, sms_max_attempts=3, enabled='1'))
 stored = scalar("SELECT value FROM settings WHERE `key`='secret.kavenegar_api_key'")
 check('Abc123Def456Ghi789Jkl0' not in stored and stored.startswith(('s1:', 'o1:')), 'API key encrypted in database')
@@ -155,12 +157,12 @@ check('Abc123Def456Ghi789Jkl0' not in html and 'Jkl0' in html, 'admin sees only 
 save(admin, 'admin.php?tab=sms', dict(action='sms_settings', api_key='', template='loginTpl', daily_limit=500, otp_ttl_seconds=240, otp_resend_seconds=90, otp_max_attempts=4, otp_phone_hourly=5, otp_ip_15min=50, otp_ip_distinct_hourly=5, sms_max_attempts=3, enabled='1', dev_mode='1'))
 check(php("echo secret_get('kavenegar_api_key');") == 'Abc123Def456Ghi789Jkl0', 'empty key field keeps stored key')
 check(scalar("SELECT value FROM settings WHERE `key`='sms_dev_mode'") == '0', 'test mode cannot be enabled in production')
-tpl = {f'template[{e}]': f'{e.replace("_", "")}Tpl' for e in ['login', 'booking_confirmed', 'booking_cancelled', 'booking_rescheduled', 'delay', 'subscription_expiring']}
-tpl.update({f'enabled[{e}]': '1' for e in ['login', 'booking_confirmed', 'booking_cancelled', 'booking_rescheduled', 'delay', 'subscription_expiring']})
+tpl = {f'template[{e}]': f'{e.replace("_", "")}Tpl' for e in ['login', 'booking_confirmed', 'booking_cancelled', 'booking_rescheduled', 'visit_time_changed', 'subscription_expiring']}
+tpl.update({f'enabled[{e}]': '1' for e in ['login', 'booking_confirmed', 'booking_cancelled', 'booking_rescheduled', 'visit_time_changed', 'subscription_expiring']})
 save(admin, 'admin.php?tab=sms', dict(action='sms_templates', **tpl))
 check(scalar("SELECT COUNT(*) FROM sms_templates WHERE enabled=1") == 6, 'all event templates saved')
 status, html = submit(admin, 'admin.php?tab=sms', dict(action='sms_templates', **{**tpl, 'template[login]': 'bad name'}))
-check('انگلیسی' in html, 'invalid template name rejected')
+check('نام الگوی کاوه‌نگار نامعتبر است' in html, 'invalid template name rejected')
 
 # OTP uses the configured lifetime; the code is never written to the SMS log.
 db('DELETE FROM auth_rate_limits')

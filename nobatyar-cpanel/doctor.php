@@ -142,7 +142,7 @@ if ($timesMode) {
         render('public/doctor-times', $vars);
         exit();
     }
-    layout_start('انتخاب نوبت ' . $d['name'], ['body_class' => 'booking-page times-page', 'robots' => 'noindex,follow', 'canonical' => doctor_url($id, $d['name'])]);
+    layout_start('انتخاب نوبت ' . doctor_display_name($d['name']), ['body_class' => 'booking-page times-page', 'robots' => 'noindex,follow', 'canonical' => doctor_url($id, $d['name'])]);
     render('public/doctor-times', $vars);
     layout_end();
     exit();
@@ -160,14 +160,14 @@ if ($relatedIds) {
 }
 $done = (int) query("SELECT COUNT(*) FROM bookings b JOIN slots s ON s.id=b.slot_id WHERE b.status='completed' AND s.doctor_id=?", [$id])->fetchColumn();
 $cfg = search_config();
-layout_start($d['name'] . ' | ' . $d['specialty_name'], [
+layout_start(doctor_display_name($d['name']) . ' | ' . $d['specialty_name'], [
     'body_class' => 'doctor-page',
-    'description' => $d['name'] . '، ' . $d['specialty_name'] . ' در ' . $cl['city'] . ' — نوبت اینترنتی، نشانی مطب، ساعت کاری و نظر بیماران.',
+    'description' => doctor_display_name($d['name']) . '، ' . $d['specialty_name'] . ' در ' . $cl['city'] . ' — نوبت اینترنتی، نشانی مطب، ساعت کاری و نظر بیماران.',
     'canonical' => doctor_url($id, $d['name']),
     'jsonld' => [
         '@context' => 'https://schema.org',
         '@type' => 'Physician',
-        'name' => $d['name'],
+        'name' => doctor_display_name($d['name']),
         'medicalSpecialty' => $d['specialty_name'],
         'address' => ['@type' => 'PostalAddress', 'addressLocality' => $cl['city'], 'addressRegion' => $cl['province'], 'streetAddress' => $cl['address']],
     ],

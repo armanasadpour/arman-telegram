@@ -25,9 +25,9 @@ foreach ($schedule as $h) {
         <tr>
           <th><?= $label ?></th>
           <?php foreach ($branches as $b): if ($branch && (int) $b['id'] !== $branch) { continue; } foreach ($rooms[$b['id']] ?? [] as $r): ?>
-            <td><?php foreach ($schedule as $h): if ((int) $h['weekday'] === $w && (int) $h['room_id'] === (int) $r['id']): ?><span class="shift-chip"><bdi><?= fa_number(substr($h['opens_at'], 0, 5) . '–' . substr($h['closes_at'], 0, 5)) ?></bdi> <?= esc($h['doctor']) ?></span><?php endif; endforeach; ?></td>
+            <td><?php foreach ($schedule as $h): if ((int) $h['weekday'] === $w && (int) $h['room_id'] === (int) $r['id']): ?><span class="shift-chip"><bdi><?= fa_number(substr($h['opens_at'], 0, 5) . '–' . substr($h['closes_at'], 0, 5)) ?></bdi> <?= esc(doctor_display_name((string) $h['doctor'])) ?></span><?php endif; endforeach; ?></td>
           <?php endforeach; endforeach; ?>
-          <td><?php foreach ($schedule as $h): if ((int) $h['weekday'] === $w && !$h['room_id']): ?><span class="shift-chip muted-chip"><bdi><?= fa_number(substr($h['opens_at'], 0, 5) . '–' . substr($h['closes_at'], 0, 5)) ?></bdi> <?= esc($h['doctor']) ?> • <?= esc($h['branch']) ?></span><?php endif; endforeach; ?></td>
+          <td><?php foreach ($schedule as $h): if ((int) $h['weekday'] === $w && !$h['room_id']): ?><span class="shift-chip muted-chip"><bdi><?= fa_number(substr($h['opens_at'], 0, 5) . '–' . substr($h['closes_at'], 0, 5)) ?></bdi> <?= esc(doctor_display_name((string) $h['doctor'])) ?> • <?= esc($h['branch']) ?></span><?php endif; endforeach; ?></td>
         </tr>
       <?php endforeach; ?>
     </tbody>
@@ -36,7 +36,7 @@ foreach ($schedule as $h) {
 
 <?php foreach ($presences as $p): $roomList = $rooms[$p['branch_id']] ?? []; $editable = $canSchedule && $p['perm_schedule']; ?>
   <article class="card" id="clinic-<?= (int) $p['id'] ?>">
-    <div class="between"><h2><?= esc($p['doctor']) ?> <small class="muted">• <?= esc($p['branch']) ?></small></h2>
+    <div class="between"><h2><?= esc(doctor_display_name((string) $p['doctor'])) ?> <small class="muted">• <?= esc($p['branch']) ?></small></h2>
       <?php if (!$p['perm_schedule']): ?><span class="badge">برنامه با خود پزشک</span><?php endif; ?></div>
     <div class="shift-list">
       <?php foreach ($byClinic[$p['id']] ?? [] as $h): ?>

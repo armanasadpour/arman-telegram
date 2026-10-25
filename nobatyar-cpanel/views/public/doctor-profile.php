@@ -54,7 +54,13 @@ if (!$cfg['reviews']) {
         <span class="dp-cta-text"><strong>دریافت نوبت</strong><small><?= $firstAt ? 'اولین نوبت آزاد: ' . esc(free_label($firstAt)) : 'مشاهده روزها و ساعت‌های آزاد' ?></small></span>
         <span class="dp-cta-arrow" aria-hidden="true"><?= icon('chevron-left') ?></span>
       </a>
-      <button type="button" class="button ghost dp-share" data-share data-share-url="<?= esc($pageUrl) ?>" data-share-title="<?= esc($d['name'] . ' — ' . $d['specialty_name']) ?>" hidden><?= icon('share') ?> اشتراک‌گذاری</button>
+      <button type="button" class="button ghost dp-share" data-share data-share-url="<?= esc($pageUrl) ?>" data-share-title="<?= esc(doctor_display_name($d['name']) . ' — ' . $d['specialty_name']) ?>" hidden><?= icon('share') ?> اشتراک‌گذاری</button>
+      <?php $me = user_now_safe(); $saved = $me && favorite_saved((int) $me['id'], $id); /* 1.0.30 saved doctors */ ?>
+      <?php if ($me): ?>
+        <button type="button" class="button ghost dp-save<?= $saved ? ' is-saved' : '' ?>" data-favorite="<?= $id ?>" aria-pressed="<?= $saved ? 'true' : 'false' ?>"><?= icon('heart') ?><span data-favorite-label><?= $saved ? 'ذخیره شده' : 'ذخیره پزشک' ?></span></button>
+      <?php else: ?>
+        <a class="button ghost dp-save" href="login.php?next=<?= esc(rawurlencode('doctor.php?id=' . $id)) ?>"><?= icon('heart') ?><span>ذخیره پزشک</span></a>
+      <?php endif; ?>
     </div>
   </section>
 
@@ -147,6 +153,7 @@ if (!$cfg['reviews']) {
                     <div class="rv-head"><span class="rv-avatar" aria-hidden="true"><?= esc(mb_substr($it['first_name'] !== '' ? $it['first_name'] : 'ب', 0, 1)) ?></span><strong><?= esc($it['first_name'] !== '' ? $it['first_name'] : 'بیمار') ?></strong><span class="stars" aria-label="<?= fa_number($it['rating']) ?> از ۵"><?= str_repeat('★', (int) $it['rating']) . str_repeat('☆', 5 - (int) $it['rating']) ?></span><small><?= esc(jdate($it['created_at'])) ?></small></div>
                     <p><?= esc($it['comment']) ?></p>
                     <?php if ($it['recommend']): ?><small class="rv-yes"><?= icon('check') ?> این پزشک را پیشنهاد می‌کند</small><?php endif; ?>
+                    <?php if (!empty($it['reply'])): /* 1.0.30 */ ?><div class="rv-reply"><strong><?= icon('chat') ?> پاسخ <?= esc(doctor_display_name($d['name'])) ?></strong><p><?= esc($it['reply']) ?></p></div><?php endif; ?>
                   </li>
                 <?php endforeach; ?>
               </ul>

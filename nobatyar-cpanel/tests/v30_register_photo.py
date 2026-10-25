@@ -36,7 +36,7 @@ def multipart(c, path, fields, files):
 
 
 def form(mobile, csrf, **over):
-    data = dict(csrf=csrf, name='دکتر عکس rc19', medical_code=str(int(mobile[-6:]) + 600000), specialty_id=spec[0]['id'] if spec else '',
+    data = dict(csrf=csrf, name='عکس rc19', medical_code=str(int(mobile[-6:]) + 600000), specialty_id=spec[0]['id'] if spec else '',
                 specialty_other='' if spec else 'عمومی', gender='', bio='', clinic_name='مطب rc19', province_id=city['province_id'],
                 city_id=city['id'], district='', address='خیابان آزمون پلاک ۹', phone='', latitude='27.183210', longitude='56.266610',
                 notes='', website='', consent='1')

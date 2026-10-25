@@ -11,6 +11,7 @@ $tabs = [
     'past' => 'سوابق نوبت‌ها',
     'held' => 'رزروهای موقت',
     'waitlist' => 'صف انتظار',
+    'saved' => 'پزشکان ذخیره‌شده',
     'family' => 'اعضای خانواده',
     'notifications' => 'اعلان‌ها',
 ];
@@ -102,6 +103,18 @@ if ($tab === 'family') {
     render_notifications();
 } elseif ($tab === 'reviews') {
     render('public/patient-reviews', ['open' => reviewable_bookings((int) $u['id']), 'mine' => query('SELECT r.rating,r.recommend,r.comment,r.status,r.created_at,d.name doctor FROM reviews r JOIN doctors d ON d.id=r.doctor_id WHERE r.user_id=? ORDER BY r.id DESC LIMIT 30', [$u['id']])->fetchAll()]);
+} elseif ($tab === 'saved') {
+    // 1.0.30: doctors saved with the heart on their page.
+    $cards = favorite_cards((int) $u['id']);
+    if ($cards) {
+        echo '<div class="doc-grid">';
+        foreach ($cards as $d) {
+            render('public/doctor-card', ['d' => $d, 'showCode' => false]);
+        }
+        echo '</div>';
+    } else {
+        echo '<div class="empty-state">' . icon('heart-handshake') . '<p>هنوز پزشکی ذخیره نکرده‌اید. در صفحه هر پزشک، دکمه «ذخیره پزشک» را بزنید تا دفعه بعد سریع‌تر نوبت بگیرید.</p><a class="button" href="index.php?view=doctors">' . icon('search') . ' جستجوی پزشک</a></div>';
+    }
 } elseif ($tab === 'waitlist') {
     render('public/waitlist', ['entries' => my_waitlist((int) $u['id'])]);
 } else {

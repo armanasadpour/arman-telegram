@@ -154,6 +154,8 @@ function admin_otp_confirm(string $code): void
 function admin_login(string $email, string $password): string
 {
     throttle('admin_login', 10, 900);
+    // 1.0.30: one account also has a limit across all networks, so guessing from many addresses stops too.
+    rate_limit('admin_login_account:' . mb_strtolower(trim($email)), 20, 3600);
     $a = query('SELECT * FROM admins WHERE email=?', [mb_strtolower(field(['email' => $email], 'email', 190))])->fetch();
     // A dummy hash keeps the response time the same whether or not the e-mail exists.
     $ok = password_verify($password, $a ? $a['password_hash'] : '$2y$10$WXz5Ff7jFtrYPxwTn6lnyeBcywDYa9PnIoPDwdAO1142aNLUWB3oW');
@@ -266,7 +268,7 @@ function admin_view_data(string $tab, string $error): array
                 'pushFailures' => query("SELECT m.created_at,m.http_status,m.error FROM push_messages m WHERE m.status='failed' ORDER BY m.id DESC LIMIT 10")->fetchAll(),
                 'waitlist' => query('SELECT status,COUNT(*) n FROM waitlist_entries GROUP BY status')->fetchAll(PDO::FETCH_KEY_PAIR),
                 'reminders7' => (int) query("SELECT COUNT(*) FROM sms_messages WHERE event='booking_reminder' AND created_at>=DATE_SUB(NOW(),INTERVAL 7 DAY)")->fetchColumn(),
-                'templates' => query("SELECT event,template,enabled,delivery_mode,body FROM sms_templates WHERE event IN ('booking_reminder','waitlist_available','visit_time_changed','delay')")->fetchAll(PDO::FETCH_UNIQUE),
+                'templates' => query("SELECT event,template,enabled,delivery_mode,body FROM sms_templates WHERE event IN ('booking_reminder','waitlist_available','visit_time_changed')")->fetchAll(PDO::FETCH_UNIQUE),
             ];
         case 'cron':
             return $data + [
@@ -286,6 +288,7 @@ function admin_view_data(string $tab, string $error): array
                 'canBackup' => admin_can('admins'),
                 'auto' => setting('backup_auto', '0') === '1',
                 'keep' => setting('backup_keep', '7'),
+                'offsite' => admin_can('admins') ? backup_offsite_settings() : null,
                 'securityLog' => log_tail('security', 25),
                 'errorLog' => log_tail('error', 25),
                 'events' => query("SELECT l.*,a.email admin_email FROM audit_log l LEFT JOIN admins a ON a.id=l.actor_admin_id WHERE l.action IN ('admin.denied','auth.suspicious_ip','backup.restore_denied','admin.login_failed','auth.locked','auth.inactive_login') ORDER BY l.id DESC LIMIT 20")->fetchAll(),
@@ -320,6 +323,8 @@ function admin_view_data(string $tab, string $error): array
                 'status' => $status,
                 'counts' => query('SELECT status,COUNT(*) FROM reviews GROUP BY status')->fetchAll(PDO::FETCH_KEY_PAIR),
                 'rows' => query('SELECT r.*,d.name doctor,u.first_name,u.mobile FROM reviews r JOIN doctors d ON d.id=r.doctor_id JOIN users u ON u.id=r.user_id WHERE r.status=? ORDER BY r.id DESC LIMIT 100', [$status])->fetchAll(),
+                // 1.0.30: doctors' replies waiting for a decision.
+                'replies' => query("SELECT r.id,r.comment,r.rating,r.reply,r.reply_at,d.name doctor FROM reviews r JOIN doctors d ON d.id=r.doctor_id WHERE r.reply_status='pending' ORDER BY r.reply_at LIMIT 100")->fetchAll(),
             ];
         case 'announcements':
         case 'sms_send':
@@ -895,7 +900,7 @@ function admin_nav_badges(): array
         $b['support'] = $one("SELECT COUNT(*) FROM support_tickets WHERE status IN ('open','waiting')");
     }
     if (admin_can('content')) {
-        $b['reviews'] = $one("SELECT COUNT(*) FROM reviews WHERE status='pending'");
+        $b['reviews'] = $one("SELECT COUNT(*) FROM reviews WHERE status='pending' OR reply_status='pending'");
     }
     return array_filter($b);
 }

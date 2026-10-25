@@ -64,7 +64,9 @@ data = urllib.parse.urlencode([('csrf', token(owner, 'admin.php?tab=provinces'))
 html = owner.open(BASE + 'admin.php?tab=provinces', data).read().decode()
 check(scalar('SELECT active FROM provinces WHERE id=?', [prov['id']]) == 0 and scalar('SELECT COUNT(*) FROM cities WHERE province_id=? AND active=1', [prov['id']]) == 0 and 'همراه' in html, 'province off together with all its cities')
 status, html = get(client(), 'city.php')
-check(f'value="{prov["id"]}"' not in html, 'inactive province leaves the picker')
+# Only the province list counts: a city option elsewhere on the page may share the same number.
+provinces = html.split('name="province"', 1)[-1].split('</select>', 1)[0]
+check(f'value="{prov["id"]}"' not in provinces, 'inactive province leaves the picker')
 data = urllib.parse.urlencode([('csrf', token(owner, 'admin.php?tab=provinces')), ('action', 'geo_bulk'), ('type', 'provinces'), ('state', '1'), ('ids[]', prov['id'])]).encode()
 owner.open(BASE + 'admin.php?tab=provinces', data).read()
 check(scalar('SELECT active FROM provinces WHERE id=?', [prov['id']]) == 1 and scalar('SELECT COUNT(*) FROM cities WHERE province_id=? AND active=1', [prov['id']]) == 0, 'province back on; cities untouched without «شهرهای این استان‌ها هم»')

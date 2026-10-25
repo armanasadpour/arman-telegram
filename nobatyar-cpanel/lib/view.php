@@ -197,7 +197,7 @@ function pagination(int $page, int $total, int $perPage, array $query): string
 /** Navigation context is set only after the selected doctor/clinic was authorized. */
 function set_panel_navigation(string $page, array $tabs, string $active, int $doctor, int $clinic, string $title): void
 {
-    $icons = ['dashboard'=>'home','profile'=>'user','clinics'=>'map','services'=>'list','schedule'=>'clock','calendar'=>'calendar','bookings'=>'calendar-check','history'=>'list','staff'=>'users','centers'=>'building','report'=>'chart','promote'=>'share','subscription'=>'receipt','notifications'=>'bell','events'=>'list','patients'=>'users','book'=>'plus','queue'=>'list','delays'=>'clock','audit'=>'list','checkin'=>'calendar-check'];
+    $icons = ['dashboard'=>'home','profile'=>'user','clinics'=>'map','services'=>'list','schedule'=>'clock','calendar'=>'calendar','bookings'=>'calendar-check','history'=>'list','staff'=>'users','centers'=>'building','report'=>'chart','reviews'=>'star','promote'=>'share','subscription'=>'receipt','notifications'=>'bell','events'=>'list','patients'=>'users','book'=>'plus','queue'=>'list','audit'=>'list','checkin'=>'calendar-check'];
     $menu = [];
     foreach ($tabs as $key=>$label) {
         $menu[$key] = ['url'=>$page . '?' . http_build_query(['doctor'=>$doctor,'clinic'=>$clinic,'tab'=>$key]),'label'=>$label,'icon'=>$icons[$key] ?? 'list','current'=>$key===$active];

@@ -1181,3 +1181,40 @@ document.querySelectorAll('.plan-rail').forEach(rail => {
       .catch((err) => { msg.textContent = err.message; btn.disabled = false; });
   });
 })();
+
+/* 1.0.30 saved doctors: the heart on the doctor's page saves or removes the doctor (api favorite/toggle). */
+(() => {
+  const btn = document.querySelector('[data-favorite]');
+  if (!btn) return;
+  const label = btn.querySelector('[data-favorite-label]');
+  const say = (text) => {
+    const t = document.createElement('p');
+    t.className = 'toast show';
+    t.setAttribute('role', 'status');
+    t.textContent = text;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  };
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    fetch('api.php?route=session', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((s) => fetch('api.php?route=favorite/toggle', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': s.data.csrf },
+        body: JSON.stringify({ doctor_id: +btn.dataset.favorite }),
+      }))
+      .then((r) => r.json().then((j) => (r.ok && j.ok ? j.data : Promise.reject(new Error((j.error && j.error.message) || 'ذخیره ممکن نشد.')))))
+      .then((d) => {
+        btn.classList.toggle('is-saved', d.saved);
+        btn.setAttribute('aria-pressed', d.saved ? 'true' : 'false');
+        if (label) label.textContent = d.saved ? 'ذخیره شده' : 'ذخیره پزشک';
+        btn.classList.add('pop');
+        setTimeout(() => btn.classList.remove('pop'), 220);
+        say(d.message);
+      })
+      .catch((err) => say(err.message))
+      .finally(() => { btn.disabled = false; });
+  });
+})();

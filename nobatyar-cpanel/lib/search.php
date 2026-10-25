@@ -619,6 +619,55 @@ function review_moderate(int $id, string $status): string
     return $status === 'approved' ? 'نظر منتشر شد.' : 'نظر پنهان شد.';
 }
 
+/**
+ * 1.0.30: the doctor's reply under one of their published reviews. Like reviews, a reply is shown on the
+ * doctor's page only after the administrator approves it; editing an approved reply sends it back for review.
+ * An empty text removes the reply.
+ */
+function review_reply_save(int $doctor, array $data): string
+{
+    doctor_actor($doctor, 'owner', 0, true);
+    $id = positive_id($data['review_id'] ?? 0);
+    $text = trim(strtr(field($data, 'reply', 500, false), ["\r\n" => "\n"]));
+    $r = query("SELECT id FROM reviews WHERE id=? AND doctor_id=? AND status='approved'", [$id, $doctor])->fetch();
+    if (!$r) {
+        throw new AuthError('نظر پیدا نشد.', 404);
+    }
+    throttle('review_reply', 60, 3600);
+    if ($text === '') {
+        query('UPDATE reviews SET reply=NULL,reply_status=NULL,reply_at=NULL WHERE id=?', [$id]);
+        event_record($doctor, 'review.reply_removed', ['review_id' => $id]);
+        return 'پاسخ برداشته شد.';
+    }
+    query("UPDATE reviews SET reply=?,reply_status='pending',reply_at=NOW() WHERE id=?", [$text, $id]);
+    event_record($doctor, 'review.reply', ['review_id' => $id, 'length' => mb_strlen($text)]);
+    return 'پاسخ ثبت شد و پس از تأیید مدیر زیر نظر بیمار نمایش داده می‌شود.';
+}
+
+/** Administrator decision on a doctor's reply. */
+function review_reply_moderate(int $id, string $status): string
+{
+    if (!in_array($status, ['approved', 'hidden'], true)) {
+        throw new AuthError('وضعیت نامعتبر است.');
+    }
+    if (!query('UPDATE reviews SET reply_status=? WHERE id=? AND reply IS NOT NULL', [$status, $id])->rowCount()
+        && !query('SELECT id FROM reviews WHERE id=? AND reply IS NOT NULL', [$id])->fetch()) {
+        throw new AuthError('پاسخ پیدا نشد.', 404);
+    }
+    audit('review.reply_' . $status, $id);
+    return $status === 'approved' ? 'پاسخ پزشک منتشر شد.' : 'پاسخ پزشک پنهان شد.';
+}
+
+/** A doctor's published reviews with their replies, for the doctor panel. */
+function doctor_panel_reviews(int $doctor): array
+{
+    return query(
+        "SELECT r.id,r.rating,r.recommend,r.comment,r.created_at,r.reply,r.reply_status,r.reply_at,u.first_name FROM reviews r JOIN users u ON u.id=r.user_id
+         WHERE r.doctor_id=? AND r.status='approved' ORDER BY r.id DESC LIMIT 100",
+        [$doctor],
+    )->fetchAll();
+}
+
 /** Approved reviews for the doctor page. */
 function doctor_reviews(int $doctor, int $limit = 10, string $sort = 'new'): array
 {
@@ -628,7 +677,7 @@ function doctor_reviews(int $doctor, int $limit = 10, string $sort = 'new'): arr
     $s = query("SELECT AVG(rating) a,COUNT(*) n,AVG(recommend) r FROM reviews WHERE doctor_id=? AND status='approved'", [$doctor])->fetch();
     $summary = (int) $s['n'] >= search_config()['reviews_min'] ? ['avg' => round((float) $s['a'], 1), 'count' => (int) $s['n'], 'recommend' => (int) round((float) $s['r'] * 100)] : null;
     $items = $summary
-        ? query("SELECT r.rating,r.recommend,r.comment,r.created_at,u.first_name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.doctor_id=? AND r.status='approved' AND r.comment IS NOT NULL ORDER BY " . match ($sort) { 'high' => 'r.rating DESC,r.id DESC', 'low' => 'r.rating ASC,r.id DESC', default => 'r.id DESC' } . ' LIMIT ' . max(1, $limit), [$doctor])->fetchAll()
+        ? query("SELECT r.rating,r.recommend,r.comment,r.created_at,u.first_name,IF(r.reply_status='approved',r.reply,NULL) reply FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.doctor_id=? AND r.status='approved' AND r.comment IS NOT NULL ORDER BY " . match ($sort) { 'high' => 'r.rating DESC,r.id DESC', 'low' => 'r.rating ASC,r.id DESC', default => 'r.id DESC' } . ' LIMIT ' . max(1, $limit), [$doctor])->fetchAll()
         : [];
     return ['summary' => $summary, 'items' => $items, 'count' => (int) $s['n']];
 }

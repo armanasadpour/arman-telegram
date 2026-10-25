@@ -368,6 +368,10 @@ try {
     migrate_v24($p);
     migrate_v24($p);
     check((int) $p->query('SELECT COUNT(*) FROM schema_migrations WHERE version=24')->fetchColumn() === 1 && (int) $p->query('SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL OR suspended_reason IS NOT NULL')->fetchColumn() === 0 && (int) $p->query('SELECT COUNT(*) FROM doctors WHERE deleted_at IS NOT NULL')->fetchColumn() === 0, 'v24 repeatable; nobody deleted or suspended by the upgrade');
+    // 1.0.30: every later step (v25 onwards) through the same runner an upgrade uses.
+    run_migrations($p);
+    run_migrations($p);
+    check((int) $p->query('SELECT MAX(version) FROM schema_migrations')->fetchColumn() === SCHEMA_VERSION, 'remaining steps up to ' . SCHEMA_VERSION . ' applied once');
     $upgraded = $p
         ->query(
             'SELECT TABLE_NAME,COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() ORDER BY TABLE_NAME,ORDINAL_POSITION',

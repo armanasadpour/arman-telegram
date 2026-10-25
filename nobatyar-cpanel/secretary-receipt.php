@@ -41,7 +41,7 @@ if ($error) {
 echo '<article class="card receipt"><span class="eyebrow">رسید پذیرش نوبت‌یار</span><h1>' .
     esc($b['patient_name']) .
     '</h1><p>' .
-    esc($b['doctor'] . ' • ' . $b['clinic']) .
+    esc(doctor_display_name((string) $b['doctor']) . ' • ' . $b['clinic']) .
     '</p><p>' .
     esc(jdate($b['starts_at'], true) . ' • ' . $b['service_name']) .
     '</p><p>وضعیت: ' .

@@ -245,7 +245,7 @@ check(clean(html), 'receipt of cancelled paid booking renders')
 admin_post('settings', dict(action='settings', fee='2000', enabled='1', refund_on_cancel='1'), 'تغییرات ذخیره شد')
 h8 = hold(patient, 'بیمار لغو پزشک')
 t8 = pay(uid, h8['id'], 2000)
-php("$_SESSION['admin_id']=null;booking_refund_on_cancel((int)$argv[2],'لغو توسط پزشک');", [h8['id']])
+php("$_SESSION['admin_id']=null;db_transaction(fn()=>booking_refund_on_cancel((int)$argv[2],'لغو توسط پزشک'));", [h8['id']])
 check(scalar('SELECT status FROM refunds WHERE tx_id=?', [t8['id']]) == 'pending', 'staff cancellation path opens refund')
 
 # ---------- Transactions report and export ----------
@@ -267,7 +267,7 @@ h9 = hold(patient, 'بیمار درگاه غیرفعال')
 php('test_gateway_off();')
 send(patient, 'booking/payment', dict(id=h9['id']), 503)
 status, html = get(patient, f'checkout.php?id={h9["id"]}')
-check('درگاه پرداخت فعالی وجود ندارد' in html, 'checkout explains no active gateway')
+check('درگاه بانکی فعال نیست' in html, 'checkout explains no active gateway')
 status, html = get(admin, 'admin.php?tab=settings')
 check('هیچ درگاه تأییدشده‌ای فعال نیست' in html, 'fee page warns when no gateway is active')
 

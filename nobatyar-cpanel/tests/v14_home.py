@@ -80,7 +80,9 @@ check(('فعلاً در' in html and 'جستجو در سراسر کشور' in ht
 db("UPDATE doctors SET subscription_until=DATE_ADD(CURDATE(),INTERVAL 300 DAY) WHERE id=?", [DOCTOR])
 empty = db("SELECT c.id FROM cities c WHERE c.active=1 AND NOT EXISTS(SELECT 1 FROM clinics cl WHERE cl.city_id=c.id) LIMIT 1")[0]['id']
 status, html = get(client(), f'index.php?city={empty}')
-check(status == 200 and 'فعلاً در' in html and 'جستجو در سراسر کشور' in html and doctor_name not in html, 'city without doctors shows the empty state with a wider search')
+# 1.0.12: «همه پزشکان» falls back to doctors of the whole country; the city's own section stays empty.
+available = html.split('aria-labelledby="h-available"', 1)[-1].split('</section>', 1)[0]
+check(status == 200 and 'فعلاً در' in available and 'جستجو در سراسر کشور' in available and doctor_name not in available, 'city without doctors shows the empty state with a wider search')
 
 # ---------- Search suggestions ----------
 part = doctor_name.split()[-1]

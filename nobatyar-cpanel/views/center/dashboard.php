@@ -28,7 +28,7 @@
   <article class="card">
     <h2>درخواست‌ها و دعوت‌های باز</h2>
     <?php foreach ($pending as $p): ?>
-      <p><?= esc($p['doctor_name']) ?> — <span class="badge status-held"><?= esc(link_status_labels()[$p['status']]) ?></span></p>
+      <p><?= esc(doctor_display_name((string) $p['doctor_name'])) ?> — <span class="badge status-held"><?= esc(link_status_labels()[$p['status']]) ?></span></p>
     <?php endforeach; ?>
     <?php if (!$pending): ?><p class="muted">موردی در انتظار پاسخ نیست.</p><?php endif; ?>
     <a href="center.php?center=<?= (int) $c['id'] ?>&amp;tab=doctors">مدیریت پزشکان ←</a>

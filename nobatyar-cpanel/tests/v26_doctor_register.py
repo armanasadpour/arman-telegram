@@ -21,7 +21,7 @@ def body(html):
 
 
 def form(mobile, **over):
-    data = dict(name='دکتر ثبت‌نام rc14', medical_code=str(int(mobile[-6:]) + 300000), specialty_id=spec, gender='female',
+    data = dict(name='ثبت‌نام rc14', medical_code=str(int(mobile[-6:]) + 300000), specialty_id=spec, gender='female',
                 bio='', clinic_name='مطب rc14', province_id=city['province_id'], city_id=city['id'], district='',
                 address='خیابان آزمون پلاک ۲', phone='', latitude='', longitude='', notes='', website='', consent='1')
     data.update(over)
@@ -32,7 +32,7 @@ def form(mobile, **over):
 c = client()
 login_user(c, NEW)
 status, html = get(c, 'doctor-panel.php')
-check(status == 200 and 'درخواست عضویت پزشک' in html and 'name="medical_code"' in html and 'پزشک پیدا نشد' not in html, 'doctor sign-in without a profile opens the registration form')
+check(status == 200 and 'ثبت‌نام پزشک' in html and 'name="medical_code"' in html and 'پزشک پیدا نشد' not in html, 'doctor sign-in without a profile opens the registration form')
 
 # Mistakes are shown and do not lock the form.
 for _ in range(6):

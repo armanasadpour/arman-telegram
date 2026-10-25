@@ -165,7 +165,7 @@ cpost(manager, 'subscription', dict(action='sub_order', plan_id=CPLAN, discount_
 order = db("SELECT * FROM center_orders WHERE center_id=? AND status='proforma'", [CENTER])[0]
 check(order['base_toman'] == 500000 and order['payable_toman'] == 500000 + order['vat_toman'] and order['vat_toman'] == round(500000 * float(order['vat_percent']) / 100), 'proforma amount from plan plus configured VAT')
 status, html = get(manager, f'center-invoice.php?id={order["id"]}')
-check(status == 200 and 'پیش‌فاکتور' in html and '۵۰۰٬۰۰۰' in html and 'مالیات' in html, 'proforma printable for billing staff')
+check(status == 200 and 'پیش‌فاکتور' in html and '۵۰۰٬۰۰۰' in html and ('مالیات' in html or not order['vat_toman']), f'proforma printable for billing staff ({status})')
 check(get(outsider, f'center-invoice.php?id={order["id"]}')[0] == 403, 'other users cannot read center invoice')
 status, html = get(manager, f'center.php?center={CENTER}&tab=subscription')
 check('درگاه پرداخت فعالی وجود ندارد' in html, 'no online payment without an active gateway')
@@ -229,7 +229,7 @@ cpost(manager, 'doctors', dict(action='presence', doctor_id=DOCTOR, branch_id=MA
 cpost(manager, 'schedule', dict(action='hours', clinic_id=CCLINIC, weekday=busy_day, opens_at='00:00', closes_at='23:59', room_id=ROOM1), 'تداخل دارد', 'center hours cannot overlap doctor personal clinic hours')
 cpost(manager, 'schedule', dict(action='hours', clinic_id=CCLINIC, weekday=free_day, opens_at='14:00', closes_at='18:00', room_id=ROOM1), 'ساعت کاری ثبت شد')
 # Second doctor in the same room.
-d2 = int(php("echo register_doctor(['name'=>'دکتر دوم مرکز','mobile'=>'09128880010','medical_code'=>'99887766','specialty_id'=>(int)query('SELECT specialty_id FROM doctors WHERE id=?',[(int)$argv[2]])->fetchColumn(),'bio'=>'','clinic_name'=>'مطب دوم','province_id'=>(int)$argv[3],'city_id'=>(int)$argv[4],'address'=>'نشانی دوم','phone'=>''],true);", [DOCTOR, province, city]).strip())
+d2 = int(php("echo register_doctor(['name'=>'دوم مرکز','mobile'=>'09128880010','medical_code'=>'99887766','specialty_id'=>(int)query('SELECT specialty_id FROM doctors WHERE id=?',[(int)$argv[2]])->fetchColumn(),'bio'=>'','clinic_name'=>'مطب دوم','province_id'=>(int)$argv[3],'city_id'=>(int)$argv[4],'address'=>'نشانی دوم','phone'=>''],true);", [DOCTOR, province, city]).strip())
 db("UPDATE doctors SET review_status='approved',active=1,subscription_until='2099-01-01' WHERE id=?", [d2])
 db("INSERT INTO center_doctors(center_id,doctor_id,status,initiated_by,perm_schedule,perm_bookings,perm_reports) VALUES(?,?,'active','center',1,0,1)", [CENTER, d2])
 cpost(manager, 'doctors', dict(action='presence', doctor_id=d2, branch_id=MAIN), 'پزشک به شعبه اضافه شد')

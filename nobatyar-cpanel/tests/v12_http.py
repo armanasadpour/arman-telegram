@@ -95,7 +95,7 @@ check(fa(mobile) in html, 'owner sees full mobiles')
 doctor = db("SELECT id,mobile,name,medical_code,specialty_id,bio FROM doctors WHERE mobile IS NOT NULL AND mobile<>'' ORDER BY id LIMIT 1")[0]
 status, html = get(support, f'admin.php?tab=doctors&doctor={doctor["id"]}')
 check(status == 200 and fa(doctor['mobile']) not in html and f'value="{doctor["mobile"]}"' not in html, 'doctor edit form hides mobile from support role')
-act(support, 'doctors', dict(action='edit_doctor', id=doctor['id'], name=doctor['name'], mobile='09120000000', medical_code=doctor['medical_code'] or '12345', specialty_id=doctor['specialty_id'] or '', bio=doctor['bio'] or ''), 'تغییرات ذخیره شد', 'support can edit doctor details', f'admin.php?tab=doctors&doctor={doctor["id"]}')
+act(support, 'doctors', dict(action='edit_doctor', id=doctor['id'], name=re.sub(r'^دکتر\s+', '', doctor['name']), mobile='09120000000', medical_code=doctor['medical_code'] or '12345', specialty_id=doctor['specialty_id'] or '', bio=doctor['bio'] or ''), 'تغییرات ذخیره شد', 'support can edit doctor details', f'admin.php?tab=doctors&doctor={doctor["id"]}')
 check(db('SELECT mobile FROM doctors WHERE id=?', [doctor['id']])[0]['mobile'] == doctor['mobile'], 'support role cannot change the doctor mobile')
 status, html = get(support, 'admin.php?tab=payments')
 check(status == 403, 'support blocked from finance')
@@ -118,7 +118,8 @@ act(owner, 'admins', dict(action='admin_save', id=ids['support'], name='پشتی
 status, html = get(support, 'admin.php?tab=dashboard')
 check('ورود مدیرکل' in html or 'name="password"' in html, 'role change revokes existing admin session')
 act(owner, 'admins', dict(action='admin_status', id=ids['viewer'], active='0'), 'غیرفعال شد', 'owner disables viewer')
-check('name="password"' in get(viewer, 'admin.php')[1], 'disabled admin session ended')
+html = get(viewer, 'admin.php')[1]
+check('ورود مدیرکل' in html or 'name="password"' in html, 'disabled admin session ended')
 c, html = admin_login('viewer@example.test', PASSWORD)
 check('غیرفعال است' in html, 'disabled admin cannot sign in')
 act(owner, 'admins', dict(action='admin_status', id=ids['admin'], active='0'), 'خودتان', 'owner cannot disable own account')

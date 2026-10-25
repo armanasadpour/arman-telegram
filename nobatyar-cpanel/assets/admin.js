@@ -264,3 +264,13 @@
   check();
   setInterval(check, 45000);
 })();
+
+/* 1.0.30 off-server backup: only the fields of the chosen destination are shown. */
+(() => {
+  const box = document.querySelector('[data-offsite]');
+  const mode = box && box.querySelector('[data-offsite-mode]');
+  if (!mode) return;
+  const sync = () => box.querySelectorAll('[data-offsite-for]').forEach((el) => { el.hidden = el.dataset.offsiteFor !== mode.value; });
+  mode.addEventListener('change', sync);
+  sync();
+})();

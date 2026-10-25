@@ -60,7 +60,7 @@ owner = admin_login()
 guest = client()
 db('DELETE FROM request_limits')
 db("UPDATE settings SET value='{}' WHERE `key`='search_config'")
-D24 = scalar("SELECT id FROM doctors WHERE name='دکتر صف آزمون'")
+D24 = scalar("SELECT id FROM doctors WHERE name='صف آزمون'")
 C24 = scalar('SELECT id FROM clinics WHERE doctor_id=?', [D24])
 check(D24 is not None, 'fixture: around-the-clock clinic from the notification suite')
 # A few extra approved doctors without schedules, so paging and «no free time» states are real.
@@ -69,7 +69,7 @@ city = scalar('SELECT city_id FROM clinics WHERE id=?', [C24])
 province = scalar('SELECT province_id FROM cities WHERE id=?', [city])
 extra = []
 for i in range(6):
-    did = int(php("echo register_doctor(['name'=>$argv[2],'mobile'=>$argv[3],'medical_code'=>$argv[4],'specialty_id'=>(int)$argv[5],'bio'=>'','clinic_name'=>'مطب جستجو','province_id'=>(int)$argv[6],'city_id'=>(int)$argv[7],'address'=>'خیابان آزمون','phone'=>''],true);", [f'دکتر جستجو {fa(i + 1)}', f'0912880000{i}', f'7788{i}01', spec, province, city]).strip())
+    did = int(php("echo register_doctor(['name'=>$argv[2],'mobile'=>$argv[3],'medical_code'=>$argv[4],'specialty_id'=>(int)$argv[5],'bio'=>'','clinic_name'=>'مطب جستجو','province_id'=>(int)$argv[6],'city_id'=>(int)$argv[7],'address'=>'خیابان آزمون','phone'=>''],true);", [f'جستجو {fa(i + 1)}', f'0912880000{i}', f'7788{i}01', spec, province, city]).strip())
     extra.append(did)
 db("UPDATE doctors SET review_status='approved',active=1,subscription_until='2099-01-01' WHERE id IN (" + ','.join(map(str, extra)) + ')')
 visible = visible_doctors()

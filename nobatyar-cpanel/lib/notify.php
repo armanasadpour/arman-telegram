@@ -13,7 +13,7 @@ function notification_categories(): array
     return [
         'booking' => 'تأیید، لغو و جابه‌جایی نوبت',
         'reminder' => 'یادآوری پیش از نوبت',
-        'delay' => 'تأخیر پزشک و تغییر زمان تقریبی',
+        'delay' => 'تغییر زمان تقریبی مراجعه',
         'waitlist' => 'آزادشدن ظرفیت در صف انتظار',
         'announcement' => 'اطلاعیه مراکز درمانی',
         'general' => 'حساب، اشتراک و پیام‌های سامانه',
@@ -293,7 +293,7 @@ function send_visit_reminders(int $limit = 200): int
             }
             $when = jdate($b['starts_at'], true) . ($b['estimated_at'] ? ' (زمان تقریبی ' . fa_number(substr($b['estimated_at'], 11, 5)) . ')' : '');
             if ($b['patient_user_id']) {
-                notify_user((int) $b['patient_user_id'], 'یادآوری نوبت ' . $b['doctor'], $when . ' • ' . $b['clinic'] . '، ' . $b['address'], (int) $b['id'], 'reminder', 'receipt.php?id=' . (int) $b['id']);
+                notify_user((int) $b['patient_user_id'], 'یادآوری نوبت ' . doctor_display_name((string) $b['doctor']), $when . ' • ' . $b['clinic'] . '، ' . $b['address'], (int) $b['id'], 'reminder', 'receipt.php?id=' . (int) $b['id']);
             }
             query('UPDATE bookings SET reminded_at=NOW() WHERE id=?', [$b['id']]);
             $sent++;

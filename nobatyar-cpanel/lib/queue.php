@@ -121,7 +121,7 @@ function reception_estimate(array $data): void
         event_record((int) $old['doctor_id'], 'reception.estimate', ['clinic_id' => $old['clinic_id'], 'estimated_at' => $at, 'reason' => $reason], $id);
         notify_booking($id, 'زمان تقریبی مراجعه تغییر کرد', 'زمان تقریبی جدید: ' . fa_number(substr($at, 11, 5)) . ' (زمان اصلی نوبت ' . fa_number(substr($old['starts_at'], 11, 5)) . ') • ' . $reason, 'delay');
         if (sms_allowed_for($old['patient_user_id'] ? (int) $old['patient_user_id'] : null, 'delay')) {
-            sms_enqueue('visit_time_changed', $old['phone'], ['token' => substr($at, 11, 5), 'token2' => digits(jdate(substr($at, 0, 10))), 'token10' => $old['doctor']], 'estimate:' . $id . ':' . $at, [
+            sms_enqueue('visit_time_changed', $old['phone'], ['token' => substr($at, 11, 5), 'token2' => digits(jdate(substr($at, 0, 10))), 'token10' => doctor_display_name((string) $old['doctor'])], 'estimate:' . $id . ':' . $at, [
                 'booking_id' => $id,
                 'user_id' => $old['patient_user_id'] ? (int) $old['patient_user_id'] : null,
             ]);

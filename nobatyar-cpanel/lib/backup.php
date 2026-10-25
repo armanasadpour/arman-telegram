@@ -186,7 +186,7 @@ function backup_upload(array $file): string
 function backup_restore(string $name, string $password, string $confirm): string
 {
     $me = admin_current();
-    if (!$me || $me['role'] !== 'owner' || !password_verify($password, $me['password_hash'])) {
+    if (!$me || $me['role'] !== 'owner' || !admin_password_confirm($password)) {
         security_event('backup.restore_denied', $name);
         throw new RuntimeException('رمز عبور مالک سامانه درست نیست.');
     }
@@ -263,5 +263,7 @@ function backup_auto(): string
     if ($latest && $latest['time'] > time() - 86000) {
         return 'پشتیبان امروز قبلاً ساخته شده است.';
     }
-    return 'پشتیبان ساخته شد: ' . backup_create('auto');
+    $name = backup_create('auto');
+    // 1.0.30: an encrypted copy also leaves the host when «پشتیبان خارج از سرور» is on.
+    return trim('پشتیبان ساخته شد: ' . $name . ' ' . backup_offsite_send($name));
 }

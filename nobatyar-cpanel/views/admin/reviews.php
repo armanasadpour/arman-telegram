@@ -1,4 +1,4 @@
-<?php /** @var string $status @var array $counts @var array $rows */
+<?php /** @var string $status @var array $counts @var array $rows @var array $replies */
 $labels = ['pending' => 'در انتظار بررسی', 'approved' => 'منتشرشده', 'hidden' => 'پنهان'];
 ?>
 <nav class="sub-tabs">
@@ -29,3 +29,26 @@ $labels = ['pending' => 'در انتظار بررسی', 'approved' => 'منتش�
   </table></div>
   <?php endif; ?>
 </section>
+<?php if ($replies): /* 1.0.30 */ ?>
+<section class="panel">
+  <h2>پاسخ پزشکان در انتظار تأیید (<?= fa_number(count($replies)) ?>)</h2>
+  <p class="muted small">پاسخ پزشک پس از انتشار زیر همان نظر در صفحه پزشک نمایش داده می‌شود.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>پزشک</th><th>نظر بیمار</th><th>پاسخ پزشک</th><th>زمان</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($replies as $r): ?>
+      <tr>
+        <td><?= esc(doctor_display_name($r['doctor'])) ?></td>
+        <td><span class="stars"><?= str_repeat('★', (int) $r['rating']) ?></span> <?= esc($r['comment'] ?? '—') ?></td>
+        <td><?= esc($r['reply']) ?></td>
+        <td><bdi><?= esc(jdate($r['reply_at'], true)) ?></bdi></td>
+        <td class="row-actions">
+          <form method="post" class="inline-form"><?php form_token('review_reply_moderate'); ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>"><input type="hidden" name="status" value="approved"><button class="small">انتشار</button></form>
+          <form method="post" class="inline-form"><?php form_token('review_reply_moderate'); ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>"><input type="hidden" name="status" value="hidden"><button class="small danger">پنهان</button></form>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+</section>
+<?php endif; ?>

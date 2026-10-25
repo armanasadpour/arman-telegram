@@ -29,6 +29,7 @@ $tabs = [
     'staff' => 'منشی و دسترسی‌ها',
     'centers' => 'مراکز درمانی',
     'report' => 'گزارش عملکرد',
+    'reviews' => 'نظرات بیماران',
     'promote' => 'لینک، QR و اطلاعیه',
     'subscription' => 'اشتراک پرو',
     'notifications' => 'اعلان‌ها',
@@ -38,13 +39,17 @@ $tabs = [
 if (!subscriptions_on()) {
     unset($tabs['subscription']);
 }
+// 1.0.30: replies to reviews exist only while reviews are on.
+if (!search_config()['reviews']) {
+    unset($tabs['reviews']);
+}
 $tab = (string) ($_GET['tab'] ?? 'dashboard');
 try {
     $d = doctor_actor($id, 'view', 0, true);
     if (!isset($tabs[$tab])) {
         throw new AuthError('صفحه پیدا نشد.', 404);
     }
-    if (in_array($tab, ['profile', 'clinics', 'services', 'staff', 'events', 'subscription', 'centers', 'report', 'promote'], true)) {
+    if (in_array($tab, ['profile', 'clinics', 'services', 'staff', 'events', 'subscription', 'centers', 'report', 'promote', 'reviews'], true)) {
         doctor_actor($id, 'owner', 0, true);
     }
     $clinics = doctor_clinics_for($id);
@@ -96,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } elseif (str_starts_with($action, 'center_')) {
             $result = ['message' => doctor_center_action($id, $action, $_POST)];
+        } elseif ($action === 'review_reply') {
+            $result = ['message' => review_reply_save($id, $_POST)];
         } elseif ($action === 'notice_save') {
             $result = ['message' => doctor_notice_save($id, $_POST)];
         } elseif ($action === 'pro_prefs') {

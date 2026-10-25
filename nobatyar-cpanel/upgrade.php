@@ -46,16 +46,28 @@ if (is_post()) {
     verify_csrf();
     try {
         if (!admin()) {
-            $_SESSION['upgrade_attempts'] = array_filter(
-                $_SESSION['upgrade_attempts'] ?? [],
-                fn($t) => $t > time() - 900,
-            );
-            if (count($_SESSION['upgrade_attempts']) >= 10) {
-                throw new RuntimeException('تعداد تلاش‌ها زیاد است؛ ۱۵ دقیقه بعد امتحان کنید.');
+            // 1.0.30: with a current database the normal two-step administrator sign-in is required; the
+            // password form only serves a database that still needs upgrading. Limits live in the database,
+            // so clearing cookies does not reset them.
+            if (schema_is_current()) {
+                throw new RuntimeException('ابتدا از پنل مدیریت (admin.php) با حساب مالک سامانه وارد شوید.');
             }
-            $_SESSION['upgrade_attempts'][] = time();
-            $a = query('SELECT * FROM admins WHERE email=?', [trim((string) ($_POST['email'] ?? ''))])->fetch();
-            if (!$a || !password_verify((string) ($_POST['password'] ?? ''), $a['password_hash'])) {
+            $email = mb_strtolower(trim((string) ($_POST['email'] ?? '')));
+            try {
+                throttle('upgrade_login', 10, 900);
+                rate_limit('admin_login_account:' . $email, 20, 3600);
+            } catch (PDOException $e) {
+                // A first-version database has no limit tables yet: fall back to a per-session limit.
+                $_SESSION['upgrade_attempts'] = array_filter($_SESSION['upgrade_attempts'] ?? [], fn($t) => $t > time() - 900);
+                if (count($_SESSION['upgrade_attempts']) >= 10) {
+                    throw new RuntimeException('تعداد تلاش‌ها زیاد است؛ ۱۵ دقیقه بعد امتحان کنید.');
+                }
+                $_SESSION['upgrade_attempts'][] = time();
+            }
+            $a = query('SELECT * FROM admins WHERE email=?', [$email])->fetch();
+            $ok = password_verify((string) ($_POST['password'] ?? ''), $a ? $a['password_hash'] : '$2y$10$WXz5Ff7jFtrYPxwTn6lnyeBcywDYa9PnIoPDwdAO1142aNLUWB3oW');
+            if (!$a || !$ok) {
+                security_event('admin.login_failed', mb_substr($email, 0, 120));
                 throw new RuntimeException('اطلاعات ورود مدیر اشتباه است.');
             }
             if (isset($a['active']) && (!(int) $a['active'] || $a['role'] !== 'owner')) {

@@ -132,7 +132,7 @@ function waitlist_process(int $clinic = 0): array
         $url = 'doctor.php?id=' . (int) $w['doctor_id'] . '&clinic=' . (int) $w['clinic_id'] . '&date=' . rawurlencode(digits(jdate(substr($slot['starts_at'], 0, 10))));
         notify_user(
             (int) $w['user_id'],
-            'زمان آزاد نزد ' . $w['doctor'],
+            'زمان آزاد نزد ' . doctor_display_name((string) $w['doctor']),
             'برای ' . $w['patient_name'] . '، نخستین زمان آزاد ' . jdate($slot['starts_at'], true) . ' است. این پیام برای چند نفر از صف ارسال می‌شود؛ هر کس زودتر رزرو کند، زمان را می‌گیرد.',
             null,
             'waitlist',
@@ -143,7 +143,7 @@ function waitlist_process(int $clinic = 0): array
             sms_enqueue(
                 'waitlist_available',
                 $phone,
-                ['token' => digits(jdate(substr($slot['starts_at'], 0, 10))), 'token2' => substr($slot['starts_at'], 11, 5), 'token10' => $w['doctor']],
+                ['token' => digits(jdate(substr($slot['starts_at'], 0, 10))), 'token2' => substr($slot['starts_at'], 11, 5), 'token10' => doctor_display_name((string) $w['doctor'])],
                 'waitlist:' . $w['id'] . ':' . $slot['starts_at'],
                 ['user_id' => (int) $w['user_id']],
             );

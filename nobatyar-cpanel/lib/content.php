@@ -11,7 +11,8 @@ declare(strict_types=1);
 function site_name(): string
 {
     try {
-        return setting('site_name', 'نوبت‌یار') ?: 'نوبت‌یار';
+        // config() redirects to the installer when nothing is installed yet, so check first.
+        return (schema_is_current_safe() ? setting('site_name', 'نوبت‌یار') : '') ?: 'نوبت‌یار';
     } catch (Throwable $e) {
         return 'نوبت‌یار';
     }
@@ -46,11 +47,25 @@ function safe_link(string $url): string
     throw new RuntimeException('پیوند باید نشانی یکی از صفحه‌های همین سایت (مثل centers.php) یا با https:// شروع شود.');
 }
 
-function site_logo_url(): string {
-    try { $file=setting('site_logo','');return $file!==''?home_image_url($file):''; } catch(Throwable $e){return '';}
+/** The uploaded site logo, or '' (also before installation, when there are no settings to read). */
+function site_logo_url(): string
+{
+    static $url = null;
+    if ($url === null) {
+        try {
+            $file = schema_is_current_safe() ? setting('site_logo', '') : '';
+            $url = $file !== '' ? home_image_url($file) : '';
+        } catch (Throwable $e) {
+            $url = '';
+        }
+    }
+    return $url;
 }
-function site_brand_logo(string $class='brand-icon'): string {
-    $url=site_logo_url();return $url?'<img class="site-custom-logo '.esc($class).'" src="'.esc($url).'" alt="'.esc(site_name()).'">':icon('logo',$class);
+
+function site_brand_logo(string $class = 'brand-icon'): string
+{
+    $url = site_logo_url();
+    return $url ? '<img class="site-custom-logo ' . esc($class) . '" src="' . esc($url) . '" alt="' . esc(site_name()) . '">' : icon('logo', $class);
 }
 function general_settings_save(array $d,array $files=[]): void
 {

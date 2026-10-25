@@ -9,7 +9,7 @@ $paidFee = (int) $b['fee_toman'];
 $discount = (int) ($b['discount_toman'] ?? 0);
 $gw = $tx && $tx['gateway']==='wallet' ? 'کیف پول' : ($tx ? (payment_gateways()[$tx['gateway']]['label'] ?? $tx['gateway']) : '');
 $ref = $tx['ref_num'] ?? ($payment['reference'] ?? null);
-$share = site_name() . ' — نوبت ' . $b['doctor'] . "\n" . jalali_long($b['starts_at']) . "\n" . $b['clinic'] . '، ' . $b['address'] . "\nکد رهگیری: " . $b['tracking_code'];
+$share = site_name() . ' — نوبت ' . doctor_display_name((string) $b['doctor']) . "\n" . jalali_long($b['starts_at']) . "\n" . $b['clinic'] . '، ' . $b['address'] . "\nکد رهگیری: " . $b['tracking_code'];
 $photo = !empty($b['photo_file']) ? '<img src="photo.php?id=' . (int) $b['doctor_id'] . '" alt="" width="72" height="72">' : esc(mb_substr(trim(preg_replace('/^دکتر\s+/u', '', $b['doctor'])), 0, 1));
 ?>
 <div class="bk receipt-wrap">
@@ -63,6 +63,7 @@ $photo = !empty($b['photo_file']) ? '<img src="photo.php?id=' . (int) $b['doctor
     <a class="button" href="patient.php"><?= icon('calendar-check') ?> مشاهده نوبت‌های من</a>
     <?php if (in_array($b['status'], ['confirmed', 'completed'], true)): ?><a class="button<?= $fresh ? '' : ' secondary' ?>" href="receipt-ticket.php?id=<?= (int) $b['id'] ?>"><?= icon('download') ?> دانلود رسید (PDF / JPG)</a><?php else: ?>
     <button type="button" class="button secondary" data-print hidden><?= icon('download') ?> ذخیره رسید (PDF)</button><?php endif; ?>
+    <?php if ($b['status'] === 'confirmed' && $b['starts_at'] > date('Y-m-d H:i:s')): /* 1.0.30 */ ?><a class="button secondary" href="calendar.php?id=<?= (int) $b['id'] ?>" download><?= icon('calendar-clock') ?> افزودن به تقویم گوشی</a><?php endif; ?>
     <button type="button" class="button secondary" data-share data-share-text="<?= esc($share) ?>" data-share-title="رسید نوبت" hidden><?= icon('share') ?> اشتراک‌گذاری رسید</button>
     <a class="button ghost" href="index.php"><?= icon('home') ?> بازگشت به صفحه اصلی</a>
   </div>

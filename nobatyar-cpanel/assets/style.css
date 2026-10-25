@@ -2397,3 +2397,28 @@ input[data-jdate]{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://
   .sub-upgrade{width:100%;justify-content:center}
 }
 @media (prefers-reduced-motion:reduce){.pf-dot{animation:none}}
+
+/* 1.0.30 saved doctors: heart on the doctor's page */
+.dp-hero-actions .dp-save{width:100%}
+.dp-save .icon{transition:transform .2s ease,color .2s ease,fill .2s ease}
+.dp-save.is-saved{color:#e11d48;border-color:rgba(225,29,72,.35);background:rgba(225,29,72,.06)}
+.dp-save.is-saved .icon{color:#e11d48;fill:#e11d48}
+.dp-save.is-saved .icon g{fill:#e11d48}
+.dp-save.pop .icon{transform:scale(1.3)}
+@media (prefers-reduced-motion:reduce){.dp-save .icon{transition:none}.dp-save.pop .icon{transform:none}}
+
+/* 1.0.30 doctor replies to reviews */
+.rv-reply{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--primary-50,#eef4ff);border-inline-start:3px solid var(--primary,#3978f6)}
+.rv-reply strong{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:var(--primary-700,#1d4ed8)}
+.rv-reply strong .icon{width:16px;height:16px}
+.rv-reply p{margin:4px 0 0;font-size:.9rem;line-height:1.8}
+.rv-panel-list{display:grid;gap:12px}
+.rv-panel-head{display:flex;align-items:center;gap:10px}
+.rv-panel-head>div{display:flex;flex-direction:column;flex:1;min-width:0}
+.rv-panel-head .stars{color:#f5a524;letter-spacing:1px}
+.rv-panel-text{margin:10px 0 6px;line-height:1.9}
+.rv-reply-form{display:grid;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line,#e2e8f0)}
+.rv-reply-form label{display:grid;gap:6px;margin:0}
+.rv-reply-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.9rem}
+.rv-reply-title .icon{width:16px;height:16px}
+.rv-reply-form button{justify-self:start}
