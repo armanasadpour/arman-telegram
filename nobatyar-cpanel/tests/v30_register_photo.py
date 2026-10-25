@@ -49,7 +49,7 @@ c = client()
 login_user(c, MOB[0])
 html = get(c, 'register.php')[1]
 check('enctype="multipart/form-data"' in html and 'name="photo"' in html and 'accept="image/jpeg,image/png"' in html, 'registration form: optional profile photo')
-check('<h2>مشخصات مطب</h2>' in html and 'مطب اول' not in html, 'heading «مشخصات مطب» (no «مطب اول»)')
+check('مطب شما کجاست؟' in html and 'مطب اول' not in html, 'clinic section heading (no «مطب اول»)')
 check('عرض جغرافیایی' not in html and 'طول جغرافیایی' not in html and '<input type="hidden" name="latitude"' in html and 'data-map-picker' in html and 'موقعیت فعلی من' in html, 'no latitude/longitude boxes; map and «موقعیت فعلی من» kept')
 
 # ---------- Bad photo: nothing saved ----------

@@ -63,7 +63,7 @@ db('DELETE FROM request_limits')
 try:
     # ---------- Settings panel ----------
     html = get(admin, 'admin.php?tab=settings')[1]
-    check('درآمد و مالیات' in html and 'name="subscriptions_enabled"' in html and 'name="invoice_vat_percent"' in html and 'id="revenue"' in html, 'settings: revenue and tax panel')
+    check('درآمد و مالیات' in html and 'name="subscriptions_enabled"' in get(admin, 'admin.php?tab=subscriptions')[1] and 'name="invoice_vat_percent"' in html and 'id="revenue"' in html, 'settings: revenue and tax panel')
     check(re.search(r'name="subscriptions_enabled"[^>]*checked', html) is not None, 'subscription sales on by default')
     html = submit(admin, 'admin.php?tab=settings', dict(action='revenue_settings', invoice_vat_percent='۴۰'))[1]
     check('بین ۰ تا ۳۰' in html, 'VAT over 30% rejected')

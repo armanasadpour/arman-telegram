@@ -110,7 +110,7 @@ try:
     fclinic = db('SELECT id FROM clinics WHERE doctor_id=?', [FREE])[0]['id']
     html = get(free, f'doctor-panel.php?doctor={FREE}&tab=staff')[1]
     check('pro-upsell' in html and 'name="mobile"' not in html.split('doctor-content')[1], 'free: secretary form replaced by the Pro card')
-    html = submit(free, f'doctor-panel.php?doctor={FREE}&tab=dashboard', dict(action='staff', clinic_id=fclinic, mobile=MOB['sec']))[1]
+    html = submit(free, f'doctor-panel.php?doctor={FREE}&tab=profile', dict(action='staff', clinic_id=fclinic, mobile=MOB['sec']))[1]
     check(not db("SELECT 1 FROM staff_scopes WHERE clinic_id=? AND role='secretary'", [fclinic]), 'free: secretary refused on the server')
     html = get(free, f'doctor-panel.php?doctor={FREE}')[1]
     check('pro-lock' in html and 'export=day' not in html and 'plan-chip is-free' in html, 'free dashboard: Excel locked, welcome box shows «رایگان»')
