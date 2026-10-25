@@ -119,7 +119,7 @@ try:
     for tab, word in (('report', 'گزارش عملکرد و آمار بازدید پروفایل'), ('promote', 'لینک اختصاصی، QR و پوستر')):
         html = get(free, f'doctor-panel.php?doctor={FREE}&tab={tab}')[1]
         check('pro-upsell' in html and word in html and 'data-qr' not in html, f'free: {tab} shows the Pro card')
-    html = submit(free, f'doctor-panel.php?doctor={FREE}&tab=promote', dict(action='notice_save', notice_text='مطب پنجشنبه تعطیل است'))[1]
+    html = submit(free, f'doctor-panel.php?doctor={FREE}&tab=profile', dict(action='notice_save', notice_text='مطب پنجشنبه تعطیل است'))[1]
     check(db('SELECT notice_text FROM doctors WHERE id=?', [FREE])[0]['notice_text'] is None, 'free: announcement refused')
     html = get(free, f'doctor-panel.php?doctor={FREE}&tab=subscription')[1]
     check(html.count('class="plan-col') == 2 and 'نسخه فعلی شما' in html, 'Pro page: comparison with the current plan marked')
