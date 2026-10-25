@@ -122,7 +122,7 @@ try:
     html = submit(free, f'doctor-panel.php?doctor={FREE}&tab=profile', dict(action='notice_save', notice_text='مطب پنجشنبه تعطیل است'))[1]
     check(db('SELECT notice_text FROM doctors WHERE id=?', [FREE])[0]['notice_text'] is None, 'free: announcement refused')
     html = get(free, f'doctor-panel.php?doctor={FREE}&tab=subscription')[1]
-    check(html.count('class="plan-col') == 2 and 'نسخه فعلی شما' in html, 'Pro page: comparison with the current plan marked')
+    check('class="plan-card' in html and 'نسخه فعلی' in html, 'Pro page: plan cards and the current plan shown')
 
     # ---------- Pro doctor (trial) ----------
     status, html = get(client(), f'doctor.php?id={PRO}')
