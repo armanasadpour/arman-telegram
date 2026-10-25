@@ -68,7 +68,9 @@ try:
     html = submit(admin, 'admin.php?tab=settings', dict(action='revenue_settings', invoice_vat_percent='۴۰'))[1]
     check('بین ۰ تا ۳۰' in html, 'VAT over 30% rejected')
     html = submit(admin, 'admin.php?tab=settings', dict(action='revenue_settings', invoice_vat_percent='۹', invoice_seller_name='شرکت نوبت‌یار نمونه', invoice_seller_economic_code='411111111111'))[1]
-    check('فروش اشتراک غیرفعال شد' in html, 'subscription sales turned off')
+    # The sales switch lives in «اشتراک‌ها» → «تنظیمات» since rc.22.
+    submit(admin, 'admin.php?tab=subscriptions&view=settings', dict(action='subscription_settings', subscription_sales_form='1', subscription_grace_days='7', subscription_trial_days='14', subscription_warning_thresholds='7,3,1', proforma_valid_hours='48'))
+    check(scalar("SELECT value FROM settings WHERE `key`='subscriptions_enabled'") == '0', 'subscription sales turned off')
     check(scalar("SELECT value FROM settings WHERE `key`='subscriptions_enabled'") == '0' and scalar("SELECT value FROM settings WHERE `key`='invoice_vat_percent'") == '9', 'switch and VAT saved')
     check(scalar("SELECT COUNT(*) FROM audit_log WHERE action='settings.revenue'") >= 1, 'change recorded in the activity log')
 
