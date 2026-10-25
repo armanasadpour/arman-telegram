@@ -136,7 +136,7 @@ try:
     check('مالیات بر ارزش افزوده (۹٪)' in rc and '۴۵۰ تومان' in rc and '۵٬۴۵۰ تومان' in rc and 'شرکت نوبت‌یار نمونه' in rc and fa('411111111111') in rc, 'receipt: VAT, total and seller')
     rev = json.loads(php('echo json_encode(payment_revenue(date("Y-m-d"),date("Y-m-d")));'))
     row = next(x for x in rev['by_purpose'] if x['purpose'] == 'booking')
-    check(int(row['vat']) >= 450 and int(row['gross']) + int(row['vat']) == int(scalar("SELECT SUM(amount_toman) FROM payment_transactions WHERE purpose='booking' AND status IN ('verified','refund_due') AND test_mode=0 AND DATE(verified_at)=CURDATE()")), 'revenue report: VAT reported separately, not as income')
+    check(int(row['vat']) >= 450 and int(row['gross']) - int(row['refunded']) + int(row['vat']) == int(scalar("SELECT SUM(amount_toman) FROM payment_transactions WHERE purpose='booking' AND status IN ('verified','refund_due') AND test_mode=0 AND DATE(verified_at)=CURDATE()")), 'revenue report: VAT reported separately, not as income')
     html = get(admin, 'admin.php?tab=payments')[1]
     check('دریافتی (بدون مالیات)' in html, 'payments report column without VAT')
 
