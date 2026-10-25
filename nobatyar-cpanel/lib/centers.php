@@ -93,6 +93,10 @@ function center_grace_days(): int
 /** SQL condition: center usable for operations (approved, active, subscription within grace). */
 function center_open_sql(string $alias = 'ce'): string
 {
+    // 1.0.30: with subscription sales off (as for doctors since rc.17) the subscription date no longer hides a center.
+    if (!subscriptions_on()) {
+        return "($alias.review_status='approved' AND $alias.active=1)";
+    }
     return "($alias.review_status='approved' AND $alias.active=1 AND $alias.subscription_until IS NOT NULL AND $alias.subscription_until>=DATE_SUB(CURDATE(),INTERVAL " .
         center_grace_days() .
         ' DAY))';
@@ -102,8 +106,8 @@ function center_is_open(array $c): bool
 {
     return $c['review_status'] === 'approved' &&
         (int) $c['active'] === 1 &&
-        !empty($c['subscription_until']) &&
-        $c['subscription_until'] >= date('Y-m-d', strtotime('-' . center_grace_days() . ' days'));
+        (!subscriptions_on() || (!empty($c['subscription_until']) &&
+        $c['subscription_until'] >= date('Y-m-d', strtotime('-' . center_grace_days() . ' days'))));
 }
 
 function center_row(int $id): array
