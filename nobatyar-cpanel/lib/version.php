@@ -5,6 +5,6 @@ declare(strict_types=1);
  * Single source of truth for the release number and the latest database schema step.
  * Every page, the API and the upgrader read these constants instead of hard-coded strings.
  */
-const APP_VERSION = '1.0.29';
-const APP_VERSION_FA = '۱.۰.۲۹';
+const APP_VERSION = '1.0.30';
+const APP_VERSION_FA = '۱.۰.۳۰';
 const SCHEMA_VERSION = 33;
