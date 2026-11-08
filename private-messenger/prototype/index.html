@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Prototype only: inline style attributes are allowed here for brevity. Production CSP has no unsafe-inline (see docs/02-architecture.md). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>Private Messenger — نمونه اولیه UI</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<svg width="0" height="0" class="hidden" aria-hidden="true">
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10a7 7 0 0 1-14 0M12 17v5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 21 3l-8.5 18-2-7.5Z"/></symbol>
+  <symbol id="i-check2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 13 4 4 8-9M10 15l2 2 9-10"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-cam-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20M16 16H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2m4 0h4a2 2 0 0 1 2 2v4l6-4v8"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l-3-3M21 17H8l3 3"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></symbol>
+</svg>
+
+<div class="proto-bar" role="navigation" aria-label="صفحات نمونه اولیه">
+  <strong>نمونه اولیه UI — بدون سرور و بدون رمزنگاری واقعی</strong>
+  <button data-go="login">ورود</button>
+  <button data-go="otp">OTP</button>
+  <button data-go="recovery">کلید بازیابی</button>
+  <button data-go="chats">گفتگوها</button>
+  <button data-go="safety">شماره امنیتی</button>
+  <button data-go="security">دستگاه‌ها</button>
+  <button data-go="call">تماس</button>
+  <button data-go="admin">پنل مدیریت</button>
+  <button data-go="admin-user">مدیریت کاربر</button>
+  <span class="spacer"></span>
+  <button id="theme" aria-label="تغییر حالت روشن و تاریک">حالت: سیستم</button>
+</div>
+
+<!-- 1. Login -->
+<section class="screen center" id="s-login" aria-label="ورود">
+  <div class="card">
+    <div class="brand"><div class="logo"><svg><use href="#i-lock"/></svg></div><div><b>Private Messenger</b><div class="small muted">پیام‌رسان خصوصی مجموعه</div></div></div>
+    <h1 style="font-size:20px;margin:0 0 4px">ورود به حساب</h1>
+    <p class="muted small" style="margin:0">ثبت‌نام عمومی وجود ندارد. حساب شما باید پیش‌تر توسط مدیر ایجاد و فعال شده باشد.</p>
+    <label class="field"><span>شماره موبایل</span><input class="ltr" inputmode="tel" placeholder="0912 000 0000" autocomplete="tel"></label>
+    <button class="btn block" data-go="otp">دریافت کد تأیید</button>
+    <p class="notice small" style="margin-top:14px">کد تأیید فقط هویت شماره شما را تأیید می‌کند و کلید رمزنگاری پیام‌ها را تولید یا بازیابی نمی‌کند.</p>
+  </div>
+</section>
+
+<!-- 2. OTP -->
+<section class="screen center" id="s-otp" aria-label="کد تأیید">
+  <div class="card">
+    <h1 style="font-size:20px;margin:0 0 4px">کد تأیید</h1>
+    <p class="muted small">کد ۶ رقمی ارسال‌شده به <span class="ltr">0912•••0000</span> را وارد کنید.</p>
+    <div class="otp" id="otp">
+      <input inputmode="numeric" maxlength="1" aria-label="رقم ۱"><input inputmode="numeric" maxlength="1" aria-label="رقم ۲"><input inputmode="numeric" maxlength="1" aria-label="رقم ۳"><input inputmode="numeric" maxlength="1" aria-label="رقم ۴"><input inputmode="numeric" maxlength="1" aria-label="رقم ۵"><input inputmode="numeric" maxlength="1" aria-label="رقم ۶">
+    </div>
+    <p class="small muted" style="text-align:center">ارسال دوباره تا <span id="otp-timer">۰۱:۰۰</span></p>
+    <button class="btn block" data-go="recovery">تأیید و ادامه</button>
+    <button class="btn secondary block" style="margin-top:8px" data-go="login">تغییر شماره</button>
+  </div>
+</section>
+
+<!-- 3. Recovery key -->
+<section class="screen center" id="s-recovery" aria-label="کلید بازیابی">
+  <div class="card" style="max-width:480px">
+    <div class="brand"><div class="logo"><svg><use href="#i-shield"/></svg></div><div><b>کلیدهای رمزنگاری روی همین دستگاه ساخته شد</b></div></div>
+    <p class="small">این <b>کلید بازیابی</b> تنها راه بازگرداندن هویت رمزنگاری شما در صورت گم‌شدن همه دستگاه‌هاست. سرور و مدیر سامانه آن را ندارند و نمی‌توانند بازیابی کنند.</p>
+    <div class="recovery" id="rk"></div>
+    <p class="notice warn">آن را روی کاغذ یا در مدیر گذرواژه نگه دارید. بدون این کلید و بدون دستگاه دیگر، پیام‌های قبلی قابل بازیابی نیستند.</p>
+    <label class="field"><span>برای اطمینان، گروه سوم را وارد کنید</span><input class="ltr" placeholder="XXXX"></label>
+    <button class="btn block" data-go="chats">ذخیره کردم، ادامه</button>
+  </div>
+</section>
+
+<!-- 4. Chats -->
+<section class="screen" id="s-chats" aria-label="گفتگوها">
+  <div class="app" id="app">
+    <aside class="sidebar">
+      <div class="side-head">
+        <button class="icon-btn" aria-label="تنظیمات امنیت" data-go="security"><svg><use href="#i-menu"/></svg></button>
+        <h2>گفتگوها</h2>
+        <button class="icon-btn" aria-label="گفتگوی جدید"><svg><use href="#i-pen"/></svg></button>
+      </div>
+      <div class="search"><svg><use href="#i-search"/></svg><input id="q" placeholder="جست‌وجو روی همین دستگاه" aria-label="جست‌وجوی محلی"></div>
+      <div class="tabs" role="tablist"><button role="tab" aria-selected="true">همه</button><button role="tab" aria-selected="false">خوانده‌نشده</button><button role="tab" aria-selected="false">آرشیو</button></div>
+      <div class="list" id="convs"></div>
+    </aside>
+    <main class="chat">
+      <div class="chat-head">
+        <button class="icon-btn back" aria-label="بازگشت" id="back"><svg><use href="#i-back"/></svg></button>
+        <div class="avatar" style="background:#7c3aed;width:40px;height:40px">س</div>
+        <div class="who"><b>سارا محمدی</b><button class="e2ee" data-go="safety"><svg><use href="#i-lock"/></svg>رمزنگاری سرتاسری · آخرین بازدید اخیراً</button></div>
+        <button class="icon-btn" aria-label="تماس صوتی" data-go="call"><svg><use href="#i-phone"/></svg></button>
+        <button class="icon-btn" aria-label="تماس تصویری" data-go="call"><svg><use href="#i-video"/></svg></button>
+      </div>
+      <div class="keywarn" role="status">
+        <svg width="18" height="18"><use href="#i-shield"/></svg>
+        <span>کلید امنیتی سارا محمدی تغییر کرده است. پیش از ادامه شماره امنیتی را بررسی کنید.</span>
+        <button class="btn secondary" style="min-height:32px;padding:4px 12px" data-go="safety">بررسی</button>
+      </div>
+      <div class="messages" id="msgs">
+        <div class="day">دیروز</div>
+        <div class="sys">پیام‌ها و تماس‌ها با رمزنگاری سرتاسری محافظت می‌شوند. سرور و مدیر سامانه نمی‌توانند آن‌ها را بخوانند.</div>
+        <div class="msg in">سلام، گزارش جلسه آماده است؟<div class="meta">۱۰:۴۲</div></div>
+        <div class="msg out">بله، الان می‌فرستم.<div class="meta">۱۰:۴۵ <svg class="read"><use href="#i-check2"/></svg></div></div>
+        <div class="msg out">
+          <div class="file"><div class="file-ico"><svg><use href="#i-file"/></svg></div><div><b>گزارش-جلسه.pdf</b><div class="small muted">۲٫۴ مگابایت · PDF</div><div class="expire">تا ۶ روز دیگر روی سرور در دسترس است</div></div></div>
+          <div class="meta">۱۰:۴۶ <svg class="read"><use href="#i-check2"/></svg></div>
+        </div>
+        <div class="day">امروز</div>
+        <div class="msg in"><div class="reply">گزارش-جلسه.pdf</div>ممنون، دیدم. چند عکس از وایت‌برد هم بفرست.<div class="reacts"><span>👍 ۱</span></div><div class="meta">۰۹:۱۲</div></div>
+        <div class="msg out">
+          <div class="photo" role="img" aria-label="تصویر نمونه"></div>
+          <div class="small muted">HD · ۱٫۱ مگابایت</div>
+          <div class="meta">۰۹:۱۵ <svg><use href="#i-check2"/></svg></div>
+        </div>
+      </div>
+      <form class="composer" id="composer">
+        <button type="button" class="icon-btn" aria-label="پیوست فایل"><svg><use href="#i-clip"/></svg></button>
+        <textarea id="text" rows="1" placeholder="پیام" aria-label="متن پیام"></textarea>
+        <button type="button" class="icon-btn" aria-label="ضبط پیام صوتی"><svg><use href="#i-mic"/></svg></button>
+        <button type="submit" class="icon-btn send" aria-label="ارسال"><svg><use href="#i-send"/></svg></button>
+      </form>
+    </main>
+  </div>
+</section>
+
+<!-- 5. Safety number -->
+<section class="screen" id="s-safety" aria-label="شماره امنیتی">
+  <div class="page">
+    <button class="btn secondary" data-go="chats">بازگشت به گفتگو</button>
+    <h1>شماره امنیتی شما و سارا محمدی</h1>
+    <div class="panel">
+      <p class="small muted" style="margin-top:0">اگر این اعداد روی دستگاه سارا هم دقیقاً همین باشد، ارتباط شما مستقیم و بدون واسطه است. مقایسه را حضوری یا از راه مطمئن انجام دهید.</p>
+      <div class="safety" id="sn"></div>
+      <svg class="qr" viewBox="0 0 29 29" role="img" aria-label="کد QR نمونه" id="qr"></svg>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        <button class="btn">اسکن کد QR مخاطب</button>
+        <button class="btn secondary" id="verify">علامت‌گذاری به‌عنوان تأییدشده</button>
+      </div>
+      <p class="small muted" style="text-align:center" id="verify-state">وضعیت: تأییدنشده</p>
+    </div>
+    <div class="panel">
+      <h3>رویدادهای امنیتی این مخاطب</h3>
+      <div class="row"><div class="grow">کلید امنیتی تغییر کرد (ممکن است به دلیل نصب مجدد یا بازنشانی حساب باشد)</div><span class="tag warn">امروز</span></div>
+      <div class="row"><div class="grow">دستگاه جدید اضافه شد: Safari / iPhone</div><span class="tag">۳ روز پیش</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Security & devices -->
+<section class="screen" id="s-security" aria-label="امنیت و دستگاه‌ها">
+  <div class="page">
+    <button class="btn secondary" data-go="chats">بازگشت</button>
+    <h1>امنیت و دستگاه‌ها</h1>
+    <div class="panel">
+      <h3>دستگاه‌های متصل</h3>
+      <div class="row"><div class="grow"><b>Chrome / Windows</b><div class="small muted">این دستگاه · فعال اکنون</div></div><span class="tag ok">تأییدشده</span></div>
+      <div class="row"><div class="grow"><b>Safari / iPhone (PWA)</b><div class="small muted">آخرین فعالیت: ۲ ساعت پیش</div></div><span class="tag ok">تأییدشده</span><button class="btn danger" style="min-height:34px;padding:4px 12px">خروج</button></div>
+      <div class="row"><div class="grow"><b>افزودن دستگاه جدید</b><div class="small muted">با اسکن کد QR دستگاه جدید یا مقایسه کد امنیتی</div></div><button class="btn secondary">اتصال دستگاه</button></div>
+    </div>
+    <div class="panel">
+      <h3>کلید بازیابی</h3>
+      <div class="row"><div class="grow">پشتیبان رمزنگاری‌شده کلید هویت روی سرور ذخیره است و فقط با کلید بازیابی شما باز می‌شود.</div><span class="tag ok">فعال</span></div>
+      <div class="row"><div class="grow">ساخت کلید بازیابی جدید (کلید قبلی باطل می‌شود)</div><button class="btn secondary">ساخت دوباره</button></div>
+    </div>
+    <div class="panel">
+      <h3>حریم خصوصی</h3>
+      <div class="row"><div class="grow">نمایش آخرین بازدید</div><button class="switch" role="switch" aria-checked="true" aria-label="نمایش آخرین بازدید"></button></div>
+      <div class="row"><div class="grow">ارسال نشانگر تایپ</div><button class="switch" role="switch" aria-checked="true" aria-label="ارسال نشانگر تایپ"></button></div>
+      <div class="row"><div class="grow">تماس فقط از طریق رله (پنهان‌کردن IP از مخاطب؛ نیازمند TURN)</div><button class="switch" role="switch" aria-checked="false" aria-label="تماس فقط از طریق رله"></button></div>
+      <div class="row"><div class="grow">قفل برنامه با PIN محلی</div><button class="switch" role="switch" aria-checked="false" aria-label="قفل برنامه"></button></div>
+    </div>
+    <p class="small muted">نصب‌شدن برنامه (PWA) روی iOS لازم است؛ در غیر این صورت Safari ممکن است پس از ۷ روز عدم استفاده داده‌های رمزنگاری این دستگاه را پاک کند.</p>
+  </div>
+</section>
+
+<!-- 7. Call -->
+<section class="screen call" id="s-call" aria-label="تماس">
+  <div class="peer">
+    <div class="avatar" style="background:#7c3aed">س</div>
+    <h2 style="margin:0">سارا محمدی</h2>
+    <div class="small" id="call-state" style="opacity:.8">در حال اتصال…</div>
+    <div class="small" style="opacity:.6;margin-top:6px"><svg width="12" height="12" style="vertical-align:middle"><use href="#i-lock"/></svg> رمزنگاری DTLS-SRTP · signaling رمزنگاری‌شده</div>
+  </div>
+  <div class="controls">
+    <button aria-pressed="false" aria-label="قطع میکروفون" data-toggle><svg><use href="#i-mic"/></svg></button>
+    <button aria-pressed="false" aria-label="خاموش کردن دوربین" data-toggle><svg><use href="#i-cam-off"/></svg></button>
+    <button aria-label="تعویض دوربین جلو و عقب"><svg><use href="#i-flip"/></svg></button>
+    <button class="hang" aria-label="پایان تماس" data-go="chats"><svg><use href="#i-phone"/></svg></button>
+  </div>
+  <p class="small" style="opacity:.6;text-align:center;max-width:420px">در صورت شکست اتصال: «اتصال برقرار نشد. شبکه شما احتمالاً به سرور TURN نیاز دارد که روی این سامانه تنظیم نشده است.»</p>
+</section>
+
+<!-- 8. Admin dashboard -->
+<section class="screen" id="s-admin" aria-label="پنل مدیریت">
+  <div class="admin">
+    <nav aria-label="منوی مدیریت">
+      <h2 style="font-size:15px;padding:0 12px">پنل مدیریت</h2>
+      <a href="#" aria-current="page" data-go="admin">داشبورد</a><a href="#" data-go="admin-user">کاربران</a><a href="#">تنظیمات</a><a href="#">فضا و پاک‌سازی</a><a href="#">گزارش ممیزی</a><a href="#">قابلیت‌های میزبان</a><a href="#">مدیران و نقش‌ها</a>
+    </nav>
+    <main>
+      <h1 style="font-size:20px;margin-top:0">داشبورد</h1>
+      <p class="notice small">این پنل هیچ امکانی برای خواندن پیام‌ها یا فایل‌ها ندارد. آمارها فقط از فراداده غیرمحتوایی محاسبه می‌شوند.</p>
+      <div class="stats" style="margin-top:14px">
+        <div class="stat"><span>حساب‌ها</span><b>۱۲۸</b><span>۱۱۹ فعال، ۶ در انتظار، ۳ معلق</span></div>
+        <div class="stat"><span>آنلاین (تقریبی، ۲ دقیقه اخیر)</span><b>۲۷</b><span>بر اساس polling</span></div>
+        <div class="stat"><span>پیام‌ها (امروز)</span><b>۳٬۴۱۲</b><span>شمارش فراداده</span></div>
+        <div class="stat"><span>تماس‌ها (امروز)</span><b>۴۱</b><span>مجموع ۳ ساعت و ۱۲ دقیقه، ۴ ناموفق (ICE)</span></div>
+      </div>
+      <div class="panel">
+        <h3>فضای ذخیره‌سازی</h3>
+        <div class="meter" aria-hidden="true"><i style="width:38%;background:var(--accent)"></i><i style="width:6%;background:#f59e0b"></i><i style="width:9%;background:#7c3aed"></i></div>
+        <div class="small">سهمیه حساب: ۵۰ گیگابایت (از cPanel UAPI)، پیوست‌ها ۱۹ گیگابایت، منقضی در انتظار حذف ۳ گیگابایت، دائمی ۴٫۵ گیگابایت، آزاد ۲۳٫۵ گیگابایت</div>
+      </div>
+      <div class="panel">
+        <h3>وضعیت سرویس‌ها</h3>
+        <div class="row"><div class="grow">Cron پاک‌سازی (هر ۱۵ دقیقه)</div><span class="tag ok">آخرین اجرا: ۶ دقیقه پیش</span></div>
+        <div class="row"><div class="grow">ارسال پیامک</div><span class="tag ok">سالم</span></div>
+        <div class="row"><div class="grow">Web Push</div><span class="tag ok">فعال</span></div>
+        <div class="row"><div class="grow">TURN</div><span class="tag warn">تنظیم نشده — تماس در برخی شبکه‌ها برقرار نمی‌شود</span></div>
+        <div class="row"><div class="grow">Long polling</div><span class="tag">غیرفعال (محدودیت Entry Process)</span></div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- 9. Admin user detail -->
+<section class="screen" id="s-admin-user" aria-label="مدیریت کاربر">
+  <div class="admin">
+    <nav aria-label="منوی مدیریت">
+      <h2 style="font-size:15px;padding:0 12px">پنل مدیریت</h2>
+      <a href="#" data-go="admin">داشبورد</a><a href="#" aria-current="page" data-go="admin-user">کاربران</a><a href="#">تنظیمات</a><a href="#">فضا و پاک‌سازی</a><a href="#">گزارش ممیزی</a><a href="#">قابلیت‌های میزبان</a><a href="#">مدیران و نقش‌ها</a>
+    </nav>
+    <main>
+      <h1 style="font-size:20px;margin-top:0">سارا محمدی <span class="tag ok">فعال</span></h1>
+      <div class="panel">
+        <h3>اطلاعات حساب</h3>
+        <table class="t"><tbody>
+          <tr><th>شماره موبایل</th><td class="ltr" style="text-align:start">+98 912 000 0000</td></tr>
+          <tr><th>ایجاد</th><td>۱۴۰۵/۰۸/۰۲ توسط admin</td></tr>
+          <tr><th>دستگاه‌ها</th><td>۲ فعال</td></tr>
+        </tbody></table>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn secondary">تعلیق</button><button class="btn secondary">خروج از همه نشست‌ها</button><button class="btn danger">بازنشانی هویت رمزنگاری</button>
+        </div>
+        <p class="small muted">بازنشانی هویت: همه دستگاه‌ها و کلیدهای عمومی حذف می‌شوند. پیام‌های قبلی <b>به هیچ وجه</b> قابل بازیابی نیستند و همه مخاطبان هشدار تغییر کلید دریافت می‌کنند.</p>
+      </div>
+      <div class="panel">
+        <h3>نگهداری فایل‌ها</h3>
+        <div class="row">
+          <div class="grow"><b>نگهداری دائمی فایل‌های این حساب</b>
+            <div class="small muted" id="ret-desc">غیرفعال — فایل‌ها ۷ روز پس از آپلود به‌صورت خودکار حذف می‌شوند.</div></div>
+          <button class="switch" role="switch" aria-checked="false" aria-label="نگهداری دائمی" id="ret"></button>
+        </div>
+        <p class="small muted">فقط مدیرکل مجاز به تغییر این گزینه است و هر تغییر در گزارش ممیزی ثبت می‌شود. با لغو نگهداری دائمی، مهلت ۷ روزه از زمان لغو محاسبه می‌شود.</p>
+      </div>
+      <div class="panel">
+        <h3>نشست‌ها</h3>
+        <table class="t"><thead><tr><th>دستگاه</th><th>IP (کوتاه‌شده)</th><th>آخرین فعالیت</th><th></th></tr></thead><tbody>
+          <tr><td>Chrome / Windows</td><td class="ltr" style="text-align:start">5.120.x.x</td><td>اکنون</td><td><button class="btn danger" style="min-height:32px;padding:2px 10px">خروج</button></td></tr>
+          <tr><td>Safari / iPhone</td><td class="ltr" style="text-align:start">2.180.x.x</td><td>۲ ساعت پیش</td><td><button class="btn danger" style="min-height:32px;padding:2px 10px">خروج</button></td></tr>
+        </tbody></table>
+      </div>
+    </main>
+  </div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
