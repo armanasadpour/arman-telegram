@@ -30,6 +30,11 @@ cPanel ← **File Manager** ← پوشه خانه (`/home/USER`، **نه** `publ
 به `public_html/` کپی کنید (برای دیدن `.htaccess` در File Manager گزینه Show Hidden Files را فعال کنید).
 اگر `public_html` از قبل سایت دیگری دارد، از روش A استفاده کنید؛ این برنامه همه درخواست‌های آن دامنه را می‌گیرد.
 
+## ۳.۱ فونت IRANSans
+
+فایل‌های `woff2` فونت را با File Manager در پوشه `private-messenger/app/resources/assets/fonts/` آپلود کنید
+(نام‌های قابل قبول در سند ۱۰، بخش ۳). وضعیت در صفحه «سیستم» پنل مدیریت دیده می‌شود.
+
 ## ۴. اجرای نصب‌کننده
 
 1. در File Manager فایل `private-messenger/storage/install-token.txt` پس از اولین باز کردن صفحه نصب ساخته می‌شود.

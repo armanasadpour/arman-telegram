@@ -1,5 +1,7 @@
-@font-face { font-family: "IRANSans"; src: url("fonts/IRANSans-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "IRANSans"; src: url("fonts/IRANSans-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "IRANSans"; src: url("fonts/IRANSans-Light.woff2") format("woff2"), url("fonts/IRANSansWeb_Light.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "IRANSans"; src: url("fonts/IRANSans-Regular.woff2") format("woff2"), url("fonts/IRANSansWeb.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IRANSans"; src: url("fonts/IRANSans-Medium.woff2") format("woff2"), url("fonts/IRANSansWeb_Medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "IRANSans"; src: url("fonts/IRANSans-Bold.woff2") format("woff2"), url("fonts/IRANSansWeb_Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 :root {
   --accent: #2563eb; --bg: #f4f6f9; --surface: #fff; --surface-2: #eef1f5; --ink: #111827; --ink-2: #4b5563;
   --line: #e3e7ed; --ok: #0f7b45; --warn-bg: #fff6db; --warn-ink: #7a5200; --danger: #b42318; --radius: 12px;
@@ -11,7 +13,7 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { font-family: "IRANSans", "Vazirmatn", Tahoma, system-ui, sans-serif; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.7; }
+body { font-family: "IRANSans", Tahoma, system-ui, sans-serif; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.7; }
 a { color: var(--accent); }
 .ltr { direction: ltr; unicode-bidi: isolate; text-align: left; }
 .muted { color: var(--ink-2); } .small { font-size: 13px; }

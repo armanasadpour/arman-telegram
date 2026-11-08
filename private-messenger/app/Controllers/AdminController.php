@@ -456,7 +456,20 @@ final class AdminController extends Controller
         $checks = json_decode((string)json_encode($this->app->settings()->get('host.checks')), true) ?: [];
         $runs = $this->app->db()->all('SELECT job, trigger_source, started_at, finished_at, status, stats FROM cron_runs ORDER BY id DESC LIMIT 20');
         $php = PHP_BINARY !== '' && !str_contains(PHP_BINARY, 'apache') && !str_contains(PHP_BINARY, 'fpm') ? PHP_BINARY : '/usr/local/bin/php';
-        return $this->page($req, 'admin/system', $this->vars(['checks' => $checks, 'runs' => $runs, 'nav' => 'system',
+        $fontDir = $this->app->root . '/app/resources/assets/fonts/';
+        $fonts = [];
+        foreach (['300 Light' => ['IRANSans-Light', 'IRANSansWeb_Light'], '400 Regular' => ['IRANSans-Regular', 'IRANSansWeb'],
+                  '500 Medium' => ['IRANSans-Medium', 'IRANSansWeb_Medium'], '700 Bold' => ['IRANSans-Bold', 'IRANSansWeb_Bold']] as $w => $names) {
+            $found = null;
+            foreach ($names as $n) {
+                if (is_file($fontDir . $n . '.woff2')) {
+                    $found = $n . '.woff2';
+                    break;
+                }
+            }
+            $fonts[$w] = $found;
+        }
+        return $this->page($req, 'admin/system', $this->vars(['checks' => $checks, 'runs' => $runs, 'nav' => 'system', 'fonts' => $fonts,
             'cron' => '*/15 * * * * ' . $php . ' ' . $this->app->root . '/app/Cli/cron.php maintenance']));
     }
 

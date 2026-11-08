@@ -6,6 +6,12 @@
   <p class="small muted">کارها: پاک‌سازی کدهای OTP قدیمی، شمارنده‌های محدودیت نرخ و نشست‌های منقضی. مسیر php را با مسیر هاست خود تطبیق دهید.</p>
 </div>
 <div class="panel table-wrap">
+  <h2>فونت IRANSans</h2>
+  <table><?php foreach ($fonts as $w => $f): ?><tr><td><?= e($w) ?></td>
+    <td><?= $f ? '<span class="tag ok">موجود</span> <span class="ltr small">' . e($f) . '</span>' : '<span class="tag warn">یافت نشد</span>' ?></td></tr><?php endforeach; ?></table>
+  <p class="small muted">محل فایل‌ها: <span class="ltr">app/resources/assets/fonts/</span> — در نبود فایل، Tahoma استفاده می‌شود.</p>
+</div>
+<div class="panel table-wrap">
   <h2>آخرین اجراهای Cron</h2>
   <table><tr><th>کار</th><th>منبع</th><th>شروع</th><th>وضعیت</th><th>آمار</th></tr>
   <?php foreach ($runs as $r): ?><tr><td class="ltr"><?= e($r['job']) ?></td><td><?= e($r['trigger_source']) ?></td><td><?= e(Fa::dateTime($r['started_at'])) ?></td>

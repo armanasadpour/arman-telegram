@@ -40,7 +40,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
-  font-family: "IRANSans", "Vazirmatn", Tahoma, system-ui, sans-serif;
+  font-family: "IRANSans", Tahoma, system-ui, sans-serif;
   background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.7;
 }
 button { font: inherit; color: inherit; cursor: pointer; }
