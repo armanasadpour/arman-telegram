@@ -1,6 +1,6 @@
 # ۰۶ — طرح دیتابیس
 
-پیش‌نویس کامل: [`database/schema-draft.sql`](../database/schema-draft.sql) (MySQL 8.0+ / MariaDB 10.6+،
+پیش‌نویس کامل: [`database/migrations/001_init.sql`](../database/migrations/001_init.sql) (MySQL 8.0+ / MariaDB 10.6+،
 InnoDB، utf8mb4). نسخه نهایی به‌صورت migration شماره‌دار در فاز ۲/۳ تولید می‌شود.
 
 ## ۱. اصول

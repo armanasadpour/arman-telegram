@@ -1,12 +1,13 @@
 # Private Messenger — پیام‌رسان خصوصی با رمزنگاری سرتاسری
 
-> وضعیت: **فاز ۱ (تحلیل، معماری و نمونه اولیه)** — در انتظار بازبینی و تأیید.
-> در این مرحله هیچ کد سروری عملیاتی تحویل نشده است و هیچ قابلیتی «آماده» اعلام نمی‌شود.
+> وضعیت: **فاز ۲ (نصب‌کننده، ورود، مدیریت کاربران، نشست‌ها، نقش‌ها)** — پیاده‌سازی و تست شد؛ در انتظار نصب روی هاست واقعی.
+> پیام‌رسانی و E2EE هنوز پیاده‌سازی نشده‌اند (فاز ۳ و ۴) و در برنامه هم نمایش داده نمی‌شوند.
+> گزارش فاز ۲: [docs/13-phase-2-report.md](docs/13-phase-2-report.md) — راهنمای نصب: [docs/12-installation-guide.md](docs/12-installation-guide.md)
 
 پیام‌رسان خصوصی، فارسی و راست‌چین برای اعضای یک مجموعه، قابل نصب روی هاست cPanel،
 با رمزنگاری سرتاسری (E2EE) پیام‌ها و فایل‌ها در دستگاه کاربران.
 
-## محتوای فاز ۱
+## اسناد
 
 | سند | موضوع |
 |---|---|
@@ -17,13 +18,30 @@
 | [docs/04-e2ee-protocol.md](docs/04-e2ee-protocol.md) | انتخاب پروتکل E2EE، سلسله‌مراتب کلید، چنددستگاهی، بازیابی، رمزنگاری فایل |
 | [docs/05-cpanel-constraints.md](docs/05-cpanel-constraints.md) | محدودیت‌های واقعی هاست اشتراکی و راهکار هر کدام |
 | [docs/06-database.md](docs/06-database.md) | طرح دیتابیس و نگاشت به جداول پیشنهادی سند اولیه |
-| [database/schema-draft.sql](database/schema-draft.sql) | پیش‌نویس اسکیمای MySQL/MariaDB |
+| [database/migrations/](database/migrations/) | اسکیمای MySQL/MariaDB (migrationها) |
 | [docs/07-api.md](docs/07-api.md) | طراحی API نسخه ۱ |
 | [docs/08-files-retention-storage.md](docs/08-files-retention-storage.md) | آپلود چندبخشی، سیاست ۷ روزه، نگهداری دائمی، فضای ذخیره‌سازی |
 | [docs/09-calls-webrtc.md](docs/09-calls-webrtc.md) | تماس دونفره WebRTC، signaling رمزنگاری‌شده، STUN/TURN |
 | [docs/10-ui-ux.md](docs/10-ui-ux.md) | اصول UI/UX، فهرست صفحات، فونت و مجوز آن |
+| [docs/11-stealth-and-login.md](docs/11-stealth-and-login.md) | روش ورود قابل انتخاب، آدرس مخفی، 404، عدم ایندکس |
+| [docs/12-installation-guide.md](docs/12-installation-guide.md) | راهنمای نصب روی cPanel بدون SSH |
+| [docs/13-phase-2-report.md](docs/13-phase-2-report.md) | گزارش فاز ۲، تست‌ها و محدودیت‌ها |
 | [tools/host-probe/](tools/host-probe/) | اسکریپت بررسی واقعی قابلیت‌های هاست cPanel (ابزار فاز ۱) |
 | [prototype/](prototype/) | نمونه اولیه رابط کاربری (HTML/CSS/JS ایستا، بدون سرور) |
+
+## ساختار کد
+
+```
+app/        کد PHP (خارج از docroot): Http, Auth, Users, Admin, Settings, Audit, Infra, Install, Controllers, Views, Cli
+config/     .env (ساخته‌شده توسط نصب‌کننده؛ هرگز commit نمی‌شود)
+database/   migrationها
+public/     تنها محتوای docroot: index.php و .htaccess
+storage/    لاگ‌ها و فایل‌ها (خارج از docroot)
+tests/      تست واحد، سرویس و انتها‌به‌انتها
+tools/      host-probe (فاز ۱) و build-release.sh (ساخت ZIP)
+```
+
+ساخت بسته نصب: `tools/build-release.sh 0.2.0` ← `dist/private-messenger-0.2.0.zip`
 
 ## اصل غیرقابل مذاکره
 
@@ -36,3 +54,4 @@
 فایل‌های `index.html` و `vercel.json` در ریشه مخزن مربوط به این پروژه نیستند و دست‌نخورده
 باقی مانده‌اند. همه فایل‌های این پروژه در پوشه `private-messenger/` قرار دارند تا با تنظیمات
 فعلی Vercel (که `public/` ریشه را منتشر می‌کند) تداخل نکنند.
+پوشه `prototype/` نمونه اولیه ایستای فاز ۱ است و در بسته نصب قرار نمی‌گیرد.

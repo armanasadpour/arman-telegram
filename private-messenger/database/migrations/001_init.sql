@@ -1,7 +1,8 @@
 -- =====================================================================
--- Private Messenger — Database schema DRAFT (Phase 1)
+-- Private Messenger — migration 001 (initial schema)
 -- Target: MySQL 8.0+ / MariaDB 10.6+, InnoDB, utf8mb4
--- Status: DRAFT for review. Final migrations are produced in Phase 2/3.
+-- Phase-3+ tables (devices keys, envelopes, attachments, calls, groups) are
+-- created now so later phases only add columns; their shape may still change.
 --
 -- Invariants (must never be violated):
 --   * No column stores message plaintext, file plaintext, or private keys
@@ -19,7 +20,13 @@ SET NAMES utf8mb4;
 CREATE TABLE users (
   id                        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   public_id                 CHAR(26)        NOT NULL,              -- ULID
-  phone_e164                VARCHAR(20)     NOT NULL,              -- required to send OTP
+  username                  VARCHAR(64)     NOT NULL,              -- lowercase, used for password login
+  phone_e164                VARCHAR(20)     NULL,                  -- required only for OTP login modes
+  password_hash             VARCHAR(255)    NULL,                  -- Argon2id; authentication ONLY, never key material
+  must_change_password      TINYINT(1)      NOT NULL DEFAULT 1,
+  password_changed_at       DATETIME(3)     NULL,
+  failed_login_count        SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  locked_until              DATETIME(3)     NULL,
   display_name              VARCHAR(100)    NOT NULL,
   bio                       VARCHAR(500)    NULL,
   avatar_attachment_id      BIGINT UNSIGNED NULL,                  -- NOT E2EE in v1 (documented)
@@ -38,6 +45,7 @@ CREATE TABLE users (
   deleted_at                DATETIME(3)     NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_public_id (public_id),
+  UNIQUE KEY uq_users_username (username),
   UNIQUE KEY uq_users_phone (phone_e164),
   KEY ix_users_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -46,7 +54,9 @@ CREATE TABLE otp_requests (
   id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   phone_e164      VARCHAR(20)     NOT NULL,
   user_id         BIGINT UNSIGNED NULL,                 -- NULL => unknown phone, no SMS is sent
-  code_hash       BINARY(32)      NOT NULL,             -- HMAC-SHA256(pepper, phone|code|id)
+  challenge_hash  BINARY(32)      NOT NULL,             -- SHA-256 of the browser challenge cookie
+  purpose         ENUM('login','second_factor') NOT NULL DEFAULT 'login',
+  code_hash       BINARY(32)      NOT NULL,             -- HMAC-SHA256(app key, challenge|phone|code)
   attempts        TINYINT UNSIGNED NOT NULL DEFAULT 0,
   max_attempts    TINYINT UNSIGNED NOT NULL DEFAULT 5,
   status          ENUM('pending','consumed','expired','locked') NOT NULL DEFAULT 'pending',
@@ -56,6 +66,7 @@ CREATE TABLE otp_requests (
   expires_at      DATETIME(3)     NOT NULL,
   consumed_at     DATETIME(3)     NULL,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_otp_challenge (challenge_hash),
   KEY ix_otp_phone_created (phone_e164, created_at),
   KEY ix_otp_ip_created (ip, created_at),
   KEY ix_otp_expires (expires_at)
@@ -460,7 +471,10 @@ CREATE TABLE admin_users (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   username            VARCHAR(64)     NOT NULL,
   password_hash       VARCHAR(255)    NOT NULL,          -- password_hash(PASSWORD_ARGON2ID)
+  display_name        VARCHAR(100)    NOT NULL DEFAULT '',
   totp_secret_enc     VARBINARY(128)  NULL,              -- sodium secretbox with app key
+  totp_enabled        TINYINT(1)      NOT NULL DEFAULT 0,
+  totp_last_step      BIGINT UNSIGNED NULL,              -- replay protection
   role_id             INT UNSIGNED    NOT NULL,
   status              ENUM('active','disabled') NOT NULL DEFAULT 'active',
   failed_attempts     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
@@ -477,9 +491,10 @@ CREATE TABLE admin_sessions (
   admin_id            BIGINT UNSIGNED NOT NULL,
   token_hash          BINARY(32)      NOT NULL,
   ip                  VARBINARY(16)   NOT NULL,
+  user_agent_summary  VARCHAR(150)    NULL,
   created_at          DATETIME(3)     NOT NULL,
   last_used_at        DATETIME        NOT NULL,
-  expires_at          DATETIME(3)     NOT NULL,          -- short (e.g. 8h, idle 30m)
+  expires_at          DATETIME(3)     NOT NULL,          -- absolute (8h); idle timeout checked on last_used_at
   revoked_at          DATETIME(3)     NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_as_token (token_hash),

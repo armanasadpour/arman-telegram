@@ -2,7 +2,7 @@
 
 ## ۱. قراردادهای عمومی
 
-- پایه: `https://<host>/api/v1/` (کاربر) و `https://<host>/admin/api/v1/` (مدیریت).
+- پایه: `https://<host>/<APP_PATH>/api/v1/` (کاربر) و `https://<host>/<ADMIN_PATH>/…` (مدیریت). هر دو مسیر مخفی و تصادفی‌اند؛ هر آدرس دیگر 404 می‌دهد (سند ۱۱).
 - قالب: JSON (`application/json; charset=utf-8`)؛ داده باینری داخل JSON با **base64url**؛ chunk فایل با
   `application/octet-stream` خام.
 - احراز هویت: کوکی `__Host-pm_session` (وب). برای کلاینت بومی آینده: `Authorization: Bearer`.
@@ -20,6 +20,7 @@
 
 | متد | مسیر | توضیح |
 |---|---|---|
+| POST | `/login` (فرم) | ورود با نام کاربری/رمز عبور در حالت `password` و `password_otp` |
 | POST | `/auth/otp/request` | `{phone}` ← همیشه `202` با پاسخ یکسان (حتی برای شماره ناشناخته/غیرفعال). rate limit: شماره ۱/۶۰ثانیه و ۵/ساعت؛ IP ۲۰/ساعت |
 | POST | `/auth/otp/verify` | `{phone, code, device_label}` ← نشست `device_pending` + `{account_state, has_identity, has_backup}`؛ ۵ تلاش برای هر OTP |
 | POST | `/auth/logout` | باطل‌سازی نشست فعلی |

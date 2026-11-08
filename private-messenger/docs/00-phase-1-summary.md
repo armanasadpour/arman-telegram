@@ -10,7 +10,7 @@
 | انتخاب پروتکل E2EE | [04-e2ee-protocol.md](04-e2ee-protocol.md) | ✔ پیشنهاد + دروازه Spike |
 | مدل تهدید | [03-threat-model.md](03-threat-model.md) | ✔ ۱۷ تهدید، ضمانت‌ها و عدم‌ضمانت‌ها |
 | معماری | [02-architecture.md](02-architecture.md) | ✔ |
-| طرح دیتابیس | [06-database.md](06-database.md)، [schema-draft.sql](../database/schema-draft.sql) | ✔ روی MariaDB 10.11 اجرا و تست شد |
+| طرح دیتابیس | [06-database.md](06-database.md)، [001_init.sql](../database/migrations/001_init.sql) | ✔ روی MariaDB 10.11 اجرا و تست شد |
 | طرح API | [07-api.md](07-api.md) | ✔ |
 | نمونه اولیه UI | [prototype/](../prototype/) | ✔ ۹ صفحه، دسکتاپ/موبایل، روشن/تاریک |
 | بررسی محدودیت‌های واقعی cPanel | [05-cpanel-constraints.md](05-cpanel-constraints.md)، [tools/host-probe](../tools/host-probe/) | ⚠ تحلیل و ابزار آماده است؛ **اجرا روی هاست واقعی هنوز انجام نشده** |

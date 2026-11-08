@@ -1,0 +1,17 @@
+# Route EVERY request (including existing files) to index.php.
+# Static assets are served by PHP only under the secret path.
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^ index.php [L]
+</IfModule>
+
+# X-Robots-Tag (noindex) and Referrer-Policy are set by PHP on every response, including 404s.
+<IfModule mod_headers.c>
+  Header always unset X-Powered-By
+</IfModule>
+
+ErrorDocument 403 /index.php
+ErrorDocument 404 /index.php

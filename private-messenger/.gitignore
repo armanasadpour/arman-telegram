@@ -1,0 +1,8 @@
+/config/.env
+/storage/logs/*
+/storage/tmp/*
+/storage/attachments/*
+/storage/install-token.txt
+/storage/installed.lock
+!/storage/**/.gitkeep
+/dist/
