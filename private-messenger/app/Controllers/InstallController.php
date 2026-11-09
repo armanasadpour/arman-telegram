@@ -11,6 +11,7 @@ use PM\Http\Request;
 use PM\Http\Response;
 use PM\Infra\Database;
 use PM\Infra\Migrator;
+use PM\Install\CpanelApi;
 use PM\Install\HostCheck;
 use PM\Support\Clock;
 use PM\Support\Env;
@@ -59,9 +60,11 @@ final class InstallController extends Controller
         $checks = HostCheck::run($this->app->root, $req);
         $blocked = HostCheck::blocking($checks);
         $form = [
+            'db_mode' => $req->input('db_mode', 'auto') === 'manual' ? 'manual' : 'auto',
+            'cpanel_user' => $req->input('cpanel_user', CpanelApi::detectUser($this->app->root)),
             'db_host' => $req->input('db_host', 'localhost'), 'db_port' => $req->input('db_port', '3306'),
             'db_name' => $req->input('db_name'), 'db_user' => $req->input('db_user'),
-            'admin_username' => $req->input('admin_username', 'admin'), 'admin_display' => $req->input('admin_display', 'مدیرکل'),
+            'admin_username' => $req->input('admin_username', 'admin'), 'admin_display' => 'مدیرکل',
         ];
         if ($req->method !== 'POST' || $blocked) {
             return $this->page($req, 'install/form', compact('checks', 'blocked', 'form') + ['error' => null]);
@@ -72,11 +75,26 @@ final class InstallController extends Controller
             return $this->page($req, 'install/form', compact('checks', 'blocked', 'form') + ['error' => $e->getMessage()]);
         }
         @unlink($tokenFile);
+        $this->removeSingleFileInstaller($req);
         $res = $this->page($req, 'install/done', $result + ['checks' => $checks, 'host' => $req->host(), 'root' => $this->app->root]);
         return $res->forgetCookie(self::COOKIE);
     }
 
-    /** @return array{app_path:string, admin_path:string} */
+    /** Deletes the single-file installer (install.php in the web root) once installation is complete. */
+    private function removeSingleFileInstaller(Request $req): void
+    {
+        $docroot = realpath((string)($req->server['DOCUMENT_ROOT'] ?? '')) ?: '';
+        if ($docroot === '') {
+            return;
+        }
+        $f = $docroot . '/install.php';
+        if (is_file($f) && str_contains((string)file_get_contents($f, false, null, 0, 4096), 'PM-SINGLE-FILE-INSTALLER')) {
+            @unlink($f);
+        }
+        @unlink($docroot . '/.pm-install-claim');
+    }
+
+    /** @return array{app_path:string, admin_path:string, cron:string, cron_cmd:string} */
     private function install(Request $req, array $form): array
     {
         $pass = $req->input('admin_password');
@@ -86,8 +104,19 @@ final class InstallController extends Controller
         if (($err = Passwords::policyError($pass, $form['admin_username'])) !== null) {
             throw new UserError('رمز مدیرکل: ' . $err);
         }
+        $cpanel = null;
+        if ($form['db_mode'] === 'auto') {
+            if (trim($form['cpanel_user']) === '' || $req->input('cpanel_pass') === '') {
+                throw new UserError('نام کاربری و رمز cPanel را وارد کنید (یا روش دستی را انتخاب کنید).');
+            }
+            $cpanel = new CpanelApi(trim($form['cpanel_user']), $req->input('cpanel_pass'), $req->host());
+            $c = $cpanel->createDatabase();
+            [$form['db_host'], $form['db_port'], $form['db_name'], $form['db_user'], $dbPass] = [$c['host'], (string)$c['port'], $c['name'], $c['user'], $c['pass']];
+        } else {
+            $dbPass = $req->input('db_pass');
+        }
         try {
-            $db = Database::connect($form['db_host'], (int)$form['db_port'], $form['db_name'], $form['db_user'], $req->input('db_pass'));
+            $db = Database::connect($form['db_host'], (int)$form['db_port'], $form['db_name'], $form['db_user'], $dbPass);
         } catch (\PDOException $e) {
             throw new UserError('اتصال به دیتابیس ناموفق بود: ' . mb_substr($e->getMessage(), 0, 200));
         }
@@ -112,7 +141,7 @@ final class InstallController extends Controller
             'APP_PATH' => $appPath,
             'ADMIN_PATH' => $adminPath,
             'DB_HOST' => $form['db_host'], 'DB_PORT' => (string)(int)$form['db_port'], 'DB_NAME' => $form['db_name'],
-            'DB_USER' => $form['db_user'], 'DB_PASS' => $req->input('db_pass'),
+            'DB_USER' => $form['db_user'], 'DB_PASS' => $dbPass,
             'INSTALLED_AT' => gmdate('c'),
         ];
         $envFile = $this->app->root . '/config/.env';
@@ -133,6 +162,19 @@ final class InstallController extends Controller
         $audit->record('installer', null, 'install.completed', null, null, ['db' => $ver], $req->ip());
 
         file_put_contents($this->app->root . '/storage/installed.lock', json_encode(['installed_at' => gmdate('c')]) . "\n");
-        return ['app_path' => $appPath, 'admin_path' => $adminPath];
+
+        // Cron is optional (maintenance also runs automatically after normal requests); try to add it.
+        $cronCmd = '/usr/local/bin/php ' . $this->app->root . '/app/Cli/cron.php maintenance';
+        $cron = 'pseudo';
+        if ($cpanel !== null) {
+            try {
+                $cpanel->addCron($cronCmd);
+                $cron = 'auto';
+            } catch (UserError $e) {
+                error_log('[pm] installer cron: ' . $e->getMessage());
+            }
+        }
+        $audit->record('installer', null, 'install.options', null, null, ['db' => $form['db_mode'], 'cron' => $cron], $req->ip());
+        return ['app_path' => $appPath, 'admin_path' => $adminPath, 'cron' => $cron, 'cron_cmd' => $cronCmd];
     }
 }

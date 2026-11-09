@@ -16,8 +16,10 @@ rm -f "$STAGE/private-messenger/config/.env" "$STAGE/private-messenger/storage/i
 find "$STAGE" -name '.DS_Store' -delete
 echo "$VERSION" > "$STAGE/private-messenger/VERSION"
 (cd "$STAGE" && find private-messenger -type f -name '*.php' -exec php -l {} \; | grep -v '^No syntax' || true)
+php tools/make-installer.php "$STAGE/private-messenger" "$VERSION" "$OUT/install.php"
+php -l "$OUT/install.php" >/dev/null
 rm -f "$OUT/private-messenger-$VERSION.zip"
 (cd "$STAGE" && zip -qr -X "$OUT/private-messenger-$VERSION.zip" private-messenger)
-(cd "$OUT" && sha256sum "private-messenger-$VERSION.zip" > "private-messenger-$VERSION.zip.sha256")
+(cd "$OUT" && sha256sum "private-messenger-$VERSION.zip" > "private-messenger-$VERSION.zip.sha256" && sha256sum install.php > install.php.sha256)
 echo "built: dist/private-messenger-$VERSION.zip"
 cat "$OUT/private-messenger-$VERSION.zip.sha256"

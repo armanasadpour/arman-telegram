@@ -15,6 +15,7 @@ foreach ($pmCandidates as $pmRoot) {
         require $pmRoot . '/app/bootstrap.php';
         $pmKernel = new PM\Http\Kernel(PM\App::boot($pmRoot));
         $pmKernel->handle(PM\Http\Request::fromGlobals())->send();
+        $pmKernel->terminate();
         return;
     }
 }

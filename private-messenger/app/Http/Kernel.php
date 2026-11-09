@@ -16,8 +16,24 @@ use PM\Controllers\InstallController;
  */
 final class Kernel
 {
+    private bool $servedApp = false;
+
     public function __construct(private readonly App $app)
     {
+    }
+
+    /** Runs after the response was sent: pseudo-cron (only for requests that reached the app). */
+    public function terminate(): void
+    {
+        if (!$this->servedApp) {
+            return; // stealth 404 paths never touch the database
+        }
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } elseif (function_exists('litespeed_finish_request')) {
+            litespeed_finish_request();
+        }
+        \PM\Maintenance::runIfDue($this->app);
     }
 
     public function handle(Request $req): Response
@@ -52,7 +68,11 @@ final class Kernel
                 if ($rest === null) {
                     return Response::redirect('/' . $secret . '/', 301);
                 }
-                return $this->requireHttps($req) ?? (new $controller($this->app, '/' . $secret))->handle($req->withPath($rest));
+                if (($redirect = $this->requireHttps($req)) !== null) {
+                    return $redirect;
+                }
+                $this->servedApp = true;
+                return (new $controller($this->app, '/' . $secret))->handle($req->withPath($rest));
             }
         }
         return Response::notFound();

@@ -1,6 +1,5 @@
 # Route EVERY request (including existing files) to index.php.
 # Static assets are served by PHP only under the secret path.
-Options -Indexes -MultiViews
 DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
