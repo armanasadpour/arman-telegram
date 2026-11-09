@@ -40,7 +40,7 @@ final class UserSessions
             return null;
         }
         $row = $this->db->one(
-            'SELECT s.id AS session_id, s.public_id AS session_public_id, s.last_used_at, u.*
+            'SELECT s.id AS session_id, s.public_id AS session_public_id, s.last_used_at, s.device_id AS session_device_id, u.*
                FROM user_sessions s JOIN users u ON u.id = s.user_id
               WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND u.status = ?',
             [Crypto::sha256($token), Clock::db(), 'active']

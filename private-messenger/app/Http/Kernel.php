@@ -105,7 +105,7 @@ final class Kernel
             $res->header('Cache-Control', 'no-store');
         }
         if (str_starts_with($res->headers['Content-Type'] ?? '', 'text/html')) {
-            $res->header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            $res->header('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
                 . "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
         }
         return $res;

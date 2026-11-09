@@ -1,8 +1,8 @@
 # Private Messenger — پیام‌رسان خصوصی با رمزنگاری سرتاسری
 
-> وضعیت: **فاز ۲ (نصب‌کننده، ورود، مدیریت کاربران، نشست‌ها، نقش‌ها)** — پیاده‌سازی و تست شد؛ در انتظار نصب روی هاست واقعی.
-> پیام‌رسانی و E2EE هنوز پیاده‌سازی نشده‌اند (فاز ۳ و ۴) و در برنامه هم نمایش داده نمی‌شوند.
-> گزارش فاز ۲: [docs/13-phase-2-report.md](docs/13-phase-2-report.md) — راهنمای نصب: [docs/12-installation-guide.md](docs/12-installation-guide.md)
+> وضعیت: **فاز ۳ (پایه رمزنگاری سرتاسری)** — پیاده‌سازی و تست شد (۱۸۵ تست). پیام متنی دونفره رمزنگاری‌شده کار می‌کند.
+> نصب: فقط فایل `install.php` را در public_html آپلود و باز کنید — [docs/12-installation-guide.md](docs/12-installation-guide.md)
+> گزارش‌ها: [فاز ۲](docs/13-phase-2-report.md) · [فاز ۳](docs/14-phase-3-report.md)
 
 پیام‌رسان خصوصی، فارسی و راست‌چین برای اعضای یک مجموعه، قابل نصب روی هاست cPanel،
 با رمزنگاری سرتاسری (E2EE) پیام‌ها و فایل‌ها در دستگاه کاربران.
@@ -26,6 +26,7 @@
 | [docs/11-stealth-and-login.md](docs/11-stealth-and-login.md) | روش ورود قابل انتخاب، آدرس مخفی، 404، عدم ایندکس |
 | [docs/12-installation-guide.md](docs/12-installation-guide.md) | راهنمای نصب روی cPanel بدون SSH |
 | [docs/13-phase-2-report.md](docs/13-phase-2-report.md) | گزارش فاز ۲، تست‌ها و محدودیت‌ها |
+| [docs/14-phase-3-report.md](docs/14-phase-3-report.md) | گزارش فاز ۳: E2EE، نتیجه Spike، تست‌ها و محدودیت‌ها |
 | [tools/host-probe/](tools/host-probe/) | اسکریپت بررسی واقعی قابلیت‌های هاست cPanel (ابزار فاز ۱) |
 | [prototype/](prototype/) | نمونه اولیه رابط کاربری (HTML/CSS/JS ایستا، بدون سرور) |
 
@@ -38,10 +39,13 @@ database/   migrationها
 public/     تنها محتوای docroot: index.php و .htaccess
 storage/    لاگ‌ها و فایل‌ها (خارج از docroot)
 tests/      تست واحد، سرویس و انتها‌به‌انتها
-tools/      host-probe (فاز ۱) و build-release.sh (ساخت ZIP)
+tools/      host-probe، build-release.sh (ZIP + install.php)، make-installer.php
+crypto-wasm/ پل Rust → WebAssembly برای vodozemac (خروجی ساخته‌شده در app/resources/assets)
 ```
 
-ساخت بسته نصب: `tools/build-release.sh 0.2.0` ← `dist/private-messenger-0.2.0.zip`
+اجرای همه تست‌ها (ماشین توسعه): `tests/run-all.sh`
+
+ساخت بسته نصب: `tools/build-release.sh 0.3.0` ← `dist/install.php` و `dist/private-messenger-0.3.0.zip`
 
 ## اصل غیرقابل مذاکره
 

@@ -6,6 +6,7 @@ namespace PM\Controllers;
 use PM\Admin\AdminService;
 use PM\Auth\Csrf;
 use PM\Auth\UserSessions;
+use PM\E2ee\KeyService;
 use PM\Http\Request;
 use PM\Http\Response;
 use PM\Http\Router;
@@ -31,6 +32,8 @@ final class AdminController extends Controller
         'revoked' => 'نشست‌ها باطل شدند.',
         'unlocked' => 'قفل ورود حساب برداشته شد.',
         'retention' => 'تنظیم نگهداری فایل تغییر کرد.',
+        'device_revoked' => 'دستگاه لغو شد.',
+        'identity_reset' => 'هویت رمزنگاری کاربر بازنشانی شد.',
         'totp_on' => 'ورود دومرحله‌ای (TOTP) فعال شد.',
         'totp_off' => 'ورود دومرحله‌ای غیرفعال شد.',
         'pw' => 'رمز عبور تغییر کرد.',
@@ -57,6 +60,8 @@ final class AdminController extends Controller
         $r->post('/users/{id}/unlock', $this->need('users.edit', fn (Request $q) => $this->userUnlock($q), true));
         $r->post('/users/{id}/sessions/revoke', $this->need('users.sessions.revoke', fn (Request $q) => $this->userSessionRevoke($q), true));
         $r->post('/users/{id}/sessions/revoke-all', $this->need('users.sessions.revoke', fn (Request $q) => $this->userSessionRevokeAll($q), true));
+        $r->post('/users/{id}/devices/revoke', $this->need('users.devices.revoke', fn (Request $q) => $this->userDeviceRevoke($q), true));
+        $r->post('/users/{id}/identity-reset', $this->need('users.identity.reset', fn (Request $q) => $this->userIdentityReset($q), true));
         $r->post('/users/{id}/retention', $this->need('users.retention.manage', fn (Request $q) => $this->userRetention($q), true));
 
         $r->get('/settings', $this->need('settings.view', fn (Request $q) => $this->settingsPage($q)));
@@ -242,7 +247,8 @@ final class AdminController extends Controller
                          WHERE a.target_type = 'user' AND a.target_id = ? ORDER BY a.id DESC LIMIT 20", [$id])
             : [];
         $retBy = $u['retention_changed_by'] ? $db->scalar('SELECT username FROM admin_users WHERE id = ?', [$u['retention_changed_by']]) : null;
-        return $this->page($req, 'admin/user', $this->vars(['u' => $u, 'sessions' => $sessions, 'audit' => $audit, 'temp' => $tempPassword,
+        $devices = (new KeyService($db))->devicesOf($id);
+        return $this->page($req, 'admin/user', $this->vars(['u' => $u, 'sessions' => $sessions, 'audit' => $audit, 'temp' => $tempPassword, 'devices' => $devices,
             'retention_by' => $retBy, 'method' => (string)$this->app->settings()->get('auth.method'),
             'msg' => $msg ?? $this->msg($req), 'error' => null, 'nav' => 'users']));
     }
@@ -311,6 +317,26 @@ final class AdminController extends Controller
         $n = (new UserSessions($this->app->db()))->revokeAll($id, 'admin_revoke');
         $this->audit()->record('admin', (int)$this->admin['id'], 'user.session.revoke_all', 'user', $id, ['count' => $n], $req->ip());
         return $this->back('/users/' . $id, 'revoked');
+    }
+
+    private function userDeviceRevoke(Request $req): Response
+    {
+        return $this->withUserError($req, function () use ($req): Response {
+            (new KeyService($this->app->db(), $this->audit()))->adminRevokeDevice((int)$this->admin['id'], $this->userId($req), $req->input('device'), $req->ip());
+            return $this->back('/users/' . $this->userId($req), 'device_revoked');
+        });
+    }
+
+    private function userIdentityReset(Request $req): Response
+    {
+        if ($req->input('confirm') !== 'بازنشانی') {
+            return $this->page($req, 'admin/error', $this->vars(['error' => 'برای تأیید، کلمه «بازنشانی» را بنویسید.', 'back' => '/users/' . $this->userId($req)]), 422);
+        }
+        return $this->withUserError($req, function () use ($req): Response {
+            $this->usersSvc()->getOrFail($this->userId($req));
+            (new KeyService($this->app->db(), $this->audit()))->adminResetIdentity((int)$this->admin['id'], $this->userId($req), $req->ip());
+            return $this->back('/users/' . $this->userId($req), 'identity_reset');
+        });
     }
 
     private function userRetention(Request $req): Response

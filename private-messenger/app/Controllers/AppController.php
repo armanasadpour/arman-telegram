@@ -23,6 +23,9 @@ final class AppController extends Controller
 
     public function handle(Request $req): Response
     {
+        if (str_starts_with($req->path, '/api/')) {
+            return (new ApiController($this->app, $this->base))->handle($req);
+        }
         $r = new Router();
         $r->get('/assets/{file}', fn (Request $q) => $this->asset($q, $q->param('file')));
         $r->get('/assets/fonts/{file}', fn (Request $q) => $this->asset($q, 'fonts/' . $q->param('file')));
@@ -37,8 +40,6 @@ final class AppController extends Controller
         $r->post('/sessions/revoke', fn (Request $q) => $this->guard($q) ?? $this->authed($q, fn () => $this->sessionRevoke($q)));
         $r->post('/sessions/revoke-others', fn (Request $q) => $this->guard($q) ?? $this->authed($q, fn () => $this->sessionRevokeOthers($q)));
         $r->post('/logout', fn (Request $q) => $this->guard($q) ?? $this->logout($q));
-        $r->get('/api/v1/me', fn (Request $q) => $this->authedJson($q, fn () => $this->apiMe()));
-        $r->get('/api/v1/sessions', fn (Request $q) => $this->authedJson($q, fn () => $this->apiSessions()));
         return $r->dispatch($req);
     }
 
@@ -75,14 +76,6 @@ final class AppController extends Controller
         return $fn();
     }
 
-    private function authedJson(Request $req, callable $fn): Response
-    {
-        $u = $this->current($req);
-        if ($u === null) {
-            return Response::json(['error' => ['code' => 'unauthenticated']], 401);
-        }
-        return $fn();
-    }
 
     private function loginPage(Request $req, ?string $error = null, int $status = 200, string $username = ''): Response
     {
@@ -250,20 +243,5 @@ final class AppController extends Controller
             ->header('Clear-Site-Data', '"cache"');
     }
 
-    private function apiMe(): Response
-    {
-        $u = $this->user;
-        return Response::json(['id' => $u['public_id'], 'username' => $u['username'], 'display_name' => $u['display_name'],
-            'must_change_password' => (bool)$u['must_change_password']]);
-    }
 
-    private function apiSessions(): Response
-    {
-        $out = [];
-        foreach ($this->sessions()->listForUser((int)$this->user['id']) as $s) {
-            $out[] = ['id' => $s['public_id'], 'device' => $s['user_agent_summary'], 'ip' => Ip::displayPrefix($s['ip_prefix']),
-                'created_at' => $s['created_at'], 'last_used_at' => $s['last_used_at'], 'current' => $s['public_id'] === $this->user['session_public_id']];
-        }
-        return Response::json(['sessions' => $out]);
-    }
 }

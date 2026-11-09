@@ -102,14 +102,14 @@ $u1->post("/$APP/password", ['current' => $aliTemp, 'new' => 'short', 'confirm' 
 check('weak new password rejected', str_contains($u1->last['body'], 'حداقل'));
 $ALI_PW = 'Ali new strong password';
 $u1->post("/$APP/password", ['current' => $aliTemp, 'new' => $ALI_PW, 'confirm' => $ALI_PW]);
-check('password changed → home', $u1->last['status'] === 303 && str_contains($u1->follow()['body'], 'سلام، علی رضایی'));
+check('password changed → home', $u1->last['status'] === 303 && str_contains($u1->follow()['body'], 'id="app"'));
 $api = $u1->get("/$APP/api/v1/me");
 check('API /me works', $api['status'] === 200 && json_decode($api['body'], true)['username'] === 'ali');
 check('API without session → 401', (new Browser($BASE))->get("/$APP/api/v1/me")['status'] === 401);
 
 $u2 = new Browser($BASE);
 $u2->post("/$APP/login", ['username' => 'ali', 'password' => $ALI_PW]);
-check('second device login', $u2->last['status'] === 303 && str_contains($u2->follow()['body'], 'سلام'));
+check('second device login', $u2->last['status'] === 303 && str_contains($u2->follow()['body'], 'id="app"'));
 check('sessions page lists 2 sessions', substr_count($u1->get("/$APP/sessions")['body'], '<tr>') === 3);
 $u1->post("/$APP/sessions/revoke-others", []);
 check('revoke other sessions → device 2 logged out', str_contains($u2->get("/$APP/")['body'], 'name="password"'));
@@ -161,7 +161,7 @@ check('OTP form shows masked phone', str_contains($o->follow()['body'], '+98912'
 $o->post("/$APP/otp/verify", ['code' => $code === '000000' ? '111111' : '000000']);
 check('wrong code → error, can retry', str_contains($o->last['body'], 'کد وارد‌شده نادرست است'));
 $o->post("/$APP/otp/verify", ['code' => $code]);
-check('correct code → logged in', $o->last['status'] === 303 && str_contains($o->follow()['body'], 'سلام'));
+check('correct code → logged in', $o->last['status'] === 303 && str_contains($o->follow()['body'], 'id="app"'));
 $x = new Browser($BASE);
 $lines = count(file("$ROOT/storage/logs/sms-test.log"));
 $x->post("/$APP/otp/request", ['phone' => '09129999999']);

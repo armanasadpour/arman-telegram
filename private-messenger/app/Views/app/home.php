@@ -1,9 +1,6 @@
-<?php use function PM\Support\e; $title = $name; $nav = 'home'; include __DIR__ . '/../_head.php'; include __DIR__ . '/_nav.php'; ?>
-<main class="page">
-  <h1>سلام، <?= e($user['display_name']) ?></h1>
-  <div class="panel">
-    <p>ورود شما موفق بود.</p>
-    <p class="small muted">این نسخه فاز ۲ است: ورود، مدیریت نشست‌ها و تغییر رمز عبور فعال است. پیام‌رسانی رمزنگاری‌شده سرتاسری در فازهای ۳ و ۴ اضافه می‌شود؛ تا آن زمان هیچ امکان پیام‌رسانی نمایش داده نمی‌شود.</p>
-  </div>
-</main>
+<?php use function PM\Support\e; $title = $name; $nav = 'home'; $bodyWorker = $asset('e2ee-worker.js'); include __DIR__ . '/../_head.php'; ?>
+<?php include __DIR__ . '/_nav.php'; ?>
+<div id="app" data-ready="0"><div class="chat-status"><div class="panel"><p>در حال آماده‌سازی رمزنگاری روی همین دستگاه…</p></div></div></div>
+<noscript><div class="page"><div class="alert error">برای رمزنگاری سرتاسری، JavaScript باید فعال باشد.</div></div></noscript>
+<script type="module" src="<?= e($asset('chat.js')) ?>"></script>
 </body></html>

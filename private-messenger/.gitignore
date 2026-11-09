@@ -6,3 +6,4 @@
 /storage/installed.lock
 !/storage/**/.gitkeep
 /dist/
+/crypto-wasm/target/

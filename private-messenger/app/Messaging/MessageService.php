@@ -1,0 +1,224 @@
+<?php
+declare(strict_types=1);
+
+namespace PM\Messaging;
+
+use PM\Infra\Database;
+use PM\Support\B64;
+use PM\Support\Clock;
+use PM\Support\Ulid;
+use PM\Support\UserError;
+
+/**
+ * Delivery service for end-to-end encrypted messages. The server only routes opaque ciphertext:
+ * one envelope per recipient device. It cannot tell a text from a reaction or an edit, and it never
+ * receives plaintext. Envelopes are deleted as soon as the recipient device acknowledges them.
+ */
+final class MessageService
+{
+    public const PROTOCOL_VERSION = 1;
+    public const MAX_ENVELOPE_BYTES = 65536;
+    public const UNDELIVERED_TTL_DAYS = 30;
+
+    public function __construct(private readonly Database $db)
+    {
+    }
+
+    /** @return list<array<string, mixed>> active users other than me */
+    public function directory(int $meId): array
+    {
+        return $this->db->all("SELECT u.public_id AS id, u.display_name, u.username,
+                                      EXISTS(SELECT 1 FROM user_master_keys k WHERE k.user_id = u.id AND k.superseded_at IS NULL) AS has_identity
+                                 FROM users u WHERE u.status = 'active' AND u.id <> ? ORDER BY u.display_name", [$meId]);
+    }
+
+    public function conversations(int $meId): array
+    {
+        return $this->db->all("SELECT c.public_id AS id, c.type, c.last_activity_at, cm.archived, cm.muted_until,
+                                      p.public_id AS peer_id, p.display_name AS peer_name, p.username AS peer_username, p.status AS peer_status
+                                 FROM conversation_members cm
+                                 JOIN conversations c ON c.id = cm.conversation_id
+                                 LEFT JOIN conversation_members pm ON pm.conversation_id = c.id AND pm.user_id <> cm.user_id
+                                 LEFT JOIN users p ON p.id = pm.user_id
+                                WHERE cm.user_id = ? AND cm.left_at IS NULL
+                                ORDER BY c.last_activity_at IS NULL, c.last_activity_at DESC, c.id DESC", [$meId]);
+    }
+
+    /** Creates (or returns) the direct conversation between two active users. */
+    public function openDirect(int $meId, string $peerPublicId): string
+    {
+        $peer = $this->db->one("SELECT id FROM users WHERE public_id = ? AND status = 'active'", [$peerPublicId]);
+        if ($peer === null || (int)$peer['id'] === $meId) {
+            throw new UserError('user_not_found');
+        }
+        $a = min($meId, (int)$peer['id']);
+        $b = max($meId, (int)$peer['id']);
+        $pair = hash('sha256', $a . '|' . $b, true);
+        return $this->db->transaction(function () use ($pair, $meId, $a, $b): string {
+            $c = $this->db->one('SELECT public_id FROM conversations WHERE direct_pair_hash = ? FOR UPDATE', [$pair]);
+            if ($c !== null) {
+                return $c['public_id'];
+            }
+            $now = Clock::db();
+            $pub = Ulid::generate();
+            $id = $this->db->insert('INSERT INTO conversations (public_id, type, direct_pair_hash, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+                [$pub, 'direct', $pair, $meId, $now]);
+            foreach ([$a, $b] as $u) {
+                $this->db->run('INSERT INTO conversation_members (conversation_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)', [$id, $u, 'member', $now]);
+            }
+            return $pub;
+        });
+    }
+
+    private function membership(int $meId, string $convPublicId): ?array
+    {
+        return $this->db->one('SELECT c.id FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
+                                WHERE c.public_id = ? AND cm.user_id = ? AND cm.left_at IS NULL', [$convPublicId, $meId]);
+    }
+
+    /**
+     * Stores one encrypted message as per-device envelopes.
+     * @param array<string, mixed> $in
+     * @return array{message_id:string, created_at:string, duplicate:bool}
+     * @throws DeviceMismatch when the envelopes do not exactly cover the active devices
+     */
+    public function send(int $meId, int $myDeviceId, array $in): array
+    {
+        $conv = is_string($in['conversation_id'] ?? null) ? $this->membership($meId, $in['conversation_id']) : null;
+        if ($conv === null) {
+            throw new UserError('conversation_not_found');
+        }
+        if ((int)($in['protocol_version'] ?? 0) !== self::PROTOCOL_VERSION) {
+            throw new UserError('unsupported_protocol_version');
+        }
+        $clientId = is_string($in['client_msg_id'] ?? null) && preg_match('/^[A-Za-z0-9_-]{22}$/', $in['client_msg_id']) ? $in['client_msg_id'] : null;
+        if ($clientId === null) {
+            throw new UserError('invalid_client_msg_id');
+        }
+        $clientRaw = self::rawId($clientId);
+        if ($clientRaw === null) {
+            throw new UserError('invalid_client_msg_id');
+        }
+        $envelopes = is_array($in['envelopes'] ?? null) ? $in['envelopes'] : [];
+        if ($envelopes === [] || count($envelopes) > 50) {
+            throw new UserError('invalid_envelopes');
+        }
+
+        $dup = $this->db->one('SELECT created_at FROM messages WHERE sender_device_id = ? AND client_msg_id = ?', [$myDeviceId, $clientRaw]);
+        if ($dup !== null) {
+            return ['message_id' => $clientId, 'created_at' => $dup['created_at'], 'duplicate' => true];
+        }
+
+        // Every active device of every member (except the sending device) must get exactly one envelope.
+        $expected = [];
+        foreach ($this->db->all("SELECT d.id, d.public_id FROM devices d JOIN conversation_members cm ON cm.user_id = d.user_id
+                                  WHERE cm.conversation_id = ? AND cm.left_at IS NULL AND d.status = 'active' AND d.id <> ?", [$conv['id'], $myDeviceId]) as $d) {
+            $expected[$d['public_id']] = (int)$d['id'];
+        }
+        $given = [];
+        foreach ($envelopes as $e) {
+            $dev = is_array($e) ? ($e['device_id'] ?? null) : null;
+            $type = is_array($e) ? ($e['type'] ?? null) : null;
+            $ct = is_array($e) ? B64::dec($e['ciphertext'] ?? null, null, self::MAX_ENVELOPE_BYTES * 2) : null;
+            if (!is_string($dev) || !in_array($type, [0, 1], true) || $ct === null || strlen($ct) > self::MAX_ENVELOPE_BYTES || isset($given[$dev])) {
+                throw new UserError('invalid_envelopes');
+            }
+            $given[$dev] = ['type' => $type, 'ct' => $ct];
+        }
+        $missing = array_values(array_diff(array_keys($expected), array_keys($given)));
+        $stale = array_values(array_diff(array_keys($given), array_keys($expected)));
+        if ($missing !== [] || $stale !== []) {
+            throw new DeviceMismatch($missing, $stale);
+        }
+        if ($expected === []) {
+            throw new UserError('recipient_has_no_devices');
+        }
+
+        return $this->db->transaction(function () use ($conv, $meId, $myDeviceId, $clientRaw, $clientId, $given, $expected): array {
+            $now = Clock::db();
+            $msgId = $this->db->insert('INSERT INTO messages (conversation_id, sender_user_id, sender_device_id, client_msg_id, envelope_count, notify, created_at)
+                                        VALUES (?, ?, ?, ?, ?, 1, ?)', [$conv['id'], $meId, $myDeviceId, $clientRaw, count($given), $now]);
+            $exp = Clock::dbIn('+' . self::UNDELIVERED_TTL_DAYS . ' days');
+            foreach ($given as $pub => $e) {
+                $envId = $this->db->insert('INSERT INTO message_envelopes (message_id, recipient_device_id, protocol_version, olm_type, ciphertext, created_at, expires_at)
+                                            VALUES (?, ?, ?, ?, ?, ?, ?)', [$msgId, $expected[$pub], self::PROTOCOL_VERSION, $e['type'], $e['ct'], $now, $exp]);
+                $this->db->run('UPDATE devices SET last_event_id = GREATEST(last_event_id, ?) WHERE id = ?', [$envId, $expected[$pub]]);
+            }
+            $this->db->run('UPDATE conversations SET last_activity_at = ? WHERE id = ?', [Clock::now()->format('Y-m-d H:i:00'), $conv['id']]);
+            return ['message_id' => $clientId, 'created_at' => $now, 'duplicate' => false];
+        });
+    }
+
+    /** @return array<string, mixed> envelopes for this device after $cursor, plus notifications after $ncursor */
+    public function sync(int $meId, int $myDeviceId, int $cursor, int $ncursor): array
+    {
+        $env = [];
+        foreach ($this->db->all('SELECT e.id, e.olm_type, e.ciphertext, e.created_at, m.client_msg_id, c.public_id AS conversation_id,
+                                        su.public_id AS sender_user_id, sd.public_id AS sender_device_id
+                                   FROM message_envelopes e JOIN messages m ON m.id = e.message_id
+                                   JOIN conversations c ON c.id = m.conversation_id
+                                   JOIN users su ON su.id = m.sender_user_id JOIN devices sd ON sd.id = m.sender_device_id
+                                  WHERE e.recipient_device_id = ? AND e.id > ? ORDER BY e.id LIMIT 100', [$myDeviceId, $cursor]) as $r) {
+            $env[] = ['id' => (int)$r['id'], 'type' => (int)$r['olm_type'], 'ciphertext' => base64_encode($r['ciphertext']),
+                'message_id' => rtrim(strtr(base64_encode($r['client_msg_id']), '+/', '-_'), '='),
+                'conversation_id' => $r['conversation_id'], 'sender_user_id' => $r['sender_user_id'],
+                'sender_device_id' => $r['sender_device_id'], 'created_at' => $r['created_at']];
+        }
+        $notes = $this->db->all('SELECT n.id, n.type, u.public_id AS subject_user_id FROM notifications n LEFT JOIN users u ON u.id = n.subject_user_id
+                                  WHERE n.user_id = ? AND n.id > ? ORDER BY n.id LIMIT 100', [$meId, $ncursor]);
+        foreach ($notes as &$n) {
+            $n['id'] = (int)$n['id'];
+        }
+        $this->db->run('UPDATE devices SET last_seen_at = ? WHERE id = ?', [Clock::now()->format('Y-m-d H:i:00'), $myDeviceId]);
+        return ['envelopes' => $env, 'notifications' => $notes,
+            'cursor' => $env ? end($env)['id'] : $cursor, 'ncursor' => $notes ? end($notes)['id'] : $ncursor];
+    }
+
+    /** Deletes acknowledged envelopes (only this device's) and records delivery. */
+    public function ack(int $meId, int $myDeviceId, array $ids): int
+    {
+        $ids = array_values(array_filter(array_map('intval', array_slice($ids, 0, 200)), fn ($i) => $i > 0));
+        if ($ids === []) {
+            return 0;
+        }
+        return $this->db->transaction(function () use ($ids, $meId, $myDeviceId): int {
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $msgIds = array_column($this->db->all("SELECT DISTINCT message_id FROM message_envelopes WHERE recipient_device_id = ? AND id IN ($in)",
+                array_merge([$myDeviceId], $ids)), 'message_id');
+            $n = $this->db->run("DELETE FROM message_envelopes WHERE recipient_device_id = ? AND id IN ($in)", array_merge([$myDeviceId], $ids))->rowCount();
+            foreach ($msgIds as $m) {
+                $this->db->run('INSERT IGNORE INTO message_receipts (message_id, user_id, delivered_at) VALUES (?, ?, ?)', [$m, $meId, Clock::db()]);
+            }
+            return $n;
+        });
+    }
+
+    /** 16-byte message id from canonical unpadded base64url (22 chars); non-canonical encodings are rejected. */
+    private static function rawId(string $id): ?string
+    {
+        $raw = base64_decode(strtr($id, '-_', '+/') . '==', true);
+        if ($raw === false || strlen($raw) !== 16 || rtrim(strtr(base64_encode($raw), '+/', '-_'), '=') !== $id) {
+            return null;
+        }
+        return $raw;
+    }
+
+    /** Delivery status of messages I sent: delivered once any device of another member acknowledged. */
+    public function status(int $myDeviceId, array $clientIds): array
+    {
+        $out = [];
+        foreach (array_slice($clientIds, 0, 100) as $cid) {
+            if (!is_string($cid) || !preg_match('/^[A-Za-z0-9_-]{22}$/', $cid)) {
+                continue;
+            }
+            $raw = self::rawId($cid);
+            if ($raw === null) {
+                continue;
+            }
+            $r = $this->db->one('SELECT MIN(r.delivered_at) AS d FROM messages m JOIN message_receipts r ON r.message_id = m.id AND r.user_id <> m.sender_user_id
+                                  WHERE m.sender_device_id = ? AND m.client_msg_id = ?', [$myDeviceId, $raw]);
+            $out[$cid] = $r && $r['d'] ? 'delivered' : 'sent';
+        }
+        return $out;
+    }
+}

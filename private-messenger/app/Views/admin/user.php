@@ -89,7 +89,31 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
   <?php if ($sessions && A::can($admin, 'users.sessions.revoke')): ?>
   <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/sessions/revoke-all" class="mt"><?php include __DIR__ . '/../_csrf.php'; ?><button class="btn danger">خروج اجباری از همه نشست‌ها</button></form>
   <?php endif; ?>
-  <p class="small muted">دستگاه‌های رمزنگاری (کلیدهای E2EE) از فاز ۳ اینجا نمایش داده می‌شوند.</p>
+</div>
+
+<div class="panel">
+  <h2>دستگاه‌های رمزنگاری</h2>
+  <p class="small muted">کلیدهای خصوصی فقط روی دستگاه کاربر هستند؛ اینجا فقط اثر انگشت کلید عمومی نمایش داده می‌شود و هیچ دسترسی به پیام‌ها نمی‌دهد.</p>
+  <div class="table-wrap"><table>
+    <tr><th>دستگاه</th><th>وضعیت</th><th class="hide-sm">اثر انگشت کلید</th><th class="hide-sm">آخرین فعالیت</th><th></th></tr>
+    <?php foreach ($devices as $d): ?>
+    <tr><td><?= e($d['label']) ?></td>
+        <td><span class="tag <?= $d['status'] === 'active' ? 'ok' : 'fail' ?>"><?= $d['status'] === 'active' ? 'فعال' : 'لغوشده' ?></span></td>
+        <td class="ltr small hide-sm"><?= $d['identity_key'] ? e(\PM\E2ee\KeyService::fingerprint($d['identity_key'])) : '—' ?></td>
+        <td class="hide-sm"><?= e(Fa::dateTime($d['last_seen_at'])) ?></td>
+        <td><?php if ($d['status'] === 'active' && A::can($admin, 'users.devices.revoke')): ?><form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/devices/revoke" class="inline"><?php include __DIR__ . '/../_csrf.php'; ?>
+          <input type="hidden" name="device" value="<?= e($d['public_id']) ?>"><button class="btn danger sm">لغو</button></form><?php endif; ?></td></tr>
+    <?php endforeach; ?>
+    <?php if (!$devices): ?><tr><td colspan="5" class="muted">کاربر هنوز وارد برنامه نشده و کلیدی نساخته است.</td></tr><?php endif; ?>
+  </table></div>
+  <?php if ($devices && A::can($admin, 'users.identity.reset')): ?>
+  <details class="mt"><summary>بازنشانی هویت رمزنگاری (برای دستگاه گم‌شده)</summary>
+    <div class="alert warn small">همه دستگاه‌های کاربر از کار می‌افتند و کاربر در ورود بعدی کلید جدید می‌سازد. پیام‌های قبلی به هیچ وجه قابل بازیابی نیستند (حتی برای مدیر) و همه مخاطبان هشدار «کلید امنیتی تغییر کرد» می‌بینند.</div>
+    <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/identity-reset"><?php include __DIR__ . '/../_csrf.php'; ?>
+      <label class="field"><span>برای تأیید، کلمه «بازنشانی» را بنویسید</span><input type="text" name="confirm" required></label>
+      <button class="btn danger">بازنشانی هویت</button></form>
+  </details>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

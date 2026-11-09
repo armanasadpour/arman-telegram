@@ -9,4 +9,4 @@
 <title><?= e($title ?? 'ورود') ?></title>
 <link rel="stylesheet" href="<?= e($asset('style.css')) ?>">
 </head>
-<body>
+<body<?= isset($bodyWorker) ? ' data-worker="' . e($bodyWorker) . '"' : '' ?>>
