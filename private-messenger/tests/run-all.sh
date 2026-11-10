@@ -18,5 +18,5 @@ echo "== one-file installer"
 rm -rf $H /tmp/pm-mock-crontab.txt && mkdir -p $H/public_html && printf '# php -- BEGIN cPanel-generated handler, do not edit\n# php -- END cPanel-generated handler, do not edit\n' > $H/public_html/.htaccess && cp dist/install.php $H/public_html/ && chown -R www-data: $H
 mysql -N -e "SELECT CONCAT('DROP DATABASE \`',schema_name,'\`;') FROM information_schema.schemata WHERE schema_name LIKE 'pmuser\_%'" | mysql
 mysql -N -e "SELECT CONCAT('DROP USER \'',user,'\'@\'',host,'\';') FROM mysql.user WHERE user LIKE 'pmuser\_%'" | mysql
-php tests/Integration/single-file-install.php https://pm.test $H/public_html $H/private-messenger | tail -1 || R=1
+php tests/Integration/single-file-install.php https://pm.test $H/public_html $H/private-messenger dist/install.php | tail -1 || R=1
 exit $R

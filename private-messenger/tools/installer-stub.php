@@ -83,11 +83,7 @@ if (filemtime(__FILE__) < time() - PM_MAX_AGE) {
 }
 $home = dirname($here);
 $target = (is_writable($home) && !is_link($home)) ? $home . '/private-messenger' : $here . '/private-messenger';
-if (is_file($target . '/storage/installed.lock')) {
-    @unlink(__FILE__);
-    pm_page('قبلاً نصب شده است', '<div class="p"><p>برنامه قبلاً روی این هاست نصب شده است و فایل نصب حذف شد.</p>'
-        . '<p>آدرس‌های ورود در فایل <code>' . pm_h($target) . '/config/.env</code> (مقدارهای APP_PATH و ADMIN_PATH) هستند.</p></div>', 200);
-}
+$updating = is_file($target . '/storage/installed.lock');
 if (!is_writable($here)) {
     pm_page('پوشه قابل نوشتن نیست', '<div class="p"><p>پوشه <code>' . pm_h($here) . '</code> قابل نوشتن نیست. در File Manager روی آن راست‌کلیک ← Change Permissions ← 755.</p></div>', 200);
 }
@@ -116,17 +112,23 @@ if (is_file($here . '/index.php') && strpos((string)file_get_contents($here . '/
 
 if (!isset($_POST['start'])) {
     $warn = '';
-    if ($foreign) {
+    if ($foreign && !$updating) {
         $warn = '<div class="warn"><b>توجه:</b> در این پوشه فایل‌های سایت دیگری هست (' . pm_h(implode('، ', array_slice($foreign, 0, 6)))
             . (count($foreign) > 6 ? '، …' : '') . '). با نصب، آن سایت از کار می‌افتد. بهتر است یک <b>ساب‌دامین جدید</b> بسازید (cPanel ← Domains) و فایل را آنجا آپلود کنید.'
             . '<br><label><input type="checkbox" name="confirm_foreign" value="1" required> می‌دانم و می‌خواهم همین‌جا نصب شود</label></div>';
+    }
+    if ($updating) {
+        pm_page('به‌روزرسانی به نسخه __PM_VERSION__',
+            '<div class="p"><p class="ok">✔ برنامه قبلاً روی این هاست نصب شده است.</p>'
+            . '<p>با زدن دکمه زیر فقط فایل‌های برنامه به نسخه جدید تغییر می‌کنند. <b>تنظیمات، دیتابیس، کاربران، پیام‌ها، فایل‌ها و آدرس‌های مخفی دست نمی‌خورند.</b></p>'
+            . '<form method="post"><input type="hidden" name="start" value="1"><button>به‌روزرسانی</button></form></div>', 200);
     }
     pm_page('نصب برنامه',
         '<div class="p"><p class="ok">✔ PHP ' . pm_h(PHP_VERSION) . ' — ✔ HTTPS — ✔ افزونه‌ها</p>'
         . '<p>با زدن دکمه زیر، فایل‌های برنامه در این مسیر قرار می‌گیرند:<br><code>' . pm_h($target) . '</code></p>'
         . '<form method="post">' . $warn . '<input type="hidden" name="start" value="1"><button>شروع نصب</button></form></div>', 200);
 }
-if ($foreign && empty($_POST['confirm_foreign'])) {
+if ($foreign && !$updating && empty($_POST['confirm_foreign'])) {
     pm_page('تأیید لازم است', '<div class="p"><p>لطفاً به صفحه قبل برگردید و گزینه تأیید را بزنید.</p></div>', 200);
 }
 
@@ -154,6 +156,7 @@ foreach ($files as $rel => $b64) {
     $dest = $target . '/' . $rel;
     if (substr($rel, -6) === '/.keep') { if (!is_dir(dirname($dest))) @mkdir(dirname($dest), 0755, true); continue; }
     if ($rel === 'config/.env' || $rel === 'storage/installed.lock') continue;
+    if ($updating && strpos($rel, 'storage/') === 0 && is_file($dest)) continue; // keep everything stored locally
     if (!is_dir(dirname($dest)) && !@mkdir(dirname($dest), 0755, true)) {
         pm_page('خطا در ساخت پوشه', '<div class="p"><p>ساخت پوشه <code>' . pm_h(dirname($dest)) . '</code> ممکن نشد. فضای دیسک یا مجوزها را بررسی کنید.</p></div>', 200);
     }
@@ -177,6 +180,18 @@ if ($existing !== '' && !is_file($here . '/.htaccess.before-install')) {
     @copy($here . '/.htaccess', $here . '/.htaccess.before-install');
 }
 file_put_contents($here . '/.htaccess', $block . ($existing !== '' ? "\n" . ltrim($existing) : ''));
+
+// ---------------------------------------------------------------- 7a. Update: apply new database migrations, done
+if ($updating) {
+    require $target . '/app/bootstrap.php';
+    $pmApp = PM\App::boot($target);
+    $applied = (new PM\Infra\Migrator($pmApp->db(), $target . '/database/migrations'))->migrate();
+    if (function_exists('opcache_reset')) @opcache_reset();
+    @unlink($claimFile);
+    @unlink(__FILE__);
+    pm_page('به‌روزرسانی انجام شد ✔', '<div class="p"><p>برنامه به نسخه __PM_VERSION__ به‌روز شد' . ($applied ? ' و ' . count($applied) . ' تغییر دیتابیس اعمال شد' : '') . '.</p>'
+        . '<p>آدرس‌های ورود همان قبلی‌ها هستند. فایل نصب حذف شد.</p><p>کاربران فقط یک بار صفحه برنامه را دوباره بارگذاری کنند.</p></div>', 200);
+}
 
 // ---------------------------------------------------------------- 7. Hand over to the web installer (skips the token step)
 @mkdir($target . '/storage/logs', 0755, true);

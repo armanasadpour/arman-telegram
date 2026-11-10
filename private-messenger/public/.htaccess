@@ -4,6 +4,9 @@ DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # The one-file installer/updater is reachable only while it physically exists (it deletes itself when done).
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^install\.php$ - [L]
   RewriteRule ^ index.php [L]
 </IfModule>
 
