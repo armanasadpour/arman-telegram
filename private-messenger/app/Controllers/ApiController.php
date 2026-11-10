@@ -43,7 +43,45 @@ final class ApiController extends Controller
         $r->post('/api/v1/messages/status', fn (Request $q) => $this->auth($q, fn () => Response::json(['status' => $this->msgs()->status((int)$this->s['session_device_id'], (array)($this->json($q)['ids'] ?? []))]), true));
         $r->get('/api/v1/sync', fn (Request $q) => $this->auth($q, fn () => $this->sync($q), true));
         $r->post('/api/v1/sync/ack', fn (Request $q) => $this->auth($q, fn () => Response::json(['deleted' => $this->msgs()->ack((int)$this->s['id'], (int)$this->s['session_device_id'], (array)($this->json($q)['ids'] ?? []))]), true));
+        $r->post('/api/v1/attachments', fn (Request $q) => $this->auth($q, fn () => Response::json($this->files()->init((int)$this->s['id'],
+            (int)$this->s['session_device_id'], (string)($this->json($q)['conversation_id'] ?? ''), $this->json($q)['size'] ?? null), 201), true));
+        $r->post('/api/v1/attachments/{id}/chunks/{index}', fn (Request $q) => $this->auth($q, fn () => $this->chunk($q), true));
+        $r->get('/api/v1/attachments/{id}/status', fn (Request $q) => $this->auth($q, fn () => Response::json(['received' => $this->files()->received((int)$this->s['id'], $q->param('id'))]), true));
+        $r->post('/api/v1/attachments/{id}/complete', fn (Request $q) => $this->auth($q, fn () => Response::json($this->files()->complete((int)$this->s['id'], $q->param('id'))), true));
+        $r->get('/api/v1/attachments/{id}/blob', fn (Request $q) => $this->auth($q, fn () => $this->download($q), true));
+        $r->get('/api/v1/conversations/{id}/presence', fn (Request $q) => $this->auth($q, fn () => Response::json(['devices' => $this->msgs()->presentDevices((int)$this->s['id'], $q->param('id'))]), true));
+        $r->post('/api/v1/ephemeral', fn (Request $q) => $this->auth($q, fn () => Response::json(['sent' => $this->msgs()->sendEphemeral((int)$this->s['id'], (int)$this->s['session_device_id'], $this->json($q))]), true));
         return $r->dispatch($req);
+    }
+
+    private function files(): \PM\Files\AttachmentService
+    {
+        return new \PM\Files\AttachmentService($this->app->db(), $this->app->settings(), $this->app->root . '/storage/attachments');
+    }
+
+    private function chunk(Request $req): Response
+    {
+        if (!preg_match('/^\d{1,7}$/', $req->param('index'))) {
+            return self::err('invalid_chunk_index', 400);
+        }
+        $in = fopen('php://input', 'rb');
+        try {
+            $this->files()->putChunk((int)$this->s['id'], $req->param('id'), (int)$req->param('index'), strtolower((string)$req->header('X-Chunk-SHA256')), $in);
+        } finally {
+            fclose($in);
+        }
+        return Response::json(['ok' => true]);
+    }
+
+    private function download(Request $req): Response
+    {
+        $files = $this->files();
+        $a = $files->downloadable((int)$this->s['id'], $req->param('id'));
+        if ($a === null) {
+            return $files->isExpired($req->param('id')) ? self::err('file_expired', 410) : self::err('not_found', 404);
+        }
+        $path = $files->filePath($a);
+        return is_file($path) ? Response::file($path, $req->header('Range')) : self::err('file_expired', 410);
     }
 
     private function keys(): KeyService
@@ -89,7 +127,11 @@ final class ApiController extends Controller
             return self::err('devices_mismatch', 409, ['missing' => $e->missing, 'stale' => $e->stale]);
         } catch (UserError $e) {
             $code = $e->getMessage();
-            return self::err(preg_match('/^[a-z_]+$/', $code) ? $code : 'invalid_request', in_array($code, ['identity_exists'], true) ? 409 : 400);
+            $status = match ($code) {
+                'identity_exists' => 409, 'insufficient_storage' => 507, 'file_too_large' => 413,
+                'upload_not_found', 'attachment_not_found' => 404, default => 400,
+            };
+            return self::err(preg_match('/^[a-z_]+$/', $code) ? $code : 'invalid_request', $status);
         }
     }
 
@@ -173,7 +215,7 @@ final class ApiController extends Controller
         if (!$this->limiter()->hit('send:' . $this->s['id'], 3000, 3600)) {
             return self::err('rate_limited', 429);
         }
-        return Response::json($this->msgs()->send((int)$this->s['id'], (int)$this->s['session_device_id'], $this->json($req)), 201);
+        return Response::json($this->msgs()->send((int)$this->s['id'], (int)$this->s['session_device_id'], $this->json($req), $this->files()), 201);
     }
 
     private function sync(Request $req): Response

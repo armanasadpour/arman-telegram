@@ -16,6 +16,14 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
     </div>
   </div>
   <div class="panel">
+    <h2>فایل‌ها و فضا</h2>
+    <div class="grid2">
+      <label class="field"><span>سقف حجم هر فایل به مگابایت (۰ = بدون محدودیت نرم‌افزاری)</span><input type="number" name="files_max_mb" value="<?= e(intdiv((int)$v('files.max_bytes'), 1048576)) ?>" <?= $dis ?>></label>
+      <label class="field"><span>سهمیه فضای هاست به گیگابایت (از cPanel؛ فقط برای نمایش، ۰ = نامعلوم)</span><input type="number" name="quota_gb" value="<?= e(intdiv((int)$v('storage.quota_bytes'), 1073741824)) ?>" <?= $dis ?>></label>
+    </div>
+    <p class="small muted">فایل‌ها ۷ روز پس از آپلود به‌صورت خودکار و غیرقابل بازیابی حذف می‌شوند (مگر برای حساب‌های دارای «نگهداری دائمی»). «بدون محدودیت» یعنی برنامه سقف مصنوعی ندارد؛ ظرفیت واقعی را فضای هاست تعیین می‌کند.</p>
+  </div>
+  <div class="panel">
     <h2>محدودیت ورود</h2>
     <div class="grid2">
       <label class="field"><span>سقف تلاش ورود هر IP در ۱۵ دقیقه</span><input type="number" name="login_ip" value="<?= e($v('login.per_ip_15min')) ?>" <?= $dis ?>></label>

@@ -119,3 +119,46 @@ body:has(#app) { display: flex; flex-direction: column; height: 100vh; height: 1
   body:has(#app) .topbar { flex-direction: row; padding: 6px 8px; }
   body:has(#app) .topbar nav a { padding: 4px 8px; font-size: 13px; }
 }
+
+/* ---------------- Chat: phase 4 ---------------- */
+.c-search-wrap { padding: 0 12px 8px; }
+.c-search { border-radius: 999px !important; background: var(--surface-2) !important; border: 0 !important; }
+.c-side-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.badge { background: var(--accent); color: #fff; border-radius: 999px; font-size: 12px; padding: 0 7px; min-width: 22px; text-align: center; }
+.c-typing { font-size: 12px; color: var(--accent); min-height: 1em; }
+.c-pinbar { display: block; width: 100%; text-align: start; border: 0; border-bottom: 1px solid var(--line); background: var(--surface); padding: 6px 12px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-quote { display: block; width: 100%; text-align: start; border: 0; border-inline-start: 3px solid var(--accent); background: rgba(37,99,235,.08); border-radius: 6px; padding: 2px 8px; margin: 2px 0 4px; font-size: 13px; cursor: pointer; overflow: hidden; }
+.c-quote b { display: block; font-size: 12px; color: var(--accent); }
+.c-quote span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+.c-msg.deleted { opacity: .75; }
+.c-reacts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.c-reacts span { background: var(--surface-2); border-radius: 999px; padding: 0 6px; font-size: 13px; }
+.c-more { border: 0; background: transparent; color: var(--ink-2); cursor: pointer; font-size: 14px; padding: 0 4px; }
+.st.read { color: var(--accent); font-weight: 700; }
+.c-menu { position: fixed; z-index: 100; background: var(--surface); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 6px; display: flex; flex-direction: column; min-width: 190px; }
+.c-menu > button { border: 0; background: transparent; text-align: start; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.c-menu > button:hover { background: var(--surface-2); }
+.c-emoji { display: flex; justify-content: space-between; padding: 2px 4px 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.c-emoji button { border: 0; background: transparent; font-size: 20px; cursor: pointer; border-radius: 8px; padding: 2px; }
+.c-emoji button:hover { background: var(--surface-2); }
+.c-replybar:not(:empty) { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 12px; background: var(--surface); border-top: 1px solid var(--line); font-size: 13px; }
+.c-replybar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-icon { min-width: 42px; padding: 6px; }
+.c-icon.rec { background: #e5484d; color: #fff; }
+.c-att { margin: 2px 0; }
+.c-att.busy { opacity: .6; cursor: progress; }
+.c-att progress { width: 100%; }
+.c-media { position: relative; display: block; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.c-thumb { display: block; max-width: 260px; max-height: 260px; border-radius: 10px; }
+.c-ph { width: 200px; height: 120px; display: grid; place-items: center; background: var(--surface-2); }
+.c-play { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+.c-att-info, .c-exp { font-size: 11px; color: var(--ink-2); }
+.c-file { display: flex; gap: 8px; align-items: center; border: 0; background: rgba(0,0,0,.04); border-radius: 10px; padding: 6px 10px; cursor: pointer; text-align: start; min-width: 200px; }
+.c-file-ico { font-size: 26px; width: 40px; text-align: center; flex: none; }
+.c-view { max-width: 100%; max-height: 70vh; display: block; margin: 0 auto; border-radius: 10px; }
+.c-sendlist { max-height: 40vh; overflow-y: auto; }
+.c-senditem { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+.c-senditem img, .c-mini { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex: none; }
+.c-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px; z-index: 200; max-width: 90vw; }
+.flash { animation: flash 1.6s; }
+@keyframes flash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: none; } }

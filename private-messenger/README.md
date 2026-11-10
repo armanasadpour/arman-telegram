@@ -1,8 +1,8 @@
 # Private Messenger — پیام‌رسان خصوصی با رمزنگاری سرتاسری
 
-> وضعیت: **فاز ۳ (پایه رمزنگاری سرتاسری)** — پیاده‌سازی و تست شد (۱۸۵ تست). پیام متنی دونفره رمزنگاری‌شده کار می‌کند.
+> وضعیت: **فاز ۴ (پیام‌رسانی کامل، فایل و رسانه رمزنگاری‌شده، نگهداری ۷ روزه)** — پیاده‌سازی و تست شد (۲۱۹ تست).
 > نصب: فقط فایل `install.php` را در public_html آپلود و باز کنید — [docs/12-installation-guide.md](docs/12-installation-guide.md)
-> گزارش‌ها: [فاز ۲](docs/13-phase-2-report.md) · [فاز ۳](docs/14-phase-3-report.md)
+> گزارش‌ها: [فاز ۲](docs/13-phase-2-report.md) · [فاز ۳](docs/14-phase-3-report.md) · [فاز ۴](docs/15-phase-4-report.md)
 
 پیام‌رسان خصوصی، فارسی و راست‌چین برای اعضای یک مجموعه، قابل نصب روی هاست cPanel،
 با رمزنگاری سرتاسری (E2EE) پیام‌ها و فایل‌ها در دستگاه کاربران.
@@ -27,6 +27,7 @@
 | [docs/12-installation-guide.md](docs/12-installation-guide.md) | راهنمای نصب روی cPanel بدون SSH |
 | [docs/13-phase-2-report.md](docs/13-phase-2-report.md) | گزارش فاز ۲، تست‌ها و محدودیت‌ها |
 | [docs/14-phase-3-report.md](docs/14-phase-3-report.md) | گزارش فاز ۳: E2EE، نتیجه Spike، تست‌ها و محدودیت‌ها |
+| [docs/15-phase-4-report.md](docs/15-phase-4-report.md) | گزارش فاز ۴: امکانات پیام، فایل و رسانه، نگهداری ۷ روزه |
 | [tools/host-probe/](tools/host-probe/) | اسکریپت بررسی واقعی قابلیت‌های هاست cPanel (ابزار فاز ۱) |
 | [prototype/](prototype/) | نمونه اولیه رابط کاربری (HTML/CSS/JS ایستا، بدون سرور) |
 
@@ -45,7 +46,7 @@ crypto-wasm/ پل Rust → WebAssembly برای vodozemac (خروجی ساخته
 
 اجرای همه تست‌ها (ماشین توسعه): `tests/run-all.sh`
 
-ساخت بسته نصب: `tools/build-release.sh 0.3.0` ← `dist/install.php` و `dist/private-messenger-0.3.0.zip`
+ساخت بسته نصب: `tools/build-release.sh 0.4.0` ← `dist/install.php` و `dist/private-messenger-0.4.0.zip`
 
 ## اصل غیرقابل مذاکره
 

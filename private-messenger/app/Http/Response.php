@@ -9,6 +9,44 @@ final class Response
     public array $headers = [];
     /** @var list<string> */
     private array $cookies = [];
+    /** @var array{0:string,1:int,2:int}|null file path, offset, length — streamed by send() */
+    private ?array $stream = null;
+
+    /**
+     * Streams (part of) a file without loading it into memory. Supports a single HTTP Range.
+     * Content is opaque ciphertext: always served as a download, never rendered.
+     */
+    public static function file(string $path, ?string $rangeHeader): self
+    {
+        $size = (int)filesize($path);
+        $start = 0;
+        $end = $size - 1;
+        $status = 200;
+        if ($rangeHeader !== null && preg_match('/^bytes=(\d*)-(\d*)$/', trim($rangeHeader), $m) && ($m[1] !== '' || $m[2] !== '')) {
+            if ($m[1] === '') {
+                $start = max(0, $size - (int)$m[2]);
+            } else {
+                $start = (int)$m[1];
+                $end = $m[2] === '' ? $size - 1 : min((int)$m[2], $size - 1);
+            }
+            if ($start > $end || $start >= $size) {
+                return new self('', 416, ['Content-Range' => 'bytes */' . $size]);
+            }
+            $status = 206;
+        }
+        $r = new self('', $status, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="blob"',
+            'Content-Length' => (string)($end - $start + 1),
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'private, no-store',
+        ]);
+        if ($status === 206) {
+            $r->headers['Content-Range'] = "bytes $start-$end/$size";
+        }
+        $r->stream = [$path, $start, $end - $start + 1];
+        return $r;
+    }
 
     public function __construct(public string $body = '', public int $status = 200, array $headers = [])
     {
@@ -101,6 +139,26 @@ final class Response
             foreach ($this->cookies as $c) {
                 header('Set-Cookie: ' . $c, false);
             }
+        }
+        if ($this->stream !== null) {
+            [$path, $offset, $len] = $this->stream;
+            @set_time_limit(0);
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            $fh = fopen($path, 'rb');
+            fseek($fh, $offset);
+            while ($len > 0 && !feof($fh) && !connection_aborted()) {
+                $buf = fread($fh, min(1048576, $len));
+                if ($buf === false || $buf === '') {
+                    break;
+                }
+                echo $buf;
+                flush();
+                $len -= strlen($buf);
+            }
+            fclose($fh);
+            return;
         }
         echo $this->body;
     }

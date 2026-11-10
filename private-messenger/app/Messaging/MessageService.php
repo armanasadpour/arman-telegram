@@ -82,7 +82,7 @@ final class MessageService
      * @return array{message_id:string, created_at:string, duplicate:bool}
      * @throws DeviceMismatch when the envelopes do not exactly cover the active devices
      */
-    public function send(int $meId, int $myDeviceId, array $in): array
+    public function send(int $meId, int $myDeviceId, array $in, ?\PM\Files\AttachmentService $files = null): array
     {
         $conv = is_string($in['conversation_id'] ?? null) ? $this->membership($meId, $in['conversation_id']) : null;
         if ($conv === null) {
@@ -134,10 +134,17 @@ final class MessageService
             throw new UserError('recipient_has_no_devices');
         }
 
-        return $this->db->transaction(function () use ($conv, $meId, $myDeviceId, $clientRaw, $clientId, $given, $expected): array {
+        $attIds = is_array($in['attachment_ids'] ?? null) ? array_values(array_filter($in['attachment_ids'], 'is_string')) : [];
+        if ($attIds !== [] && $files === null) {
+            throw new UserError('attachments_unsupported');
+        }
+        return $this->db->transaction(function () use ($conv, $meId, $myDeviceId, $clientRaw, $clientId, $given, $expected, $attIds, $files): array {
             $now = Clock::db();
             $msgId = $this->db->insert('INSERT INTO messages (conversation_id, sender_user_id, sender_device_id, client_msg_id, envelope_count, notify, created_at)
                                         VALUES (?, ?, ?, ?, ?, 1, ?)', [$conv['id'], $meId, $myDeviceId, $clientRaw, count($given), $now]);
+            if ($attIds !== []) {
+                $files->grant($meId, (int)$conv['id'], $msgId, $attIds);
+            }
             $exp = Clock::dbIn('+' . self::UNDELIVERED_TTL_DAYS . ' days');
             foreach ($given as $pub => $e) {
                 $envId = $this->db->insert('INSERT INTO message_envelopes (message_id, recipient_device_id, protocol_version, olm_type, ciphertext, created_at, expires_at)
@@ -147,6 +154,46 @@ final class MessageService
             $this->db->run('UPDATE conversations SET last_activity_at = ? WHERE id = ?', [Clock::now()->format('Y-m-d H:i:00'), $conv['id']]);
             return ['message_id' => $clientId, 'created_at' => $now, 'duplicate' => false];
         });
+    }
+
+    /**
+     * Devices of the other members that synced in the last 20 seconds. Typing signals are encrypted
+     * only for these: a signal that is never fetched would leave a gap in the ratchet, and vodozemac
+     * refuses gaps above 2000 messages — so signals must not pile up for offline devices.
+     * @return list<string>
+     */
+    public function presentDevices(int $meId, string $convPublicId): array
+    {
+        $conv = $this->membership($meId, $convPublicId);
+        if ($conv === null) {
+            throw new UserError('conversation_not_found');
+        }
+        return array_column($this->db->all("SELECT d.public_id FROM devices d JOIN conversation_members cm ON cm.user_id = d.user_id
+                                             WHERE cm.conversation_id = ? AND cm.user_id <> ? AND d.status = 'active' AND d.last_seen_at > ?",
+            [$conv['id'], $meId, Clock::now()->modify('-20 seconds')->format('Y-m-d H:i:s')]), 'public_id');
+    }
+
+    /** Short-lived encrypted signals (typing). Not stored as messages; expire after 15 seconds. */
+    public function sendEphemeral(int $meId, int $myDeviceId, array $in): int
+    {
+        $conv = is_string($in['conversation_id'] ?? null) ? $this->membership($meId, $in['conversation_id']) : null;
+        if ($conv === null || ($in['channel'] ?? '') !== 'typing') {
+            throw new UserError('invalid_ephemeral');
+        }
+        $n = 0;
+        foreach (array_slice(is_array($in['envelopes'] ?? null) ? $in['envelopes'] : [], 0, 20) as $e) {
+            $ct = is_array($e) ? B64::dec($e['ciphertext'] ?? null, null, 8192) : null;
+            $type = is_array($e) ? ($e['type'] ?? null) : null;
+            $dev = is_array($e) && is_string($e['device_id'] ?? null) ? $this->db->one("SELECT d.id FROM devices d JOIN conversation_members cm ON cm.user_id = d.user_id
+                     WHERE d.public_id = ? AND d.status = 'active' AND cm.conversation_id = ? AND d.id <> ?", [$e['device_id'], $conv['id'], $myDeviceId]) : null;
+            if ($ct === null || $dev === null || !in_array($type, [0, 1], true)) {
+                continue;
+            }
+            $this->db->insert('INSERT INTO ephemeral_envelopes (conversation_id, sender_device_id, recipient_device_id, channel, olm_type, ciphertext, created_at, expires_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [$conv['id'], $myDeviceId, $dev['id'], 'typing', $type, $ct, Clock::db(), Clock::dbIn('+15 seconds')]);
+            $n++;
+        }
+        return $n;
     }
 
     /** @return array<string, mixed> envelopes for this device after $cursor, plus notifications after $ncursor */
@@ -169,8 +216,20 @@ final class MessageService
         foreach ($notes as &$n) {
             $n['id'] = (int)$n['id'];
         }
-        $this->db->run('UPDATE devices SET last_seen_at = ? WHERE id = ?', [Clock::now()->format('Y-m-d H:i:00'), $myDeviceId]);
-        return ['envelopes' => $env, 'notifications' => $notes,
+        $eph = [];
+        foreach ($this->db->all('SELECT e.id, e.olm_type, e.ciphertext, c.public_id AS conversation_id, su.public_id AS sender_user_id, sd.public_id AS sender_device_id
+                                   FROM ephemeral_envelopes e JOIN conversations c ON c.id = e.conversation_id JOIN devices sd ON sd.id = e.sender_device_id
+                                   JOIN users su ON su.id = sd.user_id WHERE e.recipient_device_id = ? AND e.expires_at > ? ORDER BY e.id LIMIT 50',
+            [$myDeviceId, Clock::db()]) as $r) {
+            $eph[] = ['id' => (int)$r['id'], 'type' => (int)$r['olm_type'], 'ciphertext' => base64_encode($r['ciphertext']),
+                'conversation_id' => $r['conversation_id'], 'sender_user_id' => $r['sender_user_id'], 'sender_device_id' => $r['sender_device_id']];
+        }
+        if ($eph !== []) {
+            $in = implode(',', array_fill(0, count($eph), '?'));
+            $this->db->run("DELETE FROM ephemeral_envelopes WHERE recipient_device_id = ? AND id IN ($in)", array_merge([$myDeviceId], array_column($eph, 'id')));
+        }
+        $this->db->run('UPDATE devices SET last_seen_at = ? WHERE id = ?', [Clock::now()->format('Y-m-d H:i:s'), $myDeviceId]);
+        return ['envelopes' => $env, 'ephemeral' => $eph, 'notifications' => $notes,
             'cursor' => $env ? end($env)['id'] : $cursor, 'ncursor' => $notes ? end($notes)['id'] : $ncursor];
     }
 

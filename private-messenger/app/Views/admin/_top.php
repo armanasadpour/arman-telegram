@@ -1,7 +1,7 @@
 <?php use function PM\Support\e; use PM\Admin\AdminService as A; include __DIR__ . '/../_head.php'; ?>
 <header class="topbar">
   <nav>
-    <?php foreach ([['dash', '/', 'داشبورد', 'dashboard.view'], ['users', '/users', 'کاربران', 'users.view'], ['settings', '/settings', 'تنظیمات', 'settings.view'],
+    <?php foreach ([['dash', '/', 'داشبورد', 'dashboard.view'], ['users', '/users', 'کاربران', 'users.view'], ['settings', '/settings', 'تنظیمات', 'settings.view'], ['storage', '/storage', 'فضا و فایل‌ها', 'storage.view'],
                     ['admins', '/admins', 'مدیران', 'admins.manage'], ['audit', '/audit', 'گزارش ممیزی', 'audit.view'],
                     ['system', '/system', 'سیستم', 'system.capabilities.view'], ['account', '/account', 'حساب من', null]] as [$k, $href, $label, $perm]):
         if ($perm === null || A::can($admin, $perm)): ?>

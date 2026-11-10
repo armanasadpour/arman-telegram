@@ -13,6 +13,7 @@ TEST_DB_NAME=pm_unit TEST_DB_USER=pmtest TEST_DB_PASS=pmtest-pass php tests/run.
 echo "== crypto (wasm)";    node tests/crypto/olm.test.mjs | tail -1 || R=1
 echo "== e2e (http)";       fresh; php tests/Integration/e2e.php https://pm.test $H/private-messenger pm_e2e pme2e E2e-db-pass | tail -1 || R=1
 echo "== e2ee (browser)";   fresh; node tests/Integration/e2ee-browser.mjs https://pm.test $H/private-messenger pm_e2e pme2e E2e-db-pass | tail -1 || R=1
+echo "== phase 4 (browser)"; fresh; node tests/Integration/phase4-browser.mjs https://pm.test $H/private-messenger pm_e2e pme2e E2e-db-pass | tail -1 || R=1
 echo "== one-file installer"
 rm -rf $H /tmp/pm-mock-crontab.txt && mkdir -p $H/public_html && printf '# php -- BEGIN cPanel-generated handler, do not edit\n# php -- END cPanel-generated handler, do not edit\n' > $H/public_html/.htaccess && cp dist/install.php $H/public_html/ && chown -R www-data: $H
 mysql -N -e "SELECT CONCAT('DROP DATABASE \`',schema_name,'\`;') FROM information_schema.schemata WHERE schema_name LIKE 'pmuser\_%'" | mysql

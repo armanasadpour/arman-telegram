@@ -33,6 +33,7 @@ final class AdminController extends Controller
         'unlocked' => 'قفل ورود حساب برداشته شد.',
         'retention' => 'تنظیم نگهداری فایل تغییر کرد.',
         'device_revoked' => 'دستگاه لغو شد.',
+        'cleanup' => 'پاک‌سازی اجرا شد.',
         'identity_reset' => 'هویت رمزنگاری کاربر بازنشانی شد.',
         'totp_on' => 'ورود دومرحله‌ای (TOTP) فعال شد.',
         'totp_off' => 'ورود دومرحله‌ای غیرفعال شد.',
@@ -72,6 +73,8 @@ final class AdminController extends Controller
         $r->post('/admins', $this->need('admins.manage', fn (Request $q) => $this->adminCreate($q), true));
         $r->post('/admins/{id}/status', $this->need('admins.manage', fn (Request $q) => $this->adminStatus($q), true));
 
+        $r->get('/storage', $this->need('storage.view', fn (Request $q) => $this->storagePage($q)));
+        $r->post('/storage/cleanup', $this->need('storage.cleanup.run', fn (Request $q) => $this->storageCleanup($q), true));
         $r->get('/audit', $this->need('audit.view', fn (Request $q) => $this->auditPage($q)));
         $r->get('/system', $this->need('system.capabilities.view', fn (Request $q) => $this->systemPage($q)));
 
@@ -382,6 +385,8 @@ final class AdminController extends Controller
                 'sms.generic_auth_header' => preg_replace('/[^A-Za-z0-9-]/', '', $req->input('sms_generic_auth_header')) ?? '',
                 'otp.message' => mb_substr(trim($req->input('otp_message')), 0, 160) ?: 'کد: {code}',
                 'app.internal_name' => mb_substr(trim($req->input('internal_name')), 0, 60) ?: 'پیام‌رسان',
+                'files.max_bytes' => $int($req->input('files_max_mb', '0'), 0, 1048576, 'سقف حجم فایل') * 1048576,
+                'storage.quota_bytes' => $int($req->input('quota_gb', '0'), 0, 100000, 'سهمیه فضا') * 1073741824,
             ];
             if ($new['sms.generic_url'] !== '' && !str_starts_with($new['sms.generic_url'], 'https://')) {
                 throw new UserError('آدرس وب‌هوک پیامک باید با https:// شروع شود.');
@@ -464,6 +469,21 @@ final class AdminController extends Controller
             return $this->adminsPage($req, $e->getMessage());
         }
         return $this->back('/admins', 'saved');
+    }
+
+    private function storagePage(Request $req, ?array $result = null): Response
+    {
+        $files = new \PM\Files\AttachmentService($this->app->db(), $this->app->settings(), $this->app->root . '/storage/attachments');
+        $last = $this->app->db()->one("SELECT finished_at, trigger_source, stats FROM cron_runs WHERE job = 'maintenance' AND status = 'ok' ORDER BY id DESC LIMIT 1");
+        return $this->page($req, 'admin/storage', $this->vars(['st' => $files->stats(), 'last' => $last, 'result' => $result, 'nav' => 'storage',
+            'chunk' => \PM\Files\AttachmentService::chunkSize(), 'max' => (int)$this->app->settings()->get('files.max_bytes'), 'msg' => $this->msg($req)]));
+    }
+
+    private function storageCleanup(Request $req): Response
+    {
+        $stats = \PM\Maintenance::run($this->app, 'manual');
+        $this->audit()->record('admin', (int)$this->admin['id'], 'storage.cleanup', null, null, ['files' => $stats['files'] ?? null], $req->ip());
+        return $this->storagePage($req, $stats ?? ['busy' => true]);
     }
 
     private function auditPage(Request $req): Response

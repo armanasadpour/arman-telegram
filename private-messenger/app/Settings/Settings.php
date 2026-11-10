@@ -39,6 +39,8 @@ final class Settings
         'sms.generic_body' => '{"to":"{phone}","text":"{message}"}',
         'sms.generic_auth_header' => '',
         'app.internal_name' => 'پیام‌رسان',
+        'files.max_bytes' => 0,          // 0 = no software limit (real limit: disk/quota)
+        'storage.quota_bytes' => 0,      // hosting quota entered by the admin (PHP cannot read cPanel quotas); 0 = unknown
     ];
 
     /** @var array<string, mixed>|null */
