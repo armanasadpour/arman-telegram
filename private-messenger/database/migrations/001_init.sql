@@ -79,7 +79,7 @@ CREATE TABLE rate_limits (
   hits            INT UNSIGNED    NOT NULL DEFAULT 0,
   PRIMARY KEY (bucket_hash, window_start),
   KEY ix_rl_window (window_start)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 -- Devices & public keys
@@ -122,7 +122,7 @@ CREATE TABLE device_public_keys (
   UNIQUE KEY uq_dpk_device_key (device_id, key_id),
   KEY ix_dpk_unclaimed (device_id, key_type, claimed_at),
   CONSTRAINT fk_dpk_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- User Master Signing Key (public part). History kept to explain key-change warnings.
 CREATE TABLE user_master_keys (
@@ -137,7 +137,7 @@ CREATE TABLE user_master_keys (
   PRIMARY KEY (id),
   KEY ix_umk_user_current (user_id, superseded_at),
   CONSTRAINT fk_umk_user FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Encrypted key backup. Encrypted client-side with a key derived from the
 -- user's Recovery Key. The server can never decrypt it.
@@ -154,7 +154,7 @@ CREATE TABLE key_backups (
   UNIQUE KEY uq_kb_user_version (user_id, version),
   CONSTRAINT fk_kb_user FOREIGN KEY (user_id) REFERENCES users(id),
   CONSTRAINT fk_kb_msk FOREIGN KEY (master_key_id) REFERENCES user_master_keys(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- New-device linking handshake (opaque, E2EE payloads between the two devices)
 CREATE TABLE device_link_requests (
@@ -171,7 +171,7 @@ CREATE TABLE device_link_requests (
   UNIQUE KEY uq_dlr_public (public_id),
   KEY ix_dlr_user (user_id, status),
   CONSTRAINT fk_dlr_new FOREIGN KEY (new_device_id) REFERENCES devices(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE user_sessions (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -192,7 +192,7 @@ CREATE TABLE user_sessions (
   UNIQUE KEY uq_us_public (public_id),
   KEY ix_us_user (user_id, revoked_at),
   CONSTRAINT fk_us_user FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 -- Conversations
@@ -208,7 +208,7 @@ CREATE TABLE conversations (
   PRIMARY KEY (id),
   UNIQUE KEY uq_conv_public (public_id),
   UNIQUE KEY uq_conv_pair (direct_pair_hash)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE conversation_members (
   conversation_id     BIGINT UNSIGNED NOT NULL,
@@ -222,7 +222,7 @@ CREATE TABLE conversation_members (
   KEY ix_cm_user (user_id, left_at),
   CONSTRAINT fk_cm_conv FOREIGN KEY (conversation_id) REFERENCES conversations(id),
   CONSTRAINT fk_cm_user FOREIGN KEY (user_id) REFERENCES users(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 -- Messages: one metadata row + one opaque envelope per recipient device.
@@ -243,7 +243,7 @@ CREATE TABLE messages (
   KEY ix_msg_conv (conversation_id, id),
   KEY ix_msg_created (created_at),
   CONSTRAINT fk_msg_conv FOREIGN KEY (conversation_id) REFERENCES conversations(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE message_envelopes (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,  -- also the sync cursor
@@ -259,7 +259,7 @@ CREATE TABLE message_envelopes (
   KEY ix_env_expires (expires_at),
   CONSTRAINT fk_env_msg FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
   CONSTRAINT fk_env_dev FOREIGN KEY (recipient_device_id) REFERENCES devices(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- Envelopes are DELETED once the recipient device acknowledges them.
 
 -- Server-observable delivery state only (a device fetched+acked).
@@ -270,7 +270,7 @@ CREATE TABLE message_receipts (
   delivered_at        DATETIME(3)     NOT NULL,
   PRIMARY KEY (message_id, user_id),
   CONSTRAINT fk_rcpt_msg FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Short-lived encrypted signals: call signaling (SDP/ICE) and typing.
 CREATE TABLE ephemeral_envelopes (
@@ -287,7 +287,7 @@ CREATE TABLE ephemeral_envelopes (
   PRIMARY KEY (id),
   KEY ix_eph_device (recipient_device_id, id),
   KEY ix_eph_expires (expires_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Security/system events delivered via /sync (no content).
 CREATE TABLE notifications (
@@ -301,7 +301,7 @@ CREATE TABLE notifications (
   seen_at             DATETIME(3)     NULL,
   PRIMARY KEY (id),
   KEY ix_notif_user (user_id, id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE push_subscriptions (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -315,7 +315,7 @@ CREATE TABLE push_subscriptions (
   PRIMARY KEY (id),
   KEY ix_push_device (device_id),
   CONSTRAINT fk_push_dev FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 -- Attachments (encrypted blobs) — retention policy fields per spec §12
@@ -350,7 +350,7 @@ CREATE TABLE attachments (
   KEY ix_att_uploader (uploader_user_id, upload_status),
   KEY ix_att_conv (conversation_id),
   KEY ix_att_stale (upload_status, last_chunk_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Received chunk bookkeeping for resumable uploads (data itself is on disk).
 CREATE TABLE upload_chunks (
@@ -361,7 +361,7 @@ CREATE TABLE upload_chunks (
   received_at         DATETIME(3)     NOT NULL,
   PRIMARY KEY (attachment_id, chunk_index),
   CONSTRAINT fk_uc_att FOREIGN KEY (attachment_id) REFERENCES attachments(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Which conversations may download a blob (original + forwards).
 CREATE TABLE attachment_grants (
@@ -372,7 +372,7 @@ CREATE TABLE attachment_grants (
   PRIMARY KEY (attachment_id, conversation_id),
   KEY ix_ag_conv (conversation_id),
   CONSTRAINT fk_ag_att FOREIGN KEY (attachment_id) REFERENCES attachments(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Short-lived download tokens (hashed)
 CREATE TABLE download_tokens (
@@ -382,7 +382,7 @@ CREATE TABLE download_tokens (
   expires_at          DATETIME(3)     NOT NULL,
   PRIMARY KEY (token_hash),
   KEY ix_dt_expires (expires_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE storage_usage (
   id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -397,7 +397,7 @@ CREATE TABLE storage_usage (
   file_count              INT UNSIGNED    NOT NULL,
   PRIMARY KEY (id),
   KEY ix_su_time (measured_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 -- Calls (minimal metadata; media type is NOT stored)
@@ -416,7 +416,7 @@ CREATE TABLE calls (
   PRIMARY KEY (id),
   UNIQUE KEY uq_calls_public (public_id),
   KEY ix_calls_conv (conversation_id, created_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE call_participants (
   call_id             BIGINT UNSIGNED NOT NULL,
@@ -426,7 +426,7 @@ CREATE TABLE call_participants (
   left_at             DATETIME(3)     NULL,
   PRIMARY KEY (call_id, user_id),
   CONSTRAINT fk_cp_call FOREIGN KEY (call_id) REFERENCES calls(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 -- Groups (Phase 6 — reserved; final shape depends on MLS vs Megolm)
@@ -438,7 +438,7 @@ CREATE TABLE group_key_epochs (
   created_by_device   BIGINT UNSIGNED NOT NULL,
   created_at          DATETIME(3)     NOT NULL,
   PRIMARY KEY (conversation_id, epoch)                   -- enforces strict commit ordering
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 -- Administration
@@ -449,7 +449,7 @@ CREATE TABLE roles (
   is_super            TINYINT(1)      NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uq_roles_name (name)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Permission catalogue. There is deliberately NO permission for reading content.
 CREATE TABLE permissions (
@@ -457,7 +457,7 @@ CREATE TABLE permissions (
   code                VARCHAR(64)     NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_perm_code (code)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE role_permissions (
   role_id             INT UNSIGNED    NOT NULL,
@@ -465,7 +465,7 @@ CREATE TABLE role_permissions (
   PRIMARY KEY (role_id, permission_id),
   CONSTRAINT fk_rp_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
   CONSTRAINT fk_rp_perm FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE admin_users (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -484,7 +484,7 @@ CREATE TABLE admin_users (
   PRIMARY KEY (id),
   UNIQUE KEY uq_admin_username (username),
   CONSTRAINT fk_admin_role FOREIGN KEY (role_id) REFERENCES roles(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE admin_sessions (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -499,7 +499,7 @@ CREATE TABLE admin_sessions (
   PRIMARY KEY (id),
   UNIQUE KEY uq_as_token (token_hash),
   CONSTRAINT fk_as_admin FOREIGN KEY (admin_id) REFERENCES admin_users(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Append-only, hash-chained audit trail. No content, ever.
 CREATE TABLE audit_logs (
@@ -517,7 +517,7 @@ CREATE TABLE audit_logs (
   PRIMARY KEY (id),
   KEY ix_audit_target (target_type, target_id),
   KEY ix_audit_action (action, created_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE system_settings (
   setting_key         VARCHAR(100)    NOT NULL,
@@ -525,7 +525,7 @@ CREATE TABLE system_settings (
   updated_at          DATETIME(3)     NOT NULL,
   updated_by          BIGINT UNSIGNED NULL,
   PRIMARY KEY (setting_key)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE cron_runs (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -538,7 +538,7 @@ CREATE TABLE cron_runs (
   error_message       VARCHAR(500)    NULL,
   PRIMARY KEY (id),
   KEY ix_cron_job (job, started_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Single-row mutex for cron/pseudo-cron (SELECT ... FOR UPDATE or GET_LOCK())
 CREATE TABLE job_locks (
@@ -546,7 +546,7 @@ CREATE TABLE job_locks (
   locked_until        DATETIME(3)     NOT NULL,
   owner               CHAR(32)        NOT NULL,
   PRIMARY KEY (job)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed: permission catalogue (no content-read permission exists)
 INSERT INTO permissions (code) VALUES

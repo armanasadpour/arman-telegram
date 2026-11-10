@@ -14,8 +14,14 @@ final class Migrator
     /** @return list<string> applied migration names */
     public function migrate(): array
     {
+        // Many cPanel hosts create databases with a latin1 default; Persian text needs utf8mb4.
+        try {
+            $this->db->pdo->exec('ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        } catch (\PDOException) {
+            // not permitted on some hosts: every table declares utf8mb4 explicitly anyway
+        }
         $this->db->pdo->exec('CREATE TABLE IF NOT EXISTS schema_migrations (
-            name VARCHAR(190) NOT NULL PRIMARY KEY, applied_at DATETIME(3) NOT NULL) ENGINE=InnoDB');
+            name VARCHAR(190) NOT NULL PRIMARY KEY, applied_at DATETIME(3) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
         $done = array_column($this->db->all('SELECT name FROM schema_migrations'), 'name');
         $files = glob($this->dir . '/*.sql') ?: [];
         sort($files, SORT_STRING);
@@ -32,6 +38,29 @@ final class Migrator
             $applied[] = $name;
         }
         return $applied;
+    }
+
+    /** @return list<string> every table name created by the migrations (plus schema_migrations) */
+    public function ownTables(): array
+    {
+        $names = ['schema_migrations'];
+        foreach (glob($this->dir . '/*.sql') ?: [] as $f) {
+            preg_match_all('/CREATE TABLE (?:IF NOT EXISTS )?`?([a-z_]+)`?/i', (string)file_get_contents($f), $m);
+            $names = array_merge($names, $m[1]);
+        }
+        return array_values(array_unique($names));
+    }
+
+    /** Drops the listed tables (used to clean up after a failed installation). */
+    public function dropTables(array $tables): void
+    {
+        $this->db->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach ($tables as $t) {
+            if (preg_match('/^[a-z_]+$/', $t)) {
+                $this->db->pdo->exec('DROP TABLE IF EXISTS `' . $t . '`');
+            }
+        }
+        $this->db->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
     }
 
     /** Splits a plain SQL file (no procedures) on statement-terminating semicolons, ignoring comments and strings. */

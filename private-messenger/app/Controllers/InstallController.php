@@ -127,10 +127,21 @@ final class InstallController extends Controller
         if (!$okVer) {
             throw new UserError('نسخه دیتابیس پشتیبانی نمی‌شود (' . $ver . '). حداقل MySQL 8.0 یا MariaDB 10.6 لازم است.');
         }
-        if ($db->scalar("SHOW TABLES LIKE 'users'") !== null) {
-            throw new UserError('این دیتابیس خالی نیست. یک دیتابیس خالی جدید بسازید.');
+        $migrator = new Migrator($db, $this->app->root . '/database/migrations');
+        $tables = array_map(static fn (array $r): string => (string)array_values($r)[0], $db->all('SHOW TABLES'));
+        if ($tables !== []) {
+            // Leftovers of an earlier failed attempt (only our tables, no administrator yet) are removed automatically.
+            $leftover = array_diff($tables, $migrator->ownTables()) === []
+                && (!in_array('admin_users', $tables, true) || (int)$db->scalar('SELECT COUNT(*) FROM admin_users') === 0);
+            if (!$leftover) {
+                throw new UserError('این دیتابیس خالی نیست و جدول‌های دیگری دارد. یک دیتابیس خالی جدید بسازید.');
+            }
+            try {
+                $migrator->dropTables($tables);
+            } catch (\PDOException $e) {
+                throw new UserError('جدول‌های باقی‌مانده از تلاش قبلی پاک نشد (' . mb_substr($e->getMessage(), 0, 150) . '). به کاربر دیتابیس ALL PRIVILEGES بدهید.');
+            }
         }
-
         $appKey = random_bytes(32);
         $appPath = Random::string(16);
         do {
@@ -151,11 +162,29 @@ final class InstallController extends Controller
             throw new UserError('نوشتن فایل config/.env ممکن نشد. مجوز پوشه config را بررسی کنید.');
         }
 
-        (new Migrator($db, $this->app->root . '/database/migrations'))->migrate();
-        $audit = new AuditLog($db);
-        $admins = new AdminService($db, $audit, new RateLimiter($db), $appKey);
-        $superRole = (int)$db->scalar('SELECT id FROM roles WHERE is_super = 1 ORDER BY id LIMIT 1');
-        $admins->createAdmin(0, $form['admin_username'], $form['admin_display'], $pass, $superRole, $req->ip());
+        try {
+            $migrator->migrate();
+            $audit = new AuditLog($db);
+            $admins = new AdminService($db, $audit, new RateLimiter($db), $appKey);
+            $superRole = (int)$db->scalar('SELECT id FROM roles WHERE is_super = 1 ORDER BY id LIMIT 1');
+            $admins->createAdmin(0, $form['admin_username'], $form['admin_display'], $pass, $superRole, $req->ip());
+        } catch (\Throwable $e) {
+            // Undo everything so that the next attempt starts clean, and show the real reason (installation only).
+            error_log('[pm] install failed: ' . $e->getMessage());
+            @unlink($envFile);
+            $cleaned = true;
+            try {
+                $migrator->dropTables($migrator->ownTables());
+            } catch (\Throwable) {
+                $cleaned = false; // e.g. no DROP permission; leftovers are removed automatically on the next attempt
+            }
+            if ($e instanceof UserError && $cleaned) {
+                throw $e;
+            }
+            throw new UserError('ساخت جدول‌های دیتابیس ناموفق بود' . ($cleaned ? ' و تغییرات برگردانده شد' : '')
+                . '. پیام دیتابیس: ' . mb_substr($e->getMessage(), 0, 300)
+                . ' — معمولاً یعنی کاربر دیتابیس همه مجوزها (ALL PRIVILEGES) را ندارد؛ در cPanel ← MySQL Databases مجوزها را کامل کنید و دوباره «نصب کن» را بزنید.');
+        }
         $db->run("INSERT INTO system_settings (setting_key, setting_value, updated_at) VALUES ('auth.method', '\"password\"', ?)", [Clock::db()]);
         $db->run("INSERT INTO system_settings (setting_key, setting_value, updated_at) VALUES ('host.checks', ?, ?)",
             [json_encode(HostCheck::run($this->app->root, $req), JSON_UNESCAPED_UNICODE), Clock::db()]);
