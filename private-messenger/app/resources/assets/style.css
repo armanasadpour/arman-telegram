@@ -255,7 +255,18 @@ input[type=range] { accent-color: var(--accent); }
 .c-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .c-text a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .c-meta { display: flex; gap: 5px; justify-content: flex-end; align-items: center; font-size: 11px; color: var(--ink-2); line-height: 1.6; }
-.st { display: inline-flex; color: var(--ink-2); font-weight: 700; font-size: 12px; font-family: system-ui, sans-serif; } .st.dbl { letter-spacing: -4px; padding-inline-end: 4px; } .st.read { color: var(--accent); } .st.fail { color: var(--danger); }
+.st { display: inline-flex; align-items: center; font-size: 0; line-height: 0; color: color-mix(in srgb, var(--ink-2) 85%, transparent); }
+.st svg { height: 11px; width: auto; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.st.sent svg { width: 14px; } .st.double svg { width: 19px; } .st.sending svg, .st.failed svg { width: 13px; height: 13px; stroke-width: 1.6; }
+.st.sending svg { animation: tickspin 2s linear infinite; transform-origin: center; }
+@keyframes tickspin { to { transform: rotate(360deg); } }
+.st.read { color: var(--tick-read, #0ea5e9); }
+.st.read svg { stroke-width: 2.1; animation: tickpop .35s ease-out; filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tick-read, #0ea5e9) 35%, transparent)); }
+.st.double:not(.read) svg .t2 { animation: tickdraw .3s ease-out; }
+@keyframes tickpop { 0% { transform: scale(.6); opacity: .3; } 70% { transform: scale(1.15); } 100% { transform: none; } }
+@keyframes tickdraw { from { opacity: 0; transform: translateX(-3px); } }
+.st.failed { color: var(--danger); }
+.c-msg.media .c-meta .st.read { color: #7dd3fc; }
 .c-flag { font-size: 12px; color: var(--warn-ink); margin-top: 2px; }
 .c-fwd { font-size: 12px; color: var(--accent); font-weight: 500; }
 .c-sys, .c-day { align-self: center; font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 85%, transparent); border-radius: 999px; padding: 3px 14px; text-align: center; margin: 6px 0; box-shadow: var(--shadow); }
@@ -444,3 +455,4 @@ body.offline .c-side-head h1::after { content: ' · بدون اتصال'; font-s
   .c-sheet { border-radius: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.cl-audio { display: none; }

@@ -259,6 +259,35 @@ check('clear history on this device only (the other side keeps it)', (await iph.
 await a2.click('.c-emoji-btn'); await a2.click('.c-emoji-panel button >> nth=0');
 check('emoji panel inserts into the composer', (await a2.inputValue('.c-compose textarea')) === '😀');
 
+console.log('\n# Call audio route (earpiece / loudspeaker)');
+// Android Chrome reports the routes as audio devices; emulate that with Chromium's fake microphone.
+await iph.context().addInitScript(() => {
+  const orig = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
+  navigator.mediaDevices.enumerateDevices = async () => {
+    const list = await orig(); const mic = list.find((d) => d.kind === 'audioinput');
+    if (!mic) return list;
+    const fake = (label) => ({ deviceId: mic.deviceId, groupId: mic.groupId, kind: 'audioinput', label, toJSON() { return this; } });
+    return [...list, fake('Headset earpiece'), fake('Speakerphone')];
+  };
+});
+await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
+await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
+await iph.click('[aria-label="تماس صوتی"]');
+await iph.waitForSelector('.cl-overlay [aria-label="پخش از بلندگو"]', { timeout: T });
+check('voice call starts on the phone earpiece; a loudspeaker button is offered', true);
+check('call sound plays from a dedicated <audio> element (the picture element is muted)', await iph.evaluate(() => !!document.querySelector('.cl-overlay audio.cl-audio') && document.querySelector('.cl-remote').muted));
+await iph.click('.cl-overlay [aria-label="پخش از بلندگو"]');
+await iph.waitForSelector('.cl-overlay [aria-label="بلندگو روشن — پخش از گوشی"]', { timeout: T });
+check('loudspeaker toggle switches the route (and back)', true);
+check('microphone still live after the route switch', await iph.evaluate(() => [...document.querySelectorAll('video.cl-local')].some((v) => v.srcObject?.getAudioTracks().some((t) => t.readyState === 'live'))));
+await iph.click('.cl-overlay [aria-label="پایان تماس"]');
+await a2.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
+
+console.log('\n# Delivery ticks');
+await openChat(a2, 'باب'); await a2.waitForSelector('.c-msg.out .st', { timeout: T });
+const ticks = await a2.evaluate(() => [...document.querySelectorAll('.c-msg.out .st')].map((t) => t.className + '|' + !!t.querySelector('svg')));
+check('ticks are drawn icons (sent ✓ / delivered ✓✓ / read ✓✓ in colour)', ticks.length > 0 && ticks.every((t) => t.endsWith('|true')), ticks.join(','));
+
 console.log('\n# Server never sees plaintext');
 const dump = execFileSync('mysqldump', ['--skip-extended-insert', '-u', DBU, `-p${DBP}`, '-h', '127.0.0.1', DBN], { maxBuffer: 1 << 28 }).toString('latin1');
 check('database contains no channel name or channel post', !['CHANNEL-CANARY', 'CHMSG'].some((w) => dump.includes(w)));

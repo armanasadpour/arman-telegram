@@ -101,6 +101,7 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   smartphone: '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/>',
+  speaker: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',
   wifiOff: '<path d="M2 2l20 20M8.5 16.4a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 5.2-2.8M19 12.9a10 10 0 0 0-2.3-1.8M2 8.8a15 15 0 0 1 4.2-2.7M22 8.8A15 15 0 0 0 11 5M12 20h.01"/>',
 };
 function ico(name, cls = '') {
@@ -1041,11 +1042,23 @@ const FLAGS = {
   invalid_payload: 'پیام نامعتبر دریافت و رد شد.',
   not_channel_admin: 'پیامی از عضوی که مدیر کانال نیست دریافت و رد شد.',
 };
+// Delivery ticks: ⏱ sending · ✓ sent (server has it) · ✓✓ delivered (a device of the recipient got it) · ✓✓ coloured = read.
+const TICKS = {
+  sending: ['0 0 16 16', '<circle cx="8" cy="8" r="6.2"/><path d="M8 4.8V8l2.2 1.5"/>'],
+  sent: ['0 0 16 12', '<path d="M2.2 6.6 5.9 10.2 13.8 2.2"/>'],
+  double: ['0 0 21 12', '<path d="M1.6 6.6 5.3 10.2 13.2 2.2"/><path class="t2" d="M8.9 9.2 9.9 10.2 17.8 2.2"/>'],
+  failed: ['0 0 16 16', '<circle cx="8" cy="8" r="6.4"/><path d="M8 4.6v4.2M8 11.2v.2"/>'],
+};
 function tick(m) {
-  const s = m.status;
-  if (s === 'sending' || s === 'uploading') return el('span', { class: 'st', title: 'در حال ارسال', text: '⏳' });
-  if (s === 'failed') return el('span', { class: 'st fail', text: '⚠' });
-  return el('span', { class: 'st' + (s === 'read' ? ' read' : '') + (s === 'sent' ? '' : ' dbl'), title: { read: 'خوانده‌شده', delivered: 'تحویل‌شده', sent: 'ارسال‌شده' }[s] || '', text: { sent: '✓', delivered: '✓✓', read: '✓✓' }[s] || '' });
+  const st = m.status;
+  const kind = st === 'sending' || st === 'uploading' ? 'sending' : st === 'failed' ? 'failed' : st === 'sent' ? 'sent' : 'double';
+  const label = { sending: 'در حال ارسال', uploading: 'در حال ارسال', sent: 'ارسال شد', delivered: 'تحویل داده شد', read: 'خوانده شد', failed: 'ارسال نشد' }[st] || '';
+  // The text glyph stays in the DOM (tests and copy-paste) but is visually replaced by the drawn icon.
+  const n = el('span', { class: `st ${kind}${st === 'read' ? ' read' : ''}`, title: label, 'aria-label': label, 'data-st': st, text: { sent: '✓', delivered: '✓✓', read: '✓✓' }[st] || '' });
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', TICKS[kind][0]); svg.setAttribute('aria-hidden', 'true'); svg.innerHTML = TICKS[kind][1];
+  n.append(svg);
+  return n;
 }
 function linkify(text) {
   const box = el('div', { class: 'c-text' });
@@ -1352,7 +1365,12 @@ const ice = { cfg: null, at: 0 };
 async function iceConfig() { if (!ice.cfg || Date.now() - ice.at > 600000) { ice.cfg = await call('call_ice'); ice.at = Date.now(); } return ice.cfg; }
 function makePc(cfg) {
   const pc = new RTCPeerConnection({ iceServers: cfg.ice_servers, iceTransportPolicy: cfg.relay_only ? 'relay' : 'all' });
-  pc.ontrack = (e) => { cur?.ui.remote && (cur.ui.remote.srcObject = e.streams[0]); };
+  pc.ontrack = (e) => {
+    if (!cur?.ui) return;
+    cur.ui.remote.srcObject = e.streams[0];      // picture only (muted element)
+    cur.ui.audio.srcObject = e.streams[0];       // sound: one dedicated <audio> element whose output we can route
+    cur.ui.audio.play?.().catch(() => {});
+  };
   pc.onconnectionstatechange = () => {
     if (!cur || cur.pc !== pc) return;
     if (pc.connectionState === 'connected' && cur.state !== 'connected') onConnected();
@@ -1361,8 +1379,58 @@ function makePc(cfg) {
   return pc;
 }
 const gathered = (pc) => new Promise((r) => { if (pc.iceGatheringState === 'complete') return r(); const t = setTimeout(r, 3000); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); r(); } }); });
+const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 async function media(video) {
-  return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: video ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false });
+  return navigator.mediaDevices.getUserMedia({ audio: MIC, video: video ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false });
+}
+// ---- Audio route: phone earpiece (گوشی) vs loudspeaker (بلندگو).
+// A web page cannot call the phone's audio-routing API directly. What browsers do expose:
+//  • Chrome on Android lists the routes as audio devices ("Headset earpiece", "Speakerphone"); choosing the
+//    microphone device switches the whole call route, and setSinkId() can pick the output.
+//  • Safari on iPhone puts WebRTC calls on the earpiece by itself and offers no switch.
+// Voice calls start on the earpiece where possible; video calls on the speaker. The 🔊 button appears only
+// where switching really works on this device.
+const EARPIECE = /earpiece|receiver|handset|گوشی/i, SPEAKER = /speaker|بلندگو/i;
+async function audioRoutes() {
+  let devs = [];
+  try { devs = await navigator.mediaDevices.enumerateDevices(); } catch { /* unsupported */ }
+  const pick = (kind, re) => devs.find((d) => d.kind === kind && re.test(d.label) && !(re === SPEAKER && EARPIECE.test(d.label)));
+  const r = { inEar: pick('audioinput', EARPIECE), inSpk: pick('audioinput', SPEAKER), outEar: pick('audiooutput', EARPIECE), outSpk: pick('audiooutput', SPEAKER) };
+  r.sink = !!(r.outEar && r.outSpk && HTMLMediaElement.prototype.setSinkId);
+  r.input = !!(r.inEar && r.inSpk);
+  r.can = r.sink || r.input;
+  return r;
+}
+async function setRoute(speaker) {
+  const c = cur;
+  if (!c?.stream) return false;
+  c.routes ||= await audioRoutes();
+  const r = c.routes;
+  let ok = false;
+  if (r.sink) { try { await c.ui.audio.setSinkId((speaker ? r.outSpk : r.outEar).deviceId); ok = true; } catch { /* not allowed */ } }
+  if (r.input) {
+    try {
+      const old = c.stream.getAudioTracks()[0];
+      const s2 = await navigator.mediaDevices.getUserMedia({ audio: { ...MIC, deviceId: { exact: (speaker ? r.inSpk : r.inEar).deviceId } } });
+      const t = s2.getAudioTracks()[0];
+      if (cur !== c) { t.stop(); return false; }
+      t.enabled = old ? old.enabled : true;
+      await c.pc?.getSenders().find((x) => x.track?.kind === 'audio')?.replaceTrack(t);
+      if (old) { old.stop(); c.stream.removeTrack(old); }
+      c.stream.addTrack(t);
+      ok = true;
+    } catch { /* device busy / unsupported */ }
+  }
+  if (ok) c.speaker = speaker;
+  return ok;
+}
+async function initRoute() {
+  const c = cur;
+  if (!c) return;
+  c.routes = await audioRoutes();
+  c.speaker = !!c.video; // earpiece for voice, loudspeaker for video
+  if (c.routes.can) await setRoute(c.speaker);
+  if (cur === c) renderCall();
 }
 function ring(on) {
   if (!on) { cur?.ring?.close?.(); if (cur) cur.ring = null; return; }
@@ -1374,15 +1442,18 @@ function ring(on) {
   } catch { /* autoplay blocked: the visual ring still shows */ }
 }
 function callUi() {
-  const remote = el('video', { class: 'cl-remote', autoplay: true, playsinline: true });
+  const remote = el('video', { class: 'cl-remote', autoplay: true, playsinline: true, muted: true });
+  const audio = el('audio', { class: 'cl-audio', autoplay: true, playsinline: true });
   const local = el('video', { class: 'cl-local', autoplay: true, playsinline: true, muted: true });
+  remote.muted = true; // the attribute alone does not mute a script-created element
+  local.muted = true;  // never play your own microphone back
   const status = el('div', { class: 'cl-status' });
   const info2 = el('div', { class: 'cl-info' });
   const controls = el('div', { class: 'cl-controls' });
   const root2 = el('div', { class: 'cl-overlay' + (cur.video ? ' video' : ''), role: 'dialog', 'aria-label': 'تماس' },
-    remote, local, el('div', { class: 'cl-top' }, el('div', { class: 'cl-rings' }, avatar(cur.name, cur.peer, 'user', 'cl-av')), el('b', { class: 'cl-name', text: cur.name }), status, info2), controls);
+    remote, audio, local, el('div', { class: 'cl-top' }, el('div', { class: 'cl-rings' }, avatar(cur.name, cur.peer, 'user', 'cl-av')), el('b', { class: 'cl-name', text: cur.name }), status, info2), controls);
   document.body.append(root2);
-  cur.ui = { root: root2, remote, local, status, info: info2, controls };
+  cur.ui = { root: root2, remote, audio, local, status, info: info2, controls };
   renderCall();
 }
 function renderCall() {
@@ -1399,6 +1470,9 @@ function renderCall() {
   u.controls.replaceChildren(
     a ? btn(a.enabled ? 'قطع میکروفون' : 'وصل میکروفون', a.enabled ? 'mic' : '🔇', () => { a.enabled = !a.enabled; renderCall(); }, a.enabled ? '' : 'off') : '',
     v ? btn(v.enabled ? 'خاموش کردن دوربین' : 'روشن کردن دوربین', v.enabled ? 'video' : '🚫', () => { v.enabled = !v.enabled; renderCall(); }, v.enabled ? '' : 'off') : '',
+    cur.routes?.can ? btn(cur.speaker ? 'بلندگو روشن — پخش از گوشی' : 'پخش از بلندگو', 'speaker', async () => {
+      if (await setRoute(!cur.speaker)) renderCall(); else toast('تغییر خروجی صدا روی این دستگاه ممکن نشد.');
+    }, cur.speaker ? 'off' : '') : '',
     v && cur.cams > 1 ? btn('تعویض دوربین جلو و عقب', 'refresh', switchCamera) : '',
     btn('پایان تماس', 'phone', () => hangup(), 'red hang'));
 }
@@ -1413,6 +1487,7 @@ async function startCall(video) {
     const cfg = await iceConfig();
     cur.stream = await media(video);
     cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
+    await initRoute();
     cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length;
     cur.id = await call('call_start', { cid: cur.cid });
     cur.pc = makePc(cfg);
@@ -1465,6 +1540,7 @@ async function acceptCall() {
     const cfg = await iceConfig();
     cur.stream = await media(cur.video);
     cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
+    await initRoute();
     cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput').length;
     cur.pc = makePc(cfg);
     cur.stream.getTracks().forEach((t) => cur.pc.addTrack(t, cur.stream));
