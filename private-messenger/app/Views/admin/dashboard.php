@@ -9,6 +9,7 @@
   <div class="stat"><span class="small muted">آنلاین (تقریبی، ۱۰ دقیقه)</span><b><?= e(Fa::digits($stats['online'])) ?></b></div>
   <div class="stat"><span class="small muted">نشست‌های فعال</span><b><?= e(Fa::digits($stats['sessions'])) ?></b></div>
   <div class="stat"><span class="small muted">حساب‌های قفل‌شده موقت</span><b><?= e(Fa::digits($stats['locked'])) ?></b></div>
+  <div class="stat"><span class="small muted">تماس‌ها (۲۴ ساعت)</span><b><?= e(Fa::digits($stats['calls']['calls'])) ?></b><span class="small"><?= e(Fa::digits(intdiv($stats['calls']['seconds'], 60))) ?> دقیقه، <?= e(Fa::digits($stats['calls']['failed'])) ?> ناموفق، <?= e(Fa::digits($stats['calls']['missed'])) ?> بی‌پاسخ</span></div>
 </div>
 <div class="panel small">
   <div>روش ورود فعلی: <b><?= e(Settings::AUTH_METHODS[$method] ?? $method) ?></b></div>

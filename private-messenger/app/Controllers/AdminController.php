@@ -34,6 +34,8 @@ final class AdminController extends Controller
         'retention' => 'تنظیم نگهداری فایل تغییر کرد.',
         'device_revoked' => 'دستگاه لغو شد.',
         'cleanup' => 'پاک‌سازی اجرا شد.',
+        'font_saved' => 'فونت ذخیره شد. کاربران با بارگذاری دوباره صفحه آن را می‌بینند.',
+        'font_deleted' => 'فایل فونت حذف شد.',
         'identity_reset' => 'هویت رمزنگاری کاربر بازنشانی شد.',
         'totp_on' => 'ورود دومرحله‌ای (TOTP) فعال شد.',
         'totp_off' => 'ورود دومرحله‌ای غیرفعال شد.',
@@ -73,6 +75,9 @@ final class AdminController extends Controller
         $r->post('/admins', $this->need('admins.manage', fn (Request $q) => $this->adminCreate($q), true));
         $r->post('/admins/{id}/status', $this->need('admins.manage', fn (Request $q) => $this->adminStatus($q), true));
 
+        $r->get('/fonts', $this->need('settings.view', fn (Request $q) => $this->fontsPage($q)));
+        $r->post('/fonts', $this->need('settings.edit', fn (Request $q) => $this->fontsUpload($q), true));
+        $r->post('/fonts/delete', $this->need('settings.edit', fn (Request $q) => $this->fontsDelete($q), true));
         $r->get('/storage', $this->need('storage.view', fn (Request $q) => $this->storagePage($q)));
         $r->post('/storage/cleanup', $this->need('storage.cleanup.run', fn (Request $q) => $this->storageCleanup($q), true));
         $r->get('/audit', $this->need('audit.view', fn (Request $q) => $this->auditPage($q)));
@@ -183,6 +188,7 @@ final class AdminController extends Controller
                 [Clock::now()->modify('-10 minutes')->format('Y-m-d H:i:s')]),
             'locked' => (int)$db->scalar('SELECT COUNT(*) FROM users WHERE locked_until > ?', [$now]),
             'admins' => (int)$db->scalar("SELECT COUNT(*) FROM admin_users WHERE status = 'active'"),
+            'calls' => (new \PM\Calls\CallService($db, $this->app->settings()))->stats(),
         ];
         $s = $this->app->settings();
         $warnings = [];
@@ -197,6 +203,9 @@ final class AdminController extends Controller
         $cron = $db->one("SELECT finished_at, status FROM cron_runs WHERE job = 'maintenance' ORDER BY id DESC LIMIT 1");
         if ($cron === null || strtotime($cron['finished_at'] . ' UTC') < Clock::now()->getTimestamp() - 86400) {
             $warnings[] = 'Cron نگهداری در ۲۴ ساعت گذشته اجرا نشده است. دستور Cron را در cPanel اضافه کنید (صفحه «سیستم»).';
+        }
+        if ((string)$s->get('calls.turn_mode') === 'none') {
+            $warnings[] = 'سرور TURN تنظیم نشده است: تماس صوتی/تصویری در شبکه‌های ساده برقرار می‌شود ولی بین برخی اینترنت‌های همراه یا شبکه‌های سازمانی ممکن است وصل نشود (تنظیمات ← تماس).';
         }
         if ((int)$this->admin['totp_enabled'] === 0) {
             $warnings[] = 'ورود دومرحله‌ای (TOTP) برای حساب مدیریتی شما فعال نیست. از صفحه «حساب من» فعال کنید.';
@@ -386,6 +395,11 @@ final class AdminController extends Controller
                 'otp.message' => mb_substr(trim($req->input('otp_message')), 0, 160) ?: 'کد: {code}',
                 'app.internal_name' => mb_substr(trim($req->input('internal_name')), 0, 60) ?: 'پیام‌رسان',
                 'files.max_bytes' => $int($req->input('files_max_mb', '0'), 0, 1048576, 'سقف حجم فایل') * 1048576,
+                'calls.stun' => trim(preg_replace('/[^A-Za-z0-9:.\-\s,]/', '', $req->input('calls_stun')) ?? ''),
+                'calls.turn_urls' => trim(preg_replace('/[^A-Za-z0-9:.\-\s,?=&_]/', '', $req->input('calls_turn_urls')) ?? ''),
+                'calls.turn_mode' => in_array($req->input('calls_turn_mode'), ['none', 'secret', 'static'], true) ? $req->input('calls_turn_mode') : 'none',
+                'calls.turn_username' => mb_substr(trim($req->input('calls_turn_username')), 0, 100),
+                'calls.relay_only' => $req->input('calls_relay_only') === '1',
                 'storage.quota_bytes' => $int($req->input('quota_gb', '0'), 0, 100000, 'سهمیه فضا') * 1073741824,
             ];
             if ($new['sms.generic_url'] !== '' && !str_starts_with($new['sms.generic_url'], 'https://')) {
@@ -412,6 +426,12 @@ final class AdminController extends Controller
             if ($s->get($k) !== $v) {
                 $s->set($k, $v, (int)$this->admin['id']);
                 $changed[] = $k;
+            }
+        }
+        foreach (['calls_turn_secret' => 'calls.turn_secret', 'calls_turn_password' => 'calls.turn_password'] as $field => $key) {
+            if ($req->input($field) !== '') {
+                $s->setSecret($key, $req->input($field), (int)$this->admin['id']);
+                $changed[] = $key;
             }
         }
         if ($req->input('sms_api_key') !== '') {
@@ -469,6 +489,74 @@ final class AdminController extends Controller
             return $this->adminsPage($req, $e->getMessage());
         }
         return $this->back('/admins', 'saved');
+    }
+
+    public const FONT_WEIGHTS = ['Light' => '300 — نازک', 'Regular' => '400 — معمولی', 'Medium' => '500 — متوسط', 'Bold' => '700 — ضخیم'];
+
+    private function fontDir(): string
+    {
+        return $this->app->root . '/app/resources/assets/fonts';
+    }
+
+    private function fontsPage(Request $req, ?string $error = null): Response
+    {
+        $state = [];
+        foreach (array_keys(self::FONT_WEIGHTS) as $w) {
+            $f = null;
+            foreach (["IRANSans-$w.woff2", $w === 'Regular' ? 'IRANSansWeb.woff2' : "IRANSansWeb_$w.woff2"] as $n) {
+                if (is_file($this->fontDir() . '/' . $n)) {
+                    $f = ['name' => $n, 'size' => filesize($this->fontDir() . '/' . $n)];
+                    break;
+                }
+            }
+            $state[$w] = $f;
+        }
+        return $this->page($req, 'admin/fonts', $this->vars(['fonts' => $state, 'error' => $error, 'nav' => 'fonts', 'msg' => $this->msg($req),
+            'writable' => is_dir($this->fontDir()) && is_writable($this->fontDir()), 'can_edit' => AdminService::can($this->admin, 'settings.edit')]));
+    }
+
+    /** Accepts WOFF2 files only (checked by signature, not by name), stored under fixed names; never executable. */
+    private function fontsUpload(Request $req): Response
+    {
+        $saved = 0;
+        foreach (array_keys(self::FONT_WEIGHTS) as $w) {
+            $f = $_FILES['font_' . $w] ?? null;
+            if (!is_array($f) || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+            if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
+                return $this->fontsPage($req, 'آپلود فایل ' . $w . ' ناموفق بود (کد ' . (int)$f['error'] . ').');
+            }
+            if ($f['size'] > 3 * 1048576 || file_get_contents($f['tmp_name'], false, null, 0, 4) !== 'wOF2') {
+                return $this->fontsPage($req, 'فایل ' . $w . ' یک فونت WOFF2 معتبر نیست. فقط فایل‌های ‎.woff2‎ (حداکثر ۳ مگابایت) پذیرفته می‌شوند.');
+            }
+            if (!is_dir($this->fontDir()) && !@mkdir($this->fontDir(), 0755, true)) {
+                return $this->fontsPage($req, 'پوشه فونت قابل ساخت نیست.');
+            }
+            $dest = $this->fontDir() . "/IRANSans-$w.woff2";
+            if (!@move_uploaded_file($f['tmp_name'], $dest)) {
+                return $this->fontsPage($req, 'ذخیره فایل ممکن نشد؛ مجوز پوشه app/resources/assets/fonts را بررسی کنید.');
+            }
+            @chmod($dest, 0644);
+            $saved++;
+        }
+        if ($saved === 0) {
+            return $this->fontsPage($req, 'هیچ فایلی انتخاب نشده است.');
+        }
+        $this->audit()->record('admin', (int)$this->admin['id'], 'settings.font_upload', null, null, ['files' => $saved], $req->ip());
+        return $this->back('/fonts', 'font_saved');
+    }
+
+    private function fontsDelete(Request $req): Response
+    {
+        $w = $req->input('weight');
+        if (isset(self::FONT_WEIGHTS[$w])) {
+            foreach (["IRANSans-$w.woff2", $w === 'Regular' ? 'IRANSansWeb.woff2' : "IRANSansWeb_$w.woff2"] as $n) {
+                @unlink($this->fontDir() . '/' . $n);
+            }
+            $this->audit()->record('admin', (int)$this->admin['id'], 'settings.font_delete', null, null, ['weight' => $w], $req->ip());
+        }
+        return $this->back('/fonts', 'font_deleted');
     }
 
     private function storagePage(Request $req, ?array $result = null): Response

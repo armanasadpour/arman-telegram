@@ -16,6 +16,23 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
     </div>
   </div>
   <div class="panel">
+    <h2>تماس صوتی و تصویری</h2>
+    <p class="small muted">تماس‌ها درون‌برنامه‌ای و از طریق اینترنت (WebRTC) هستند. صدا و تصویر با DTLS-SRTP رمزنگاری می‌شود و اطلاعات برقراری تماس داخل پیام‌های رمزنگاری‌شده سرتاسری منتقل می‌شود.</p>
+    <label class="field"><span>سرورهای STUN (هر کدام در یک خط؛ پیش‌فرض STUN عمومی گوگل است که IP تماس‌گیرنده را می‌بیند — خالی یعنی فقط شبکه محلی)</span>
+      <textarea name="calls_stun" class="ltr" rows="2" <?= $dis ?>><?= e($v('calls.stun')) ?></textarea></label>
+    <label class="field"><span>سرور TURN (اختیاری؛ برای شبکه‌هایی که اتصال مستقیم ندارند) — مثلاً turn:turn.example.com:3478 و turns:turn.example.com:443?transport=tcp</span>
+      <textarea name="calls_turn_urls" class="ltr" rows="2" <?= $dis ?>><?= e($v('calls.turn_urls')) ?></textarea></label>
+    <div class="grid2">
+      <label class="field"><span>نوع احراز هویت TURN</span><select name="calls_turn_mode" <?= $dis ?>>
+        <?php foreach (['none' => 'بدون TURN', 'secret' => 'راز مشترک (coturn use-auth-secret) — پیشنهادی', 'static' => 'نام کاربری و رمز ثابت'] as $k => $l): ?><option value="<?= e($k) ?>" <?= $v('calls.turn_mode') === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?>
+      </select></label>
+      <label class="field"><span>راز مشترک TURN (خالی = حفظ مقدار فعلی)</span><input type="password" name="calls_turn_secret" class="ltr" autocomplete="off" placeholder="<?= $s->hasSecret('calls.turn_secret') ? '•••••• (ذخیره شده)' : '' ?>" <?= $dis ?>></label>
+      <label class="field"><span>نام کاربری TURN (حالت ثابت)</span><input type="text" name="calls_turn_username" class="ltr" value="<?= e($v('calls.turn_username')) ?>" <?= $dis ?>></label>
+      <label class="field"><span>رمز TURN (حالت ثابت؛ خالی = حفظ مقدار فعلی)</span><input type="password" name="calls_turn_password" class="ltr" autocomplete="off" <?= $dis ?>></label>
+    </div>
+    <label class="check"><input type="checkbox" name="calls_relay_only" value="1" <?= $v('calls.relay_only') ? 'checked' : '' ?> <?= $dis ?>> همه تماس‌ها فقط از طریق TURN (IP کاربران از هم پنهان می‌ماند؛ نیازمند TURN)</label>
+  </div>
+  <div class="panel">
     <h2>فایل‌ها و فضا</h2>
     <div class="grid2">
       <label class="field"><span>سقف حجم هر فایل به مگابایت (۰ = بدون محدودیت نرم‌افزاری)</span><input type="number" name="files_max_mb" value="<?= e(intdiv((int)$v('files.max_bytes'), 1048576)) ?>" <?= $dis ?>></label>

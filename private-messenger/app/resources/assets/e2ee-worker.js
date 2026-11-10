@@ -9,6 +9,8 @@ const SEG = 262144, SEGC = SEG + 16;                    // file encryption segme
 const enc = new TextEncoder(), dec = new TextDecoder();
 const FILE_AAD = enc.encode('pm-file-v1');
 const EVENT_TYPES = ['edit', 'delete', 'reaction', 'pin'];
+const CALL_ACTIONS = ['offer', 'answer', 'reject', 'hangup', 'cancel', 'busy'];
+let callMode = false;
 
 let db, lsk, pk, account, msk, me, deviceId, cursor = 0, ncursor = 0;
 let visible = true, syncing = false, stopped = false, timer = null, lastTyping = 0;
@@ -366,6 +368,7 @@ function validPayload(p, env) {
     case 'text': return validStr(b.text, MAX_TEXT) && (b.reply_to == null || validStr(b.reply_to, 30));
     case 'file': return validStr(b.text ?? '', MAX_TEXT) && validStr(b.att?.id, 64) && validStr(b.att?.key, 64) && validStr(b.att?.prefix, 16) && Number.isSafeInteger(b.att?.size);
     case 'read': return Array.isArray(b.mids) && b.mids.length <= 200 && b.mids.every((x) => validStr(x, 30));
+    case 'call': return validStr(b.call_id, 26) && CALL_ACTIONS.includes(b.action) && (b.sdp == null || validStr(b.sdp, 30000)) && typeof (b.video ?? false) === 'boolean';
     default: return EVENT_TYPES.includes(p.t) && validStr(b.target, 30);
   }
 }
@@ -419,6 +422,12 @@ async function receive(env) {
     const m = { ...base, text: p.body.text || '', reply_to: p.body.reply_to || null, flag, fwd: p.body.fwd === true, att: p.t === 'file' ? sanitizeAtt(p.body.att) : null };
     await putMessage(m, ops); emit('message', m);
     await applyPendingEvents(m.mid);
+    return;
+  }
+  if (p.t === 'call') {
+    await write([...ops, ['events', { mid: p.mid, applied: true }]]);
+    // Offers older than 90 s are stale (e.g. delivered after the device was offline): never ring for them.
+    if (Date.now() - p.ts < 90000 || p.body.action !== 'offer') emit('call', { cid: p.cid, from: p.su, ts: p.ts, ...p.body });
     return;
   }
   await write([...ops, ['events', { mid: p.mid, applied: false, p }]]);
@@ -487,7 +496,7 @@ async function syncOnce() {
 }
 function schedule() {
   clearTimeout(timer);
-  if (!stopped) timer = setTimeout(async () => { await syncOnce(); schedule(); }, visible ? 2500 : 15000);
+  if (!stopped) timer = setTimeout(async () => { await syncOnce(); schedule(); }, callMode ? 1000 : visible ? 2500 : 15000);
 }
 
 // ------------------------------------------------------------------ safety number (Signal numeric fingerprint)
@@ -564,7 +573,20 @@ const commands = {
   start,
   async reset_identity() { if (!db) { db = await openDb(`pm-e2ee-${me.id}`); await loadLocalKeys(); } await createIdentity(true); cursor = 0; ncursor = 0; return ready(''); },
   conversations,
-  async directory() { return (await api('/directory')).users; },
+  async search_users({ q }) { return (await api('/users/search?q=' + encodeURIComponent(q))).users; },
+  async contacts() { return (await api('/contacts')).users; },
+  async follow({ user_id, on }) { await api(on ? '/contacts' : '/contacts/remove', { method: 'POST', body: { user_id } }); },
+  async call_ice() { return api('/calls/ice'); },
+  async call_start({ cid }) { return (await api('/calls', { method: 'POST', body: { conversation_id: cid } })).id; },
+  async call_status({ id, status, reason }) { try { return (await api(`/calls/${encodeURIComponent(id)}/status`, { method: 'POST', body: { status, reason } })).status; } catch { return null; } },
+  async call_history() { return (await api('/calls')).calls; },
+  /** Sends an end-to-end encrypted call signal (offer / answer / hangup …). Not stored as a chat message. */
+  async call_signal({ cid, peer, body }) {
+    const mid = newId();
+    await write([['events', { mid, applied: true }]]);
+    await deliver(cid, peer, mid, payloadOf(cid, mid, 'call', body));
+  },
+  call_mode({ active }) { callMode = !!active; if (callMode) { syncOnce(); schedule(); } else schedule(); },
   async open_direct({ user_id }) { return (await api('/conversations', { method: 'POST', body: { user_id } })).id; },
   messages: ({ cid }) => messages(cid),
   send: ({ cid, peer, text, reply_to }) => sendMessage(cid, peer, 'text', { text: String(text).slice(0, MAX_TEXT), reply_to: reply_to || null }),

@@ -162,3 +162,21 @@ body:has(#app) { display: flex; flex-direction: column; height: 100vh; height: 1
 .c-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px; z-index: 200; max-width: 90vw; }
 .flash { animation: flash 1.6s; }
 @keyframes flash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: none; } }
+
+/* ---------------- Calls & contacts (phase 5) ---------------- */
+.c-user .btn { flex: none; }
+.c-missed { color: var(--danger) !important; }
+.cl-overlay { position: fixed; inset: 0; z-index: 300; background: #0b1220; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 32px 16px; }
+.cl-remote { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0b1220; display: none; }
+.cl-local { position: absolute; width: 120px; height: 160px; object-fit: cover; border-radius: 12px; inset-block-end: 120px; inset-inline-start: 16px; background: #111; display: none; z-index: 2; }
+.cl-overlay.video .cl-remote, .cl-overlay.video.has-local .cl-local { display: block; }
+.cl-top { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.cl-av { width: 96px; height: 96px; font-size: 36px; }
+.cl-overlay.video .cl-av { width: 56px; height: 56px; font-size: 22px; }
+.cl-status { opacity: .85; font-size: 14px; }
+.cl-info { opacity: .7; font-size: 12px; }
+.cl-controls { position: relative; z-index: 2; display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.cl-btn { width: 60px; height: 60px; border-radius: 50%; border: 0; background: rgba(255,255,255,.16); color: #fff; font-size: 24px; cursor: pointer; }
+.cl-btn.off { background: #fff; color: #0b1220; }
+.cl-btn.red { background: #e5484d; }
+.cl-btn.green { background: #22a06b; }

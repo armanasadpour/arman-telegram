@@ -34,9 +34,16 @@ final class ApiController extends Controller
         $r->post('/api/v1/keys/upload', fn (Request $q) => $this->auth($q, fn () => $this->upload($q), true));
         $r->get('/api/v1/users/{id}/keys', fn (Request $q) => $this->auth($q, fn () => $this->userKeys($q), true));
         $r->post('/api/v1/keys/claim', fn (Request $q) => $this->auth($q, fn () => $this->claim($q), true));
-        $r->get('/api/v1/directory', fn (Request $q) => $this->auth($q, fn () => Response::json(['users' => array_map(
-            fn ($u) => ['id' => $u['id'], 'display_name' => $u['display_name'], 'username' => $u['username'], 'has_identity' => (bool)$u['has_identity']],
-            $this->msgs()->directory((int)$this->s['id']))])));
+        $r->get('/api/v1/users/search', fn (Request $q) => $this->auth($q, fn () => $this->limiter()->hit('usersearch:' . $this->s['id'], 300, 3600)
+            ? Response::json(['users' => self::users($this->msgs()->searchUsers((int)$this->s['id'], $q->queryString('q')))]) : self::err('rate_limited', 429)));
+        $r->get('/api/v1/contacts', fn (Request $q) => $this->auth($q, fn () => Response::json(['users' => self::users($this->msgs()->contacts((int)$this->s['id']))])));
+        $r->post('/api/v1/contacts', fn (Request $q) => $this->auth($q, fn () => $this->follow($q, true)));
+        $r->post('/api/v1/contacts/remove', fn (Request $q) => $this->auth($q, fn () => $this->follow($q, false)));
+        $r->get('/api/v1/calls', fn (Request $q) => $this->auth($q, fn () => Response::json(['calls' => $this->calls()->history((int)$this->s['id'])])));
+        $r->get('/api/v1/calls/ice', fn (Request $q) => $this->auth($q, fn () => Response::json($this->calls()->iceConfig((string)$this->s['public_id']))));
+        $r->post('/api/v1/calls', fn (Request $q) => $this->auth($q, fn () => Response::json(['id' => $this->calls()->start((int)$this->s['id'], (string)($this->json($q)['conversation_id'] ?? ''))], 201), true));
+        $r->post('/api/v1/calls/{id}/status', fn (Request $q) => $this->auth($q, fn () => Response::json(['status' => $this->calls()->update((int)$this->s['id'], $q->param('id'),
+            (string)($this->json($q)['status'] ?? ''), isset($this->json($q)['reason']) ? (string)$this->json($q)['reason'] : null)]), true));
         $r->get('/api/v1/conversations', fn (Request $q) => $this->auth($q, fn () => $this->conversations()));
         $r->post('/api/v1/conversations', fn (Request $q) => $this->auth($q, fn () => Response::json(['id' => $this->msgs()->openDirect((int)$this->s['id'], (string)($this->json($q)['user_id'] ?? ''))])));
         $r->post('/api/v1/messages', fn (Request $q) => $this->auth($q, fn () => $this->send($q), true));
@@ -52,6 +59,23 @@ final class ApiController extends Controller
         $r->get('/api/v1/conversations/{id}/presence', fn (Request $q) => $this->auth($q, fn () => Response::json(['devices' => $this->msgs()->presentDevices((int)$this->s['id'], $q->param('id'))]), true));
         $r->post('/api/v1/ephemeral', fn (Request $q) => $this->auth($q, fn () => Response::json(['sent' => $this->msgs()->sendEphemeral((int)$this->s['id'], (int)$this->s['session_device_id'], $this->json($q))]), true));
         return $r->dispatch($req);
+    }
+
+    private function calls(): \PM\Calls\CallService
+    {
+        return new \PM\Calls\CallService($this->app->db(), $this->app->settings());
+    }
+
+    private static function users(array $rows): array
+    {
+        return array_map(fn ($u) => ['id' => $u['id'], 'display_name' => $u['display_name'], 'username' => $u['username'],
+            'has_identity' => (bool)$u['has_identity'], 'is_contact' => (bool)$u['is_contact']], $rows);
+    }
+
+    private function follow(Request $req, bool $on): Response
+    {
+        $this->msgs()->follow((int)$this->s['id'], (string)($this->json($req)['user_id'] ?? ''), $on);
+        return Response::json(['ok' => true]);
     }
 
     private function files(): \PM\Files\AttachmentService
@@ -129,7 +153,7 @@ final class ApiController extends Controller
             $code = $e->getMessage();
             $status = match ($code) {
                 'identity_exists' => 409, 'insufficient_storage' => 507, 'file_too_large' => 413,
-                'upload_not_found', 'attachment_not_found' => 404, default => 400,
+                'upload_not_found', 'attachment_not_found', 'call_not_found', 'user_not_found' => 404, default => 400,
             };
             return self::err(preg_match('/^[a-z_]+$/', $code) ? $code : 'invalid_request', $status);
         }

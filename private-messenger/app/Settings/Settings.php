@@ -39,6 +39,11 @@ final class Settings
         'sms.generic_body' => '{"to":"{phone}","text":"{message}"}',
         'sms.generic_auth_header' => '',
         'app.internal_name' => 'پیام‌رسان',
+        'calls.stun' => 'stun:stun.l.google.com:19302', // public STUN (reveals the caller's IP to its operator); editable
+        'calls.turn_urls' => '',
+        'calls.turn_mode' => 'none',     // none | secret (coturn use-auth-secret) | static
+        'calls.turn_username' => '',
+        'calls.relay_only' => false,
         'files.max_bytes' => 0,          // 0 = no software limit (real limit: disk/quota)
         'storage.quota_bytes' => 0,      // hosting quota entered by the admin (PHP cannot read cPanel quotas); 0 = unknown
     ];

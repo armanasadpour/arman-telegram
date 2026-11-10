@@ -28,6 +28,7 @@ const ERR = {
   key_changed: 'کلید امنیتی مخاطب تغییر کرده است', file_expired: 'فایل از سرور حذف شده است (بیش از ۷ روز گذشته)', insufficient_storage: 'فضای سرور کافی نیست؛ با مدیر تماس بگیرید',
   file_too_large: 'حجم فایل از سقف تعیین‌شده توسط مدیر بیشتر است', file_missing: 'برای ارسال دوباره، فایل را دوباره انتخاب کنید', attachment_not_found: 'فایل دیگر روی سرور نیست',
   peer_has_no_devices: 'مخاطب هنوز وارد برنامه نشده است', target_not_found: 'پیام پیدا نشد',
+  rate_limited: 'درخواست‌های زیادی ارسال شده؛ کمی بعد دوباره تلاش کنید', query_too_short: 'حداقل ۳ حرف وارد کنید',
 };
 const errText = (e) => ERR[e] || ERR[e?.message] || 'خطا: ' + (e?.message || e);
 function toast(text) {
@@ -46,6 +47,7 @@ worker.onmessage = ({ data }) => {
   if (event === 'key_changed' && current?.peer?.id === d.user_id) renderBanner();
   if (event === 'conversations_changed') scheduleRefresh();
   if (event === 'state') handleState(d);
+  if (event === 'call') onCallSignal(d);
 };
 worker.onerror = () => status('خطا در بارگذاری موتور رمزنگاری. صفحه را دوباره بارگذاری کنید.');
 
@@ -77,7 +79,8 @@ function renderApp() {
   searchEl = el('input', { type: 'search', class: 'c-search', placeholder: 'جست‌وجو در پیام‌های همین دستگاه', 'aria-label': 'جست‌وجوی محلی', oninput: onSearch });
   root.replaceChildren(el('div', { class: 'c-app' },
     el('aside', { class: 'c-side' },
-      el('div', { class: 'c-side-head' }, el('h1', { text: 'گفتگوها' }), el('button', { class: 'btn sm', text: 'گفتگوی جدید', onclick: openDirectory })),
+      el('div', { class: 'c-side-head' }, el('h1', { text: 'گفتگوها' }),
+        el('div', { class: 'row' }, el('button', { class: 'btn secondary sm', text: 'تماس‌ها', onclick: showCallHistory }), el('button', { class: 'btn sm', text: 'گفتگوی جدید', onclick: openDirectory }))),
       el('div', { class: 'c-search-wrap' }, searchEl),
       listEl,
       el('p', { class: 'c-note', text: '🔒 پیام‌ها فقط روی همین دستگاه و به‌صورت رمزنگاری‌شده نگهداری می‌شوند. پاک کردن داده‌های مرورگر یعنی از دست رفتن پیام‌های قبلی این دستگاه.' })),
@@ -116,18 +119,48 @@ function onSearch() {
         el('span', { class: 'c-time', text: faDay.format(r.ts) })); }));
   }, 250);
 }
+/** New chat: your contacts (people you follow) + search by name/username. There is no list of all members. */
 async function openDirectory() {
-  const users = await call('directory');
-  const dlg = dialog('شروع گفتگو', el('div', { class: 'c-dir' }, ...users.map((u) => el('button', { class: 'c-item', disabled: !u.has_identity, onclick: async () => {
-    close(dlg);
-    const id = await call('open_direct', { user_id: u.id });
-    await refreshList();
-    const c = convs.find((x) => x.id === id);
-    if (c) openConversation(c);
-  } }, el('span', { class: 'c-av', text: u.display_name.slice(0, 1) }),
-    el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: u.display_name }), el('span', { class: 'c-prev', text: u.has_identity ? u.username : 'هنوز وارد برنامه نشده است' }))))),
-  users.length ? null : el('p', { class: 'muted', text: 'کاربر دیگری وجود ندارد.' }));
+  const listBox = el('div', { class: 'c-dir' });
+  const hint = el('p', { class: 'small muted' });
+  const input = el('input', { type: 'search', placeholder: 'جست‌وجوی کاربر: حداقل ۳ حرف از نام یا نام کاربری', 'aria-label': 'جست‌وجوی کاربر' });
+  const row = (u) => {
+    const followBtn = el('button', { class: 'btn sm ' + (u.is_contact ? 'secondary' : ''), text: u.is_contact ? '✓ دنبال‌شده' : '+ دنبال کردن',
+      onclick: async () => { try { await call('follow', { user_id: u.id, on: !u.is_contact }); u.is_contact = !u.is_contact; followBtn.replaceWith(row(u).querySelector('.c-follow')); } catch (e) { toast(errText(e)); } } });
+    followBtn.classList.add('c-follow');
+    return el('div', { class: 'c-item c-user' }, el('span', { class: 'c-av', text: u.display_name.slice(0, 1) }),
+      el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: u.display_name }), el('span', { class: 'c-prev', text: u.has_identity ? '@' + u.username : 'هنوز وارد برنامه نشده است' })),
+      followBtn,
+      el('button', { class: 'btn sm', text: 'گفتگو', disabled: !u.has_identity, onclick: async () => {
+        close(dlg);
+        const id = await call('open_direct', { user_id: u.id });
+        await refreshList();
+        const c = convs.find((x) => x.id === id);
+        if (c) openConversation(c);
+      } }));
+  };
+  const showContacts = async () => {
+    const users = await call('contacts');
+    hint.textContent = users.length ? 'مخاطبین شما (افرادی که دنبال کرده‌اید):' : 'هنوز کسی را دنبال نکرده‌اید. نام یا نام کاربری فرد را جست‌وجو کنید.';
+    listBox.replaceChildren(...users.map(row));
+  };
+  let t;
+  input.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(async () => {
+      const q = input.value.trim();
+      if (q.length < 3) return showContacts();
+      try {
+        const users = await call('search_users', { q });
+        hint.textContent = users.length ? 'نتیجه جست‌وجو:' : 'کاربری با این مشخصات پیدا نشد.';
+        listBox.replaceChildren(...users.map(row));
+      } catch (e) { hint.textContent = errText(e); }
+    }, 300);
+  });
+  const dlg = dialog('شروع گفتگو', input, hint, listBox);
   dlg.showModal();
+  input.focus();
+  showContacts();
 }
 function dialog(title, ...body) {
   const dlg = el('dialog', { class: 'c-dialog' }, el('h2', { text: title }), ...body, el('button', { class: 'btn secondary block mt', text: 'بستن', onclick: () => close(dlg) }));
@@ -156,6 +189,8 @@ async function openConversation(c, focusMid = null) {
       el('button', { class: 'btn secondary sm c-back', text: '→', 'aria-label': 'بازگشت', onclick: () => { current = null; root.querySelector('.c-app').classList.remove('show-chat'); refreshList(); } }),
       el('div', { class: 'c-head-name' }, el('b', { text: c.peer.display_name }), typingEl,
         el('button', { class: 'c-lock', text: '🔒 رمزنگاری سرتاسری — شماره امنیتی', onclick: showSafety })),
+      el('button', { class: 'btn secondary c-icon', text: '📞', 'aria-label': 'تماس صوتی', title: 'تماس صوتی', onclick: () => startCall(false) }),
+      el('button', { class: 'btn secondary c-icon', text: '🎥', 'aria-label': 'تماس تصویری', title: 'تماس تصویری', onclick: () => startCall(true) }),
       el('button', { class: 'btn secondary sm', text: 'رسانه‌ها', onclick: showMedia })),
     bannerEl, pinEl, msgsEl, replyBar,
     el('div', { class: 'c-compose' },
@@ -432,6 +467,186 @@ async function showSafety() {
     state,
     s.pending ? el('p', { class: 'alert warn small', text: 'کلید این مخاطب تغییر کرده و هنوز پذیرفته نشده است؛ این شماره مربوط به کلید قبلی است.' }) : null,
     s.verified || s.pending ? null : el('button', { class: 'btn', text: 'اعداد یکسان است — تأیید', onclick: async () => { await call('verify', { user_id: current.peer.id }); state.textContent = '✔ شما این مخاطب را تأیید کرده‌اید.'; } }));
+  dlg.showModal();
+}
+
+// ------------------------------------------------------------------ calls (WebRTC, in-app over the internet)
+// Signalling (SDP incl. DTLS fingerprints) goes through the end-to-end encrypted channel; media is DTLS-SRTP.
+let cur = null; // { id, cid, peer, name, video, outgoing, pc, stream, ui, state, started, ringTimer, tick, ring }
+const CALL_STATE = { calling: 'در حال برقراری تماس…', ringing: 'در حال زنگ خوردن…', incoming: 'تماس ورودی', connecting: 'در حال اتصال…', connected: 'متصل' };
+const ice = { cfg: null, at: 0 };
+async function iceConfig() { if (!ice.cfg || Date.now() - ice.at > 600000) { ice.cfg = await call('call_ice'); ice.at = Date.now(); } return ice.cfg; }
+function makePc(cfg) {
+  const pc = new RTCPeerConnection({ iceServers: cfg.ice_servers, iceTransportPolicy: cfg.relay_only ? 'relay' : 'all' });
+  pc.ontrack = (e) => { cur?.ui.remote && (cur.ui.remote.srcObject = e.streams[0]); };
+  pc.onconnectionstatechange = () => {
+    if (!cur || cur.pc !== pc) return;
+    if (pc.connectionState === 'connected' && cur.state !== 'connected') onConnected();
+    if (pc.connectionState === 'failed') endCall('failed', 'ice_failed', cfg.has_turn ? 'اتصال تماس برقرار نشد.' : 'اتصال تماس برقرار نشد. شبکه شما احتمالاً به سرور TURN نیاز دارد که روی این سامانه تنظیم نشده است.');
+  };
+  return pc;
+}
+const gathered = (pc) => new Promise((r) => { if (pc.iceGatheringState === 'complete') return r(); const t = setTimeout(r, 3000); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); r(); } }); });
+async function media(video) {
+  return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: video ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false });
+}
+function ring(on) {
+  if (!on) { cur?.ring?.close?.(); if (cur) cur.ring = null; return; }
+  try {
+    const ctx = new AudioContext(); const g = ctx.createGain(); g.gain.value = 0; g.connect(ctx.destination);
+    const o = ctx.createOscillator(); o.frequency.value = 440; o.connect(g); o.start();
+    let i = 0; const iv = setInterval(() => { g.gain.value = (i++ % 4 < 2) ? 0.08 : 0; }, 400);
+    cur.ring = { close: () => { clearInterval(iv); ctx.close(); } };
+  } catch { /* autoplay blocked: the visual ring still shows */ }
+}
+function callUi() {
+  const remote = el('video', { class: 'cl-remote', autoplay: true, playsinline: true });
+  const local = el('video', { class: 'cl-local', autoplay: true, playsinline: true, muted: true });
+  const status = el('div', { class: 'cl-status' });
+  const info = el('div', { class: 'cl-info' });
+  const controls = el('div', { class: 'cl-controls' });
+  const root2 = el('div', { class: 'cl-overlay' + (cur.video ? ' video' : ''), role: 'dialog', 'aria-label': 'تماس' },
+    remote, local, el('div', { class: 'cl-top' }, el('div', { class: 'c-av cl-av', text: cur.name.slice(0, 1) }), el('b', { text: cur.name }), status, info), controls);
+  document.body.append(root2);
+  cur.ui = { root: root2, remote, local, status, info, controls };
+  renderCall();
+}
+function renderCall() {
+  if (!cur) return;
+  const u = cur.ui;
+  u.status.textContent = cur.state === 'connected' ? CALL_STATE.connected + ' · ' + dur((Date.now() - cur.started) / 1000) : CALL_STATE[cur.state] + (cur.video ? ' (تصویری)' : ' (صوتی)');
+  const btn = (label, text, fn, cls = '') => el('button', { class: 'cl-btn ' + cls, 'aria-label': label, title: label, text, onclick: fn });
+  if (cur.state === 'incoming') {
+    u.controls.replaceChildren(btn('رد تماس', '✕', () => rejectCall(), 'red'), btn('پاسخ', '📞', () => acceptCall(), 'green'));
+    return;
+  }
+  const a = cur.stream?.getAudioTracks()[0], v = cur.stream?.getVideoTracks()[0];
+  u.controls.replaceChildren(
+    a ? btn(a.enabled ? 'قطع میکروفون' : 'وصل میکروفون', a.enabled ? '🎤' : '🔇', () => { a.enabled = !a.enabled; renderCall(); }, a.enabled ? '' : 'off') : '',
+    v ? btn(v.enabled ? 'خاموش کردن دوربین' : 'روشن کردن دوربین', v.enabled ? '📷' : '🚫', () => { v.enabled = !v.enabled; renderCall(); }, v.enabled ? '' : 'off') : '',
+    v && cur.cams > 1 ? btn('تعویض دوربین جلو و عقب', '🔄', switchCamera) : '',
+    btn('پایان تماس', '✆', () => hangup(), 'red'));
+}
+async function startCall(video) {
+  if (cur) return toast('یک تماس در جریان است.');
+  if (!current) return;
+  if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) return toast('این مرورگر از تماس پشتیبانی نمی‌کند.');
+  cur = { cid: current.id, peer: current.peer.id, name: current.peer.display_name, video, outgoing: true, state: 'calling' };
+  callUi();
+  call('call_mode', { active: true });
+  try {
+    const cfg = await iceConfig();
+    cur.stream = await media(video);
+    cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
+    cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length;
+    cur.id = await call('call_start', { cid: cur.cid });
+    cur.pc = makePc(cfg);
+    cur.stream.getTracks().forEach((t) => cur.pc.addTrack(t, cur.stream));
+    await cur.pc.setLocalDescription(await cur.pc.createOffer());
+    await gathered(cur.pc);
+    if (!cur) return;
+    await call('call_signal', { cid: cur.cid, peer: cur.peer, body: { call_id: cur.id, action: 'offer', sdp: cur.pc.localDescription.sdp, video } });
+    cur.state = 'ringing'; renderCall();
+    cur.ringTimer = setTimeout(() => { if (cur?.state === 'ringing') { signal('cancel'); endCall('missed', 'timeout', 'پاسخی داده نشد.'); } }, ((await iceConfig()).ring_seconds || 45) * 1000);
+  } catch (e) {
+    endCall('failed', 'error', e?.name === 'NotAllowedError' ? 'اجازه دسترسی به میکروفون/دوربین داده نشد.' : 'تماس برقرار نشد: ' + errText(e));
+  }
+}
+const signal = (action, extra = {}) => cur && call('call_signal', { cid: cur.cid, peer: cur.peer, body: { call_id: cur.id, action, video: !!cur.video, ...extra } }).catch(() => {});
+async function onCallSignal(d) {
+  if (d.action === 'offer') {
+    if (cur) { // already in a call: tell the caller we are busy
+      call('call_signal', { cid: d.cid, peer: d.from, body: { call_id: d.call_id, action: 'busy', video: false } }).catch(() => {});
+      return;
+    }
+    const c = convs.find((x) => x.id === d.cid) || (await call('conversations').then((l) => (convs = l).find((x) => x.id === d.cid)));
+    cur = { id: d.call_id, cid: d.cid, peer: d.from, name: c?.peer?.display_name || 'تماس', video: !!d.video, outgoing: false, state: 'incoming', offer: d.sdp };
+    callUi(); ring(true);
+    call('call_mode', { active: true });
+    cur.ringTimer = setTimeout(() => { if (cur?.state === 'incoming') endCall(null, null, 'تماس ازدست‌رفته از ' + cur.name); }, 50000);
+    if (document.visibilityState !== 'visible' && window.Notification?.permission === 'granted') new Notification('تماس ورودی', { body: cur.name, tag: 'call' });
+    return;
+  }
+  if (!cur || d.call_id !== cur.id || d.from !== cur.peer) return; // signals of another call are ignored
+  if (d.action === 'answer' && cur.outgoing && cur.state === 'ringing') {
+    clearTimeout(cur.ringTimer);
+    cur.state = 'connecting'; renderCall();
+    try { await cur.pc.setRemoteDescription({ type: 'answer', sdp: d.sdp }); } catch { endCall('failed', 'error', 'پاسخ تماس نامعتبر بود.'); }
+  } else if (d.action === 'reject') endCall(null, null, cur.name + ' تماس را رد کرد.');
+  else if (d.action === 'busy') endCall('ended', 'busy', cur.name + ' در حال مکالمه دیگری است.');
+  else if (d.action === 'cancel') endCall(null, null, 'تماس ازدست‌رفته از ' + cur.name);
+  else if (d.action === 'hangup') endCall(null, null, cur.state === 'incoming' ? 'تماس ازدست‌رفته از ' + cur.name : 'تماس پایان یافت.');
+}
+async function acceptCall() {
+  ring(false); clearTimeout(cur.ringTimer);
+  cur.state = 'connecting'; renderCall();
+  try {
+    const cfg = await iceConfig();
+    cur.stream = await media(cur.video);
+    cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
+    cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput').length;
+    cur.pc = makePc(cfg);
+    cur.stream.getTracks().forEach((t) => cur.pc.addTrack(t, cur.stream));
+    await cur.pc.setRemoteDescription({ type: 'offer', sdp: cur.offer });
+    await cur.pc.setLocalDescription(await cur.pc.createAnswer());
+    await gathered(cur.pc);
+    if (!cur) return;
+    await call('call_status', { id: cur.id, status: 'active' });
+    await signal('answer', { sdp: cur.pc.localDescription.sdp });
+    renderCall();
+  } catch (e) {
+    signal('hangup');
+    endCall('failed', 'error', e?.name === 'NotAllowedError' ? 'اجازه دسترسی به میکروفون/دوربین داده نشد.' : 'تماس برقرار نشد: ' + errText(e));
+  }
+}
+function rejectCall() { signal('reject'); endCall('rejected', 'hangup', null); }
+function hangup() { signal('hangup'); endCall('ended', 'hangup', null); }
+async function onConnected() {
+  cur.state = 'connected'; cur.started = Date.now();
+  cur.tick = setInterval(renderCall, 1000);
+  renderCall();
+  try {
+    const stats = await cur.pc.getStats();
+    let pair = null; const cands = {};
+    stats.forEach((r) => { if (r.type === 'candidate-pair' && r.state === 'succeeded' && (r.nominated || !pair)) pair = r; if (r.type === 'local-candidate') cands[r.id] = r; });
+    const relay = pair && cands[pair.localCandidateId]?.candidateType === 'relay';
+    cur.ui.info.textContent = '🔒 رمزنگاری DTLS-SRTP · ' + (relay ? 'از طریق سرور رله (TURN)' : 'ارتباط مستقیم');
+  } catch { /* stats unavailable */ }
+}
+async function switchCamera() {
+  const v = cur.stream.getVideoTracks()[0];
+  const facing = (v.getSettings().facingMode === 'environment') ? 'user' : 'environment';
+  try {
+    const ns = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } });
+    const nt = ns.getVideoTracks()[0];
+    await cur.pc.getSenders().find((x) => x.track?.kind === 'video')?.replaceTrack(nt);
+    v.stop(); cur.stream.removeTrack(v); cur.stream.addTrack(nt); cur.ui.local.srcObject = cur.stream;
+    renderCall();
+  } catch { toast('تعویض دوربین ممکن نشد.'); }
+}
+function endCall(status, reason, message) {
+  if (!cur) return;
+  const c = cur; cur = null;
+  c.ring?.close?.();
+  clearTimeout(c.ringTimer); clearInterval(c.tick);
+  if (status && c.id) call('call_status', { id: c.id, status, reason });
+  c.stream?.getTracks().forEach((t) => t.stop());
+  try { c.pc?.close(); } catch { /* ignore */ }
+  c.ui?.root.remove();
+  call('call_mode', { active: false });
+  if (message) toast(message);
+}
+async function showCallHistory() {
+  const calls = await call('call_history');
+  const label = (x) => x.status === 'missed' ? (x.outgoing ? 'بی‌پاسخ' : 'ازدست‌رفته') : x.status === 'rejected' ? 'رد شد' : x.status === 'cancelled' ? 'لغو شد' : x.status === 'failed' ? 'ناموفق' : x.status === 'ringing' || x.status === 'active' ? 'در جریان' : '';
+  const dlg = dialog('تاریخچه تماس‌ها', calls.length ? el('div', { class: 'c-dir' }, ...calls.map((x) => el('div', { class: 'c-item' },
+    el('span', { class: 'c-file-ico', text: x.outgoing ? '↗' : '↙' }),
+    el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: x.peer.display_name }),
+      el('span', { class: 'c-prev' + (x.status === 'missed' && !x.outgoing ? ' c-missed' : ''), text: faDay.format(new Date(x.created_at.replace(' ', 'T') + 'Z')) + ' ' + fa.format(new Date(x.created_at.replace(' ', 'T') + 'Z')) + ' — ' + (x.duration != null && x.status === 'ended' ? dur(x.duration) : label(x)) })),
+    el('button', { class: 'btn sm secondary', text: '📞', 'aria-label': 'تماس دوباره', onclick: async () => {
+      close(dlg); const c = convs.find((y) => y.id === x.conversation_id); if (c) { await openConversation(c); startCall(false); }
+    } })))) : el('p', { class: 'muted', text: 'هنوز تماسی ندارید.' }),
+    el('p', { class: 'small muted', text: 'روی سرور فقط زمان، مدت و نتیجه تماس ثبت می‌شود؛ صوتی یا تصویری بودن و محتوای تماس ثبت نمی‌شود.' }));
   dlg.showModal();
 }
 

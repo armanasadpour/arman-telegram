@@ -51,7 +51,7 @@ const { p: alice, ctx: aCtx } = await login('alice', 'Alice strong pass 1');
 const { p: bob } = await login('bob', 'Bob strong pass 12');
 const { p: carol } = await login('carol', 'Carol strong pass 1');
 async function openWith(p, name) {
-  if (!(await p.$(`.c-item:has-text("${name}")`))) { await p.click('text=گفتگوی جدید'); await p.click(`dialog .c-item:has-text("${name}")`); }
+  if (!(await p.$(`.c-item:has-text("${name}")`))) { await p.click('text=گفتگوی جدید'); await p.fill('dialog input[type=search]', name); await p.click(`dialog .c-user:has-text("${name}") button:text-is("گفتگو")`); }
   else await p.click(`.c-list .c-item:has-text("${name}")`);
   await p.waitForSelector('.c-compose textarea', { timeout: T });
 }

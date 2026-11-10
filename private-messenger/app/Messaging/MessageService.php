@@ -24,12 +24,43 @@ final class MessageService
     {
     }
 
-    /** @return list<array<string, mixed>> active users other than me */
-    public function directory(int $meId): array
+    private const USER_COLS = "u.public_id AS id, u.display_name, u.username,
+        EXISTS(SELECT 1 FROM user_master_keys k WHERE k.user_id = u.id AND k.superseded_at IS NULL) AS has_identity";
+
+    /**
+     * Finds users by at least 3 characters of their username (prefix) or display name. There is deliberately
+     * no "list everyone" endpoint: members are found by searching, then followed (added to contacts).
+     * @return list<array<string, mixed>>
+     */
+    public function searchUsers(int $meId, string $q): array
     {
-        return $this->db->all("SELECT u.public_id AS id, u.display_name, u.username,
-                                      EXISTS(SELECT 1 FROM user_master_keys k WHERE k.user_id = u.id AND k.superseded_at IS NULL) AS has_identity
-                                 FROM users u WHERE u.status = 'active' AND u.id <> ? ORDER BY u.display_name", [$meId]);
+        $q = trim($q);
+        if (mb_strlen($q) < 3 || mb_strlen($q) > 64) {
+            throw new UserError('query_too_short');
+        }
+        $like = addcslashes($q, '%_\\');
+        return $this->db->all('SELECT ' . self::USER_COLS . ', EXISTS(SELECT 1 FROM user_contacts c WHERE c.user_id = ? AND c.contact_user_id = u.id) AS is_contact
+                                 FROM users u WHERE u.status = \'active\' AND u.id <> ? AND (u.username LIKE ? OR u.display_name LIKE ?)
+                                ORDER BY (u.username = ?) DESC, u.display_name LIMIT 10', [$meId, $meId, mb_strtolower($like) . '%', '%' . $like . '%', mb_strtolower($q)]);
+    }
+
+    public function contacts(int $meId): array
+    {
+        return $this->db->all('SELECT ' . self::USER_COLS . ', 1 AS is_contact FROM user_contacts c JOIN users u ON u.id = c.contact_user_id
+                                WHERE c.user_id = ? AND u.status = \'active\' ORDER BY u.display_name', [$meId]);
+    }
+
+    public function follow(int $meId, string $userPublicId, bool $on): void
+    {
+        $u = $this->db->one("SELECT id FROM users WHERE public_id = ? AND status = 'active'", [$userPublicId]);
+        if ($u === null || (int)$u['id'] === $meId) {
+            throw new UserError('user_not_found');
+        }
+        if ($on) {
+            $this->db->run('INSERT IGNORE INTO user_contacts (user_id, contact_user_id, created_at) VALUES (?, ?, ?)', [$meId, $u['id'], Clock::db()]);
+        } else {
+            $this->db->run('DELETE FROM user_contacts WHERE user_id = ? AND contact_user_id = ?', [$meId, $u['id']]);
+        }
     }
 
     public function conversations(int $meId): array

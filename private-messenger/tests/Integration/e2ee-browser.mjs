@@ -75,7 +75,7 @@ check('server stores only 32-byte public keys', keyBytes === '32/32', keyBytes);
 console.log('\n# Messaging');
 const CANARY1 = 'سلام باب CANARY-ALICE-7f3a', CANARY2 = 'سلام آلیس CANARY-BOB-91c2';
 await alice.click('text=گفتگوی جدید');
-await alice.click('dialog .c-item:has-text("باب")');
+await alice.fill('dialog input[type=search]', 'باب'); await alice.click('dialog .c-user:has-text("باب") button:text-is("گفتگو")');
 await alice.fill('.c-compose textarea', CANARY1);
 await alice.press('.c-compose textarea', 'Enter');
 await alice.waitForSelector('.c-msg.out .st:text("✓")', { timeout: 15000 });
