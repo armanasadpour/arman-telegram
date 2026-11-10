@@ -172,14 +172,14 @@ final class UserService
         $this->sessions->revokeAll((int)$fresh['id'], 'user_revoke', $keepSessionId);
     }
 
-    public function setPermanentRetention(int $adminId, int $id, bool $on, string $ip): void
+    public function setPermanentRetention(int $adminId, int $id, bool $on, string $ip, int $retentionDays = 7): void
     {
         $u = $this->getOrFail($id);
         if ((bool)$u['permanent_file_retention'] === $on) {
             return;
         }
         $now = Clock::db();
-        $this->db->transaction(function () use ($id, $on, $adminId, $now): void {
+        $this->db->transaction(function () use ($id, $on, $adminId, $now, $retentionDays): void {
             $this->db->run('UPDATE users SET permanent_file_retention = ?, retention_changed_by = ?, retention_changed_at = ?, updated_at = ? WHERE id = ?',
                 [$on ? 1 : 0, $adminId, $now, $now, $id]);
             if ($on) {
@@ -188,10 +188,10 @@ final class UserService
                                  WHERE uploader_user_id = ? AND upload_status = 'complete' AND (expires_at IS NULL OR expires_at > ?)",
                     [$adminId, $now, $id, $now]);
             } else {
-                // Revocation starts a fresh 7-day window from now (see docs/08).
+                // Revocation starts a fresh retention window (default 7 days) from now (see docs/08).
                 $this->db->run("UPDATE attachments SET retention_permanent = 0, expires_at = ?, retention_set_by = ?, retention_set_at = ?
                                  WHERE uploader_user_id = ? AND retention_permanent = 1 AND upload_status = 'complete'",
-                    [Clock::dbIn('+7 days'), $adminId, $now, $id]);
+                    [Clock::dbIn('+' . max(1, $retentionDays) . ' days'), $adminId, $now, $id]);
             }
             $this->db->insert('INSERT INTO notifications (user_id, type, created_at) VALUES (?, ?, ?)', [$id, 'retention_changed', $now]);
         });

@@ -18,6 +18,15 @@ final class Fa
         return strtr((string)$s, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
     }
 
+    public static function bytes(?int $b): string
+    {
+        if ($b === null) {
+            return 'نامعلوم';
+        }
+        return $b >= 1073741824 ? self::digits(number_format($b / 1073741824, 2)) . ' گیگابایت'
+            : ($b >= 1048576 ? self::digits(number_format($b / 1048576, 1)) . ' مگابایت' : self::digits(number_format($b / 1024, 0)) . ' کیلوبایت');
+    }
+
     /** Gregorian UTC DATETIME string -> Persian (Jalali) date/time in Asia/Tehran, Persian digits. */
     public static function dateTime(?string $utc): string
     {

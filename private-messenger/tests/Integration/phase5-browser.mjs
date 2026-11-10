@@ -157,7 +157,7 @@ await bob.waitForSelector('dialog .c-item', { timeout: T });
 check('call history lists the calls', (await bob.locator('dialog .c-item').count()) === 4);
 await bob.click('dialog >> text=بستن');
 await admin.goto(ADM);
-check('admin dashboard shows call statistics (counts only)', (await admin.textContent('main')).includes('تماس‌ها (۲۴ ساعت)'));
+check('admin dashboard shows call statistics (counts only)', (await admin.textContent('main')).includes('تماس‌ها — ۲۴ ساعت'));
 
 // ---------------------------------------------------------------- signalling never in plaintext
 console.log('\n# Server never sees call signalling');

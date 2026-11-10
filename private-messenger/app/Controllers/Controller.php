@@ -66,6 +66,23 @@ abstract class Controller
         return $res;
     }
 
+    /** Accent colour as a tiny stylesheet (the CSP forbids inline styles). Linked only on signed-in pages. */
+    protected function themeCss(): Response
+    {
+        $accent = (string)$this->app->settings()->get('app.accent');
+        if (!isset(\PM\Settings\Settings::ACCENTS[$accent])) {
+            $accent = '#2563eb';
+        }
+        [$r, $g, $b] = sscanf($accent, '#%02x%02x%02x');
+        return new Response(":root { --accent: $accent; --accent-soft: rgba($r, $g, $b, .08); }\n", 200,
+            ['Content-Type' => 'text/css; charset=utf-8', 'Cache-Control' => 'private, max-age=86400']);
+    }
+
+    protected function themeHref(): string
+    {
+        return $this->base . '/theme.css?v=' . substr(md5((string)$this->app->settings()->get('app.accent')), 0, 8);
+    }
+
     private function assetVersion(string $f): string
     {
         $file = $this->app->root . '/app/resources/assets/' . $f;

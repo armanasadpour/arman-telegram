@@ -15,7 +15,7 @@ $fmt = fn (?int $b) => $b === null ? 'نامعلوم' : ($b >= 1073741824 ? Fa::
 <div class="panel small">
   <p>سقف حجم هر فایل: <b><?= $max ? e($fmt($max)) : 'بدون محدودیت نرم‌افزاری' ?></b> — اندازه هر قطعه آپلود روی این هاست: <?= e($fmt($chunk)) ?> (بر اساس post_max_size)</p>
   <p>آخرین پاک‌سازی: <?= $last ? e(Fa::dateTime($last['finished_at']) . ' (' . ['cron' => 'Cron', 'pseudo' => 'خودکار هنگام استفاده', 'manual' => 'دستی'][$last['trigger_source']] . ')') : 'هنوز اجرا نشده' ?></p>
-  <p class="muted">فایل‌ها ۷ روز پس از آپلود حذف می‌شوند. فایل منقضی بلافاصله از دسترس خارج می‌شود، حتی اگر حذف فیزیکی هنوز اجرا نشده باشد. نسخه پشتیبان پوشه storage/attachments را حداکثر ۷ روز نگه دارید.</p>
+  <p class="muted">فایل‌ها <?= e(Fa::digits($retention)) ?> روز پس از آپلود حذف می‌شوند. فایل منقضی بلافاصله از دسترس خارج می‌شود، حتی اگر حذف فیزیکی هنوز اجرا نشده باشد. نسخه پشتیبان پوشه storage/attachments را حداکثر <?= e(Fa::digits($retention)) ?> روز نگه دارید.</p>
   <?php if (A::can($admin, 'storage.cleanup.run')): ?>
   <form method="post" action="<?= e($base) ?>/storage/cleanup"><?php include __DIR__ . '/../_csrf.php'; ?><button class="btn secondary">اجرای پاک‌سازی همین حالا</button></form>
   <?php endif; ?>

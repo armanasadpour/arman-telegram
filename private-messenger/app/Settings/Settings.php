@@ -46,7 +46,19 @@ final class Settings
         'calls.relay_only' => false,
         'files.max_bytes' => 0,          // 0 = no software limit (real limit: disk/quota)
         'storage.quota_bytes' => 0,      // hosting quota entered by the admin (PHP cannot read cPanel quotas); 0 = unknown
+        'files.retention_days' => 7,     // days an attachment stays on the server (accounts with permanent retention excepted)
+        'app.accent' => '#2563eb',       // accent colour inside the app and the admin panel (never on the anonymous login page)
+        'app.logo' => '',                // version tag of storage/branding/logo.png ('' = default icon)
+        'limits.search_per_hour' => 300,
+        'limits.send_per_hour' => 3000,
+        'limits.claim_per_hour' => 600,
+        'notify.enabled' => true,        // browser notifications while the tab is in the background
+        'notify.preview' => 'none',      // none | sender — message text is never shown (it is not available outside the page anyway)
+        'backup.reminder_days' => 7,     // dashboard warning when no backup was downloaded for this many days; 0 = off
+        'backup.last_at' => '',
     ];
+
+    public const ACCENTS = ['#2563eb' => 'آبی', '#0d9488' => 'فیروزه‌ای', '#16a34a' => 'سبز', '#7c3aed' => 'بنفش', '#db2777' => 'صورتی', '#ea580c' => 'نارنجی', '#475569' => 'خاکستری'];
 
     /** @var array<string, mixed>|null */
     private ?array $cache = null;

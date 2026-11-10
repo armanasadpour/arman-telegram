@@ -8,5 +8,10 @@
 <meta name="referrer" content="no-referrer">
 <title><?= e($title ?? 'ورود') ?></title>
 <link rel="stylesheet" href="<?= e($asset('style.css')) ?>">
+<?php if (!empty($theme)): ?><link rel="stylesheet" href="<?= e($theme) ?>">
+<?php endif; if (!empty($manifest)): ?><link rel="manifest" href="<?= e($manifest) ?>">
+<link rel="icon" href="<?= e($icon) ?>"><link rel="apple-touch-icon" href="<?= e($icon) ?>">
+<meta name="theme-color" content="<?= e($themeColor) ?>">
+<?php endif; ?>
 </head>
 <body<?= isset($bodyWorker) ? ' data-worker="' . e($bodyWorker) . '"' : '' ?>>

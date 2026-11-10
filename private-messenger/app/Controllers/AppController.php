@@ -9,6 +9,7 @@ use PM\Auth\PasswordLogin;
 use PM\Auth\UserSessions;
 use PM\Http\Request;
 use PM\Http\Response;
+use PM\Settings\Settings;
 use PM\Http\Router;
 use PM\Infra\Sms\SmsFactory;
 use PM\Support\Ip;
@@ -30,6 +31,9 @@ final class AppController extends Controller
         $r->get('/assets/{file}', fn (Request $q) => $this->asset($q, $q->param('file')));
         $r->get('/assets/fonts/{file}', fn (Request $q) => $this->asset($q, 'fonts/' . $q->param('file')));
         $r->get('/', fn (Request $q) => $this->home($q));
+        $r->get('/theme.css', fn () => $this->themeCss());
+        $r->get('/b/{tok}/manifest.webmanifest', fn (Request $q) => hash_equals($this->brandToken(), $q->param('tok')) ? $this->manifest() : Response::notFound());
+        $r->get('/b/{tok}/icon', fn (Request $q) => hash_equals($this->brandToken(), $q->param('tok')) ? $this->icon() : Response::notFound());
         $r->post('/login', fn (Request $q) => $this->guard($q) ?? $this->passwordLogin($q));
         $r->post('/otp/request', fn (Request $q) => $this->guard($q) ?? $this->otpRequest($q));
         $r->get('/otp', fn (Request $q) => $this->otpForm($q));
@@ -108,7 +112,53 @@ final class AppController extends Controller
         if ((int)$u['must_change_password'] === 1) {
             return $this->redirect('/password');
         }
-        return $this->page($req, 'app/home', ['user' => $u, 'name' => (string)$this->app->settings()->get('app.internal_name')]);
+        $b = $this->base . '/b/' . $this->brandToken();
+        $accent = (string)$this->app->settings()->get('app.accent');
+        return $this->page($req, 'app/home', ['user' => $u, 'name' => (string)$this->app->settings()->get('app.internal_name'),
+            'theme' => $this->themeHref(), 'manifest' => $b . '/manifest.webmanifest', 'icon' => $b . '/icon?v=' . $this->logoVersion(),
+            'themeColor' => isset(Settings::ACCENTS[$accent]) ? $accent : '#2563eb']);
+    }
+
+    // ------------------------------------------------------------------ branding (revealed only after sign-in)
+    /** Unguessable path segment so that name and logo are never reachable from the anonymous login page. */
+    private function brandToken(): string
+    {
+        return substr(hash_hmac('sha256', 'pm-brand-v1', $this->app->key()), 0, 22);
+    }
+
+    private function logoVersion(): string
+    {
+        return substr(md5((string)$this->app->settings()->get('app.logo')), 0, 8);
+    }
+
+    private function manifest(): Response
+    {
+        $s = $this->app->settings();
+        $name = (string)$s->get('app.internal_name');
+        $accent = (string)$s->get('app.accent');
+        $logo = $this->app->root . '/storage/branding/logo.png';
+        $dim = is_file($logo) ? @getimagesize($logo) : false;
+        $icon = ['src' => 'icon?v=' . $this->logoVersion(), 'purpose' => 'any']
+            + ($dim ? ['type' => 'image/png', 'sizes' => $dim[0] . 'x' . $dim[1]] : ['type' => 'image/svg+xml', 'sizes' => 'any']);
+        $m = ['name' => $name, 'short_name' => mb_substr($name, 0, 12), 'lang' => 'fa', 'dir' => 'rtl',
+            'start_url' => $this->base . '/', 'scope' => $this->base . '/', 'display' => 'standalone',
+            'background_color' => '#f4f6f9', 'theme_color' => isset(Settings::ACCENTS[$accent]) ? $accent : '#2563eb', 'icons' => [$icon]];
+        return new Response((string)json_encode($m, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 200,
+            ['Content-Type' => 'application/manifest+json; charset=utf-8', 'Cache-Control' => 'private, no-cache']);
+    }
+
+    private function icon(): Response
+    {
+        $logo = $this->app->root . '/storage/branding/logo.png';
+        if (is_file($logo)) {
+            return new Response((string)file_get_contents($logo), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, max-age=604800']);
+        }
+        $accent = (string)$this->app->settings()->get('app.accent');
+        $accent = isset(Settings::ACCENTS[$accent]) ? $accent : '#2563eb';
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="' . $accent . '"/>'
+            . '<path d="M136 160h240a40 40 0 0 1 40 40v120a40 40 0 0 1-40 40H236l-76 56v-56h-24a40 40 0 0 1-40-40V200a40 40 0 0 1 40-40z" fill="#fff"/>'
+            . '<rect x="220" y="236" width="72" height="60" rx="10" fill="' . $accent . '"/><path d="M234 236v-16a22 22 0 0 1 44 0v16" stroke="' . $accent . '" stroke-width="12" fill="none"/></svg>';
+        return new Response($svg, 200, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'private, max-age=604800']);
     }
 
     private function passwordLogin(Request $req): Response

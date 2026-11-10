@@ -12,8 +12,26 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
     <p class="small muted">فقط مدیرکل می‌تواند روش ورود را تغییر دهد. روش‌های پیامکی بدون تنظیم ارائه‌دهنده پیامک قابل انتخاب نیستند. در هیچ روشی کلید رمزنگاری پیام‌ها از رمز عبور یا کد پیامکی ساخته نمی‌شود.</p>
     <div class="grid2">
       <label class="field"><span>مدت اعتبار نشست کاربر (روز)</span><input type="number" name="session_days" value="<?= e($v('session.days')) ?>" <?= $dis ?>></label>
-      <label class="field"><span>نام داخلی برنامه (فقط پس از ورود نمایش داده می‌شود)</span><input type="text" name="internal_name" value="<?= e($v('app.internal_name')) ?>" <?= $dis ?>></label>
     </div>
+  </div>
+  <div class="panel" id="look">
+    <h2>نام، لوگو و رنگ</h2>
+    <p class="small muted">نام، لوگو و رنگ فقط <b>پس از ورود</b> نمایش داده می‌شوند. صفحه ورود عمداً بی‌نام و بی‌نشان می‌ماند تا مشخص نباشد این سایت پیام‌رسان است.</p>
+    <div class="grid2">
+      <label class="field"><span>نام برنامه (عنوان داخل برنامه و نام برنامه نصب‌شده روی گوشی)</span><input type="text" name="internal_name" maxlength="60" value="<?= e($v('app.internal_name')) ?>" <?= $dis ?>></label>
+      <div class="field"><span>رنگ اصلی</span><div class="row wrap">
+        <?php foreach (Settings::ACCENTS as $hex => $label): ?><label class="swatch" title="<?= e($label) ?>"><input type="radio" name="accent" value="<?= e($hex) ?>" <?= $v('app.accent') === $hex ? 'checked' : '' ?> <?= $dis ?>><span class="sw-<?= e(substr($hex, 1)) ?>"></span> <?= e($label) ?></label><?php endforeach; ?>
+      </div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>اعلان‌ها</h2>
+    <label class="check"><input type="checkbox" name="notify_enabled" value="1" <?= $v('notify.enabled') ? 'checked' : '' ?> <?= $dis ?>> اعلان مرورگر برای پیام و تماس جدید وقتی برنامه در پس‌زمینه است (کاربر باید در مرورگر اجازه دهد)</label>
+    <label class="field"><span>متن اعلان پیام</span><select name="notify_preview" <?= $dis ?>>
+      <option value="none" <?= $v('notify.preview') === 'none' ? 'selected' : '' ?>>فقط «پیام جدید» — بدون نام فرستنده (امن‌ترین)</option>
+      <option value="sender" <?= $v('notify.preview') === 'sender' ? 'selected' : '' ?>>نام فرستنده یا گروه</option>
+    </select></label>
+    <p class="small muted">متن پیام هرگز در اعلان نمایش داده نمی‌شود (اعلان روی صفحه قفل گوشی دیده می‌شود). اعلان فقط وقتی برنامه باز است (حتی در پس‌زمینه) کار می‌کند؛ اعلان در حالت بسته (Web Push) در این نسخه وجود ندارد.</p>
   </div>
   <div class="panel">
     <h2>تماس صوتی و تصویری</h2>
@@ -38,11 +56,15 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
       <label class="field"><span>سقف حجم هر فایل به مگابایت (۰ = بدون محدودیت نرم‌افزاری)</span><input type="number" name="files_max_mb" value="<?= e(intdiv((int)$v('files.max_bytes'), 1048576)) ?>" <?= $dis ?>></label>
       <label class="field"><span>سهمیه فضای هاست به گیگابایت (از cPanel؛ فقط برای نمایش، ۰ = نامعلوم)</span><input type="number" name="quota_gb" value="<?= e(intdiv((int)$v('storage.quota_bytes'), 1073741824)) ?>" <?= $dis ?>></label>
     </div>
-    <p class="small muted">فایل‌ها ۷ روز پس از آپلود به‌صورت خودکار و غیرقابل بازیابی حذف می‌شوند (مگر برای حساب‌های دارای «نگهداری دائمی»). «بدون محدودیت» یعنی برنامه سقف مصنوعی ندارد؛ ظرفیت واقعی را فضای هاست تعیین می‌کند.</p>
+    <label class="field"><span>مدت نگهداری فایل روی سرور (روز؛ پیش‌فرض ۷)</span><input type="number" name="retention_days" min="1" max="3650" value="<?= e($v('files.retention_days')) ?>" <?= $is_super ? $dis : 'disabled' ?>></label>
+    <p class="small muted">فایل‌ها پس از این مدت به‌صورت خودکار و غیرقابل بازیابی حذف می‌شوند (مگر برای حساب‌های دارای «نگهداری دائمی»). تغییر این عدد فقط روی فایل‌های جدید اثر دارد و فقط مدیرکل می‌تواند آن را تغییر دهد. «بدون محدودیت» یعنی برنامه سقف مصنوعی ندارد؛ ظرفیت واقعی را فضای هاست تعیین می‌کند.</p>
   </div>
   <div class="panel">
-    <h2>محدودیت ورود</h2>
+    <h2>محدودیت نرخ درخواست</h2>
     <div class="grid2">
+      <label class="field"><span>ارسال پیام/رویداد برای هر کاربر در ساعت</span><input type="number" name="limit_send" value="<?= e($v('limits.send_per_hour')) ?>" <?= $dis ?>></label>
+      <label class="field"><span>جست‌وجوی کاربر برای هر کاربر در ساعت</span><input type="number" name="limit_search" value="<?= e($v('limits.search_per_hour')) ?>" <?= $dis ?>></label>
+      <label class="field"><span>دریافت کلید یک‌بارمصرف (شروع گفتگو با دستگاه جدید) در ساعت</span><input type="number" name="limit_claim" value="<?= e($v('limits.claim_per_hour')) ?>" <?= $dis ?>></label>
       <label class="field"><span>سقف تلاش ورود هر IP در ۱۵ دقیقه</span><input type="number" name="login_ip" value="<?= e($v('login.per_ip_15min')) ?>" <?= $dis ?>></label>
       <label class="field"><span>قفل حساب پس از چند رمز اشتباه پیاپی</span><input type="number" name="login_fail" value="<?= e($v('login.user_fail_lock')) ?>" <?= $dis ?>></label>
       <label class="field"><span>مدت قفل (دقیقه)</span><input type="number" name="login_lock" value="<?= e($v('login.lock_minutes')) ?>" <?= $dis ?>></label>
@@ -74,6 +96,16 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
   <?php if ($can_edit): ?><button class="btn">ذخیره تنظیمات</button><?php endif; ?>
 </form>
 <?php if ($can_edit): ?>
+<div class="panel mt">
+  <h2>لوگو</h2>
+  <p>لوگوی سفارشی: <b><?= $v('app.logo') !== '' ? 'بارگذاری شده' : 'ندارد (نماد پیش‌فرض)' ?></b></p>
+  <p class="small muted">لوگو فقط پس از ورود و به‌عنوان نماد برنامه نصب‌شده (PWA) روی گوشی/رایانه استفاده می‌شود. فایل PNG مربعی، ۱۹۲ تا ۱۰۲۴ پیکسل (پیشنهاد: ۵۱۲×۵۱۲)، حداکثر ۱ مگابایت.</p>
+  <form method="post" action="<?= e($base) ?>/settings/logo" enctype="multipart/form-data" class="row">
+    <?php include __DIR__ . '/../_csrf.php'; ?>
+    <input type="file" name="logo" accept="image/png" required class="grow"><button class="btn secondary">بارگذاری</button>
+  </form>
+  <?php if ($v('app.logo') !== ''): ?><form method="post" action="<?= e($base) ?>/settings/logo/delete" class="mt"><?php include __DIR__ . '/../_csrf.php'; ?><button class="btn danger sm">حذف لوگو</button></form><?php endif; ?>
+</div>
 <form method="post" action="<?= e($base) ?>/settings/sms-test" class="panel mt">
   <?php include __DIR__ . '/../_csrf.php'; ?>
   <h2>ارسال پیامک آزمایشی (با تنظیمات ذخیره‌شده)</h2>

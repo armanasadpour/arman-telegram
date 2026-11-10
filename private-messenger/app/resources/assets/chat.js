@@ -7,7 +7,14 @@ const faDay = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', m
 const faNum = new Intl.NumberFormat('fa-IR');
 const EMOJI = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 let seq = 0, me = null, convs = [], current = null, refreshTimer = null, readTimer = null, typingTimer = null;
-let reply = null, editing = null;
+let reply = null, editing = null, notifyCfg = { enabled: true, preview: 'none' };
+/** Background notification for a new incoming message: never the text; the sender's name only if the admin allows it. */
+function notifyMessage(d) {
+  if (!notifyCfg.enabled || document.visibilityState === 'visible' || window.Notification?.permission !== 'granted' || d.dir !== 'in' || d.flag) return;
+  const c = convs.find((x) => x.id === d.cid);
+  const who = notifyCfg.preview === 'sender' ? (c?.peer?.display_name || c?.name || names.get(d.from) || '') : '';
+  try { new Notification(who ? `پیام جدید از ${who}` : 'پیام جدید', { tag: 'pm-msg', silent: false }); } catch { /* not allowed here */ }
+}
 const names = new Map(); // user id -> display name (group members, contacts)
 const pid = () => current?.peer?.id || null;           // null for groups
 const cname = () => current?.peer?.display_name || current?.name || 'گروه';
@@ -45,7 +52,7 @@ function toast(text) {
 worker.onmessage = ({ data }) => {
   if (data.id) { const p = pending.get(data.id); pending.delete(data.id); data.ok ? p.resolve(data.result) : p.reject(new Error(data.error)); return; }
   const { event, data: d } = data;
-  if (event === 'message') { if (current && d.cid === current.id) { upsertMessage(d); if (d.dir === 'in') scheduleRead(); } scheduleRefresh(); }
+  if (event === 'message') { if (current && d.cid === current.id) { upsertMessage(d); if (d.dir === 'in') scheduleRead(); } scheduleRefresh(); if (d.status === 'received') notifyMessage(d); }
   if (event === 'status') { const m = byMid.get(d.mid); if (m) { m.status = d.status; upsertMessage(m, false); } }
   if (event === 'removed') { byMid.delete(d.mid); document.querySelector(`[data-mid="${CSS.escape(d.mid)}"]`)?.remove(); }
   if (event === 'progress') { const b = document.querySelector(`[data-mid="${CSS.escape(d.mid)}"] progress`); if (b) { b.max = d.total; b.value = d.done; } }
@@ -70,7 +77,7 @@ const resetButton = () => el('button', { class: 'btn', text: 'ساخت کلید�
 } });
 function handleState(s) {
   switch (s.state) {
-    case 'ready': me = s.me; if (s.needs_recovery) return showRecovery(true); renderApp(); return;
+    case 'ready': me = s.me; if (s.notify) notifyCfg = s.notify; if (s.needs_recovery) return showRecovery(true); renderApp(); return;
     case 'link_waiting': me = s.me; return linkWaiting(s);
     case 'unsupported': return status('این مرورگر امکانات لازم برای رمزنگاری سرتاسری را ندارد. از نسخه جدید Chrome، Firefox یا Safari استفاده کنید.');
     case 'locked': return status('برنامه در یک تب یا پنجره دیگر باز است. برای جلوگیری از خرابی کلیدها فقط یک تب در هر زمان مجاز است. آن تب را ببندید و این صفحه را دوباره بارگذاری کنید.',
@@ -240,6 +247,9 @@ function renderApp() {
           el('button', { class: 'btn secondary sm', text: 'تماس‌ها', onclick: showCallHistory }),
           el('button', { class: 'btn secondary sm', text: 'گروه جدید', onclick: createGroup }),
           el('button', { class: 'btn sm', text: 'گفتگوی جدید', onclick: openDirectory }))),
+      notifyCfg.enabled && window.Notification?.permission === 'default'
+        ? el('button', { class: 'btn secondary sm c-notif', text: '🔔 فعال‌سازی اعلان پیام و تماس', onclick: async (e) => {
+          try { await Notification.requestPermission(); } catch { /* unsupported */ } e.target.remove(); } }) : null,
       el('div', { class: 'c-search-wrap' }, searchEl),
       listEl,
       el('p', { class: 'c-note', text: '🔒 پیام‌ها فقط روی همین دستگاه و به‌صورت رمزنگاری‌شده نگهداری می‌شوند. پاک کردن داده‌های مرورگر یعنی از دست رفتن پیام‌های قبلی این دستگاه.' })),

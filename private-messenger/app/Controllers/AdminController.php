@@ -42,6 +42,11 @@ final class AdminController extends Controller
         'pw' => 'رمز عبور تغییر کرد.',
         'sms_ok' => 'پیامک آزمایشی ارسال شد.',
         'admin_created' => 'مدیر جدید ایجاد شد.',
+        'role_saved' => 'نقش ذخیره شد.',
+        'role_deleted' => 'نقش حذف شد.',
+        'logo_saved' => 'لوگو ذخیره شد.',
+        'logo_deleted' => 'لوگو حذف شد و نماد پیش‌فرض استفاده می‌شود.',
+        'path_app' => 'آدرس مخفی برنامه تغییر کرد. آدرس جدید را برای کاربران بفرستید.',
     ];
 
     public function handle(Request $req): Response
@@ -81,6 +86,20 @@ final class AdminController extends Controller
         $r->get('/storage', $this->need('storage.view', fn (Request $q) => $this->storagePage($q)));
         $r->post('/storage/cleanup', $this->need('storage.cleanup.run', fn (Request $q) => $this->storageCleanup($q), true));
         $r->get('/audit', $this->need('audit.view', fn (Request $q) => $this->auditPage($q)));
+        $r->get('/audit/export', $this->need('audit.view', fn (Request $q) => $this->auditExport($q)));
+        $r->get('/reports', $this->need('reports.view', fn (Request $q) => $this->reportsPage($q)));
+        $r->get('/reports/export', $this->need('reports.view', fn (Request $q) => $this->reportsExport($q)));
+        $r->post('/roles', $this->need('admins.manage', fn (Request $q) => $this->roleSave($q, null), true));
+        $r->post('/roles/{id}', $this->need('admins.manage', fn (Request $q) => $this->roleSave($q, (int)$q->param('id')), true));
+        $r->post('/roles/{id}/delete', $this->need('admins.manage', fn (Request $q) => $this->roleDelete($q), true));
+        $r->post('/admins/{id}/role', $this->need('admins.manage', fn (Request $q) => $this->adminRole($q), true));
+        $r->get('/backup', $this->need('backup.download', fn (Request $q) => $this->backupPage($q)));
+        $r->post('/backup/download', $this->need('backup.download', fn (Request $q) => $this->backupDownload($q), true));
+        $r->post('/backup/settings', $this->need('backup.download', fn (Request $q) => $this->backupSettings($q), true));
+        $r->post('/system/paths', $this->need('system.paths.manage', fn (Request $q) => $this->pathChange($q), true));
+        $r->post('/settings/logo', $this->need('settings.edit', fn (Request $q) => $this->logoUpload($q), true));
+        $r->post('/settings/logo/delete', $this->need('settings.edit', fn (Request $q) => $this->logoDelete($q), true));
+        $r->get('/theme.css', $this->need(null, fn () => $this->themeCss()));
         $r->get('/system', $this->need('system.capabilities.view', fn (Request $q) => $this->systemPage($q)));
 
         $r->get('/account', $this->need(null, fn (Request $q) => $this->accountPage($q)));
@@ -131,7 +150,7 @@ final class AdminController extends Controller
 
     private function vars(array $v): array
     {
-        return $v + ['admin' => $this->admin, 'msg' => null, 'nav' => ''];
+        return $v + ['admin' => $this->admin, 'msg' => null, 'nav' => '', 'theme' => $this->admin !== null ? $this->themeHref() : null];
     }
 
     private function back(string $path, string $msg): Response
@@ -161,6 +180,8 @@ final class AdminController extends Controller
             return $this->loginPage($req, null, true, $u);
         }
         if ($res !== 'ok') {
+            \PM\Admin\Stats::bump($this->app->db(), 'admin.login_failed');
+            $this->audit()->record('system', null, 'admin.login_failed', null, null, ['username' => mb_substr(trim($u), 0, 64)], $req->ip());
             return $this->loginPage($req, 'اطلاعات ورود نادرست است.', $req->input('totp') !== '', $u);
         }
         $token = $this->svc()->createSession((int)$a['id'], $req->ip(), $req->userAgent());
@@ -171,6 +192,7 @@ final class AdminController extends Controller
     {
         if (($a = $this->current($req)) !== null) {
             $this->svc()->revokeSession((int)$a['session_id']);
+            $this->audit()->record('admin', (int)$a['id'], 'admin.logout', 'admin', (int)$a['id'], [], $req->ip());
         }
         return $this->redirect('/')->forgetCookie(AdminService::COOKIE);
     }
@@ -179,18 +201,9 @@ final class AdminController extends Controller
     private function dashboard(Request $req): Response
     {
         $db = $this->app->db();
-        $counts = array_column($db->all('SELECT status, COUNT(*) n FROM users GROUP BY status'), 'n', 'status');
-        $now = Clock::db();
-        $stats = [
-            'users' => $counts,
-            'sessions' => (int)$db->scalar('SELECT COUNT(*) FROM user_sessions WHERE revoked_at IS NULL AND expires_at > ?', [$now]),
-            'online' => (int)$db->scalar('SELECT COUNT(DISTINCT user_id) FROM user_sessions WHERE revoked_at IS NULL AND last_used_at > ?',
-                [Clock::now()->modify('-10 minutes')->format('Y-m-d H:i:s')]),
-            'locked' => (int)$db->scalar('SELECT COUNT(*) FROM users WHERE locked_until > ?', [$now]),
-            'admins' => (int)$db->scalar("SELECT COUNT(*) FROM admin_users WHERE status = 'active'"),
-            'calls' => (new \PM\Calls\CallService($db, $this->app->settings()))->stats(),
-        ];
+        $stats = new \PM\Admin\Stats($db);
         $s = $this->app->settings();
+        $files = new \PM\Files\AttachmentService($db, $s, $this->app->root . '/storage/attachments');
         $warnings = [];
         $method = (string)$s->get('auth.method');
         $provider = (string)$s->get('sms.provider');
@@ -210,8 +223,15 @@ final class AdminController extends Controller
         if ((int)$this->admin['totp_enabled'] === 0) {
             $warnings[] = 'ورود دومرحله‌ای (TOTP) برای حساب مدیریتی شما فعال نیست. از صفحه «حساب من» فعال کنید.';
         }
-        return $this->page($req, 'admin/dashboard', $this->vars(['stats' => $stats, 'warnings' => $warnings, 'method' => $method,
-            'cron' => $cron, 'nav' => 'dash', 'msg' => $this->msg($req)]));
+        $remind = $s->int('backup.reminder_days');
+        $last = (string)$s->get('backup.last_at');
+        if ($remind > 0 && AdminService::can($this->admin, 'backup.download')
+            && ($last === '' || strtotime($last . ' UTC') < Clock::now()->getTimestamp() - $remind * 86400)) {
+            $warnings[] = $last === '' ? 'هنوز هیچ نسخه پشتیبانی از دیتابیس گرفته نشده است (صفحه «پشتیبان‌گیری»).'
+                : 'بیش از ' . \PM\Support\Fa::digits($remind) . ' روز از آخرین نسخه پشتیبان گذشته است (صفحه «پشتیبان‌گیری»).';
+        }
+        return $this->page($req, 'admin/dashboard', $this->vars(['o' => $stats->overview(), 'health' => $stats->health($this->app->root, (int)$s->get('storage.quota_bytes')),
+            'st' => $files->stats(), 'warnings' => $warnings, 'method' => $method, 'week' => array_reverse($stats->daily(7)), 'nav' => 'dash', 'msg' => $this->msg($req)]));
     }
 
     // ------------------------------------------------------------------ users
@@ -260,7 +280,11 @@ final class AdminController extends Controller
             : [];
         $retBy = $u['retention_changed_by'] ? $db->scalar('SELECT username FROM admin_users WHERE id = ?', [$u['retention_changed_by']]) : null;
         $devices = (new KeyService($db))->devicesOf($id);
+        if ($req->method === 'GET') { // every look at an account is itself recorded
+            $this->audit()->record('admin', (int)$this->admin['id'], 'user.view', 'user', $id, [], $req->ip());
+        }
         return $this->page($req, 'admin/user', $this->vars(['u' => $u, 'sessions' => $sessions, 'audit' => $audit, 'temp' => $tempPassword, 'devices' => $devices,
+            'ustats' => (new \PM\Admin\Stats($db))->forUser($id), 'retention_days' => $this->app->settings()->int('files.retention_days'),
             'retention_by' => $retBy, 'method' => (string)$this->app->settings()->get('auth.method'),
             'msg' => $msg ?? $this->msg($req), 'error' => null, 'nav' => 'users']));
     }
@@ -354,7 +378,8 @@ final class AdminController extends Controller
     private function userRetention(Request $req): Response
     {
         return $this->withUserError($req, function () use ($req): Response {
-            $this->usersSvc()->setPermanentRetention((int)$this->admin['id'], $this->userId($req), $req->input('permanent') === '1', $req->ip());
+            $this->usersSvc()->setPermanentRetention((int)$this->admin['id'], $this->userId($req), $req->input('permanent') === '1', $req->ip(),
+                $this->app->settings()->int('files.retention_days'));
             return $this->back('/users/' . $this->userId($req), 'retention');
         });
     }
@@ -401,6 +426,12 @@ final class AdminController extends Controller
                 'calls.turn_username' => mb_substr(trim($req->input('calls_turn_username')), 0, 100),
                 'calls.relay_only' => $req->input('calls_relay_only') === '1',
                 'storage.quota_bytes' => $int($req->input('quota_gb', '0'), 0, 100000, 'سهمیه فضا') * 1073741824,
+                'app.accent' => isset(Settings::ACCENTS[$req->input('accent')]) ? $req->input('accent') : (string)$s->get('app.accent'),
+                'limits.send_per_hour' => $int($req->input('limit_send', (string)$s->get('limits.send_per_hour')), 100, 100000, 'سقف ارسال'),
+                'limits.search_per_hour' => $int($req->input('limit_search', (string)$s->get('limits.search_per_hour')), 10, 10000, 'سقف جست‌وجو'),
+                'limits.claim_per_hour' => $int($req->input('limit_claim', (string)$s->get('limits.claim_per_hour')), 50, 100000, 'سقف دریافت کلید'),
+                'notify.enabled' => $req->input('notify_enabled') === '1',
+                'notify.preview' => $req->input('notify_preview') === 'sender' ? 'sender' : 'none',
             ];
             if ($new['sms.generic_url'] !== '' && !str_starts_with($new['sms.generic_url'], 'https://')) {
                 throw new UserError('آدرس وب‌هوک پیامک باید با https:// شروع شود.');
@@ -417,6 +448,7 @@ final class AdminController extends Controller
                     throw new UserError('برای ورود با پیامک ابتدا ارائه‌دهنده پیامک را تنظیم کنید.');
                 }
                 $new['auth.method'] = $method;
+                $new['files.retention_days'] = $int($req->input('retention_days', (string)$s->get('files.retention_days')), 1, 3650, 'مدت نگهداری فایل');
             }
         } catch (UserError $e) {
             return $this->settingsPage($req, $e->getMessage());
@@ -465,9 +497,8 @@ final class AdminController extends Controller
     private function adminsPage(Request $req, ?string $error = null): Response
     {
         $svc = $this->svc();
-        return $this->page($req, 'admin/admins', $this->vars(['list' => $svc->listAdmins(), 'roles' => $svc->roles(), 'error' => $error,
-            'nav' => 'admins', 'msg' => $this->msg($req), 'perms' => AdminService::PERMISSIONS,
-            'role_perms' => $this->app->db()->all('SELECT rp.role_id, p.code FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id')]));
+        return $this->page($req, 'admin/admins', $this->vars(['list' => $svc->listAdmins(), 'roles' => $svc->rolesDetailed(), 'error' => $error,
+            'nav' => 'admins', 'msg' => $this->msg($req), 'perms' => AdminService::PERMISSIONS, 'super_only' => AdminService::SUPER_ONLY]));
     }
 
     private function adminCreate(Request $req): Response
@@ -564,7 +595,8 @@ final class AdminController extends Controller
         $files = new \PM\Files\AttachmentService($this->app->db(), $this->app->settings(), $this->app->root . '/storage/attachments');
         $last = $this->app->db()->one("SELECT finished_at, trigger_source, stats FROM cron_runs WHERE job = 'maintenance' AND status = 'ok' ORDER BY id DESC LIMIT 1");
         return $this->page($req, 'admin/storage', $this->vars(['st' => $files->stats(), 'last' => $last, 'result' => $result, 'nav' => 'storage',
-            'chunk' => \PM\Files\AttachmentService::chunkSize(), 'max' => (int)$this->app->settings()->get('files.max_bytes'), 'msg' => $this->msg($req)]));
+            'chunk' => \PM\Files\AttachmentService::chunkSize(), 'max' => (int)$this->app->settings()->get('files.max_bytes'), 'msg' => $this->msg($req),
+            'retention' => $this->app->settings()->int('files.retention_days')]));
     }
 
     private function storageCleanup(Request $req): Response
@@ -574,20 +606,254 @@ final class AdminController extends Controller
         return $this->storagePage($req, $stats ?? ['busy' => true]);
     }
 
+    /** @return array{0:string, 1:list<mixed>, 2:array<string,string>} WHERE clause, params, normalized filters */
+    private function auditFilter(Request $req): array
+    {
+        $f = ['action' => trim($req->queryString('action')), 'actor' => trim($req->queryString('actor')), 'target' => trim($req->queryString('target')),
+              'from' => trim($req->queryString('from')), 'to' => trim($req->queryString('to'))];
+        $w = ['1 = 1'];
+        $p = [];
+        if ($f['action'] !== '') {
+            $w[] = 'a.action LIKE ?';
+            $p[] = str_replace(['%', '_'], ['\%', '\_'], mb_substr($f['action'], 0, 64)) . '%';
+        }
+        if ($f['actor'] !== '') {
+            $w[] = 'ad.username = ?';
+            $p[] = mb_strtolower(mb_substr($f['actor'], 0, 64));
+        }
+        if ($f['target'] !== '') {
+            $w[] = 'u.username = ?';
+            $p[] = mb_strtolower(mb_substr($f['target'], 0, 64));
+        }
+        foreach (['from' => '>=', 'to' => '<'] as $k => $op) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', \PM\Support\Fa::toLatinDigits($f[$k]))) {
+                $f[$k] = \PM\Support\Fa::toLatinDigits($f[$k]);
+                $w[] = "a.created_at $op ?";
+                $p[] = $k === 'to' ? date('Y-m-d', strtotime($f[$k] . ' +1 day')) : $f[$k];
+            } else {
+                $f[$k] = '';
+            }
+        }
+        return [implode(' AND ', $w), $p, $f];
+    }
+
+    private const AUDIT_SELECT = "SELECT a.id, a.actor_type, a.action, a.target_type, a.target_id, a.details, a.ip, a.created_at,
+                                         ad.username AS actor, u.username AS target_user
+                                    FROM audit_logs a
+                               LEFT JOIN admin_users ad ON ad.id = a.actor_id AND a.actor_type = 'admin'
+                               LEFT JOIN users u ON u.id = a.target_id AND a.target_type = 'user'";
+
     private function auditPage(Request $req): Response
     {
-        $rows = $this->app->db()->all("SELECT a.id, a.actor_type, a.action, a.target_type, a.target_id, a.details, a.ip, a.created_at,
-                                              ad.username AS actor, u.username AS target_user
-                                         FROM audit_logs a
-                                    LEFT JOIN admin_users ad ON ad.id = a.actor_id AND a.actor_type = 'admin'
-                                    LEFT JOIN users u ON u.id = a.target_id AND a.target_type = 'user'
-                                     ORDER BY a.id DESC LIMIT 200");
-        return $this->page($req, 'admin/audit', $this->vars(['rows' => $rows, 'verify' => $this->audit()->verify(), 'nav' => 'audit']));
+        [$where, $params, $f] = $this->auditFilter($req);
+        $page = max(1, (int)$req->queryString('page'));
+        $rows = $this->app->db()->all(self::AUDIT_SELECT . " WHERE $where ORDER BY a.id DESC LIMIT 101 OFFSET " . (($page - 1) * 100), $params);
+        $more = count($rows) > 100;
+        return $this->page($req, 'admin/audit', $this->vars(['rows' => array_slice($rows, 0, 100), 'verify' => $this->audit()->verify(), 'nav' => 'audit',
+            'f' => $f, 'page' => $page, 'more' => $more,
+            'actions' => array_column($this->app->db()->all('SELECT DISTINCT action FROM audit_logs ORDER BY action'), 'action')]));
+    }
+
+    private function auditExport(Request $req): Response
+    {
+        [$where, $params, $f] = $this->auditFilter($req);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'audit.export', null, null, array_filter($f), $req->ip());
+        $rows = $this->app->db()->all(self::AUDIT_SELECT . " WHERE $where ORDER BY a.id DESC LIMIT 50000", $params);
+        $out = [['id', 'time_utc', 'actor_type', 'actor', 'action', 'target_type', 'target_id', 'target_user', 'details', 'ip']];
+        foreach ($rows as $r) {
+            $out[] = [$r['id'], $r['created_at'], $r['actor_type'], $r['actor'], $r['action'], $r['target_type'], $r['target_id'], $r['target_user'], $r['details'], Ip::fromBinary($r['ip'])];
+        }
+        return $this->csv('audit-' . gmdate('Ymd-His') . '.csv', $out);
+    }
+
+    /** CSV with a UTF-8 BOM (Excel opens Persian text correctly); cells that look like formulas are neutralized. */
+    private function csv(string $name, array $rows): Response
+    {
+        $h = fopen('php://temp', 'w+');
+        fwrite($h, "\xEF\xBB\xBF");
+        foreach ($rows as $r) {
+            fputcsv($h, array_map(static fn ($v) => is_string($v) && $v !== '' && strpbrk($v[0], '=+-@') !== false ? "'" . $v : $v, $r), ',', '"', '');
+        }
+        rewind($h);
+        $body = (string)stream_get_contents($h);
+        fclose($h);
+        return new Response($body, 200, ['Content-Type' => 'text/csv; charset=utf-8', 'Content-Disposition' => 'attachment; filename="' . $name . '"',
+            'Cache-Control' => 'private, no-store']);
+    }
+
+    // ------------------------------------------------------------------ reports (non-content)
+    private function reportDays(Request $req): int
+    {
+        $d = (int)$req->queryString('days');
+        return in_array($d, [7, 30, 90, 365], true) ? $d : 30;
+    }
+
+    private function reportsPage(Request $req): Response
+    {
+        $days = $this->reportDays($req);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'report.view', null, null, ['days' => $days], $req->ip());
+        $stats = new \PM\Admin\Stats($this->app->db());
+        $rows = $stats->daily($days);
+        $tot = array_fill_keys(array_keys(\PM\Admin\Stats::METRICS), 0);
+        foreach ($rows as $r) {
+            foreach ($tot as $k => $_) {
+                $tot[$k] += (int)$r[$k];
+            }
+        }
+        $tot['senders'] = (int)$this->app->db()->scalar('SELECT COUNT(DISTINCT sender_user_id) FROM messages WHERE created_at >= ?', [$rows[count($rows) - 1]['day'] . ' 00:00:00']);
+        return $this->page($req, 'admin/reports', $this->vars(['rows' => $rows, 'tot' => $tot, 'days' => $days, 'nav' => 'reports', 'o' => $stats->overview()]));
+    }
+
+    private function reportsExport(Request $req): Response
+    {
+        $days = $this->reportDays($req);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'report.export', null, null, ['days' => $days], $req->ip());
+        $rows = (new \PM\Admin\Stats($this->app->db()))->daily($days);
+        $out = [array_merge(['day_utc'], array_keys(\PM\Admin\Stats::METRICS))];
+        foreach ($rows as $r) {
+            $out[] = array_values($r);
+        }
+        return $this->csv('report-' . $days . 'd-' . gmdate('Ymd') . '.csv', $out);
+    }
+
+    // ------------------------------------------------------------------ roles
+    private function roleSave(Request $req, ?int $id): Response
+    {
+        try {
+            $this->svc()->saveRole((int)$this->admin['id'], $id, $req->input('name'), array_filter((array)($req->post['perms'] ?? []), 'is_string'), $req->ip());
+        } catch (UserError $e) {
+            return $this->adminsPage($req, $e->getMessage());
+        }
+        return $this->back('/admins', 'role_saved');
+    }
+
+    private function roleDelete(Request $req): Response
+    {
+        try {
+            $this->svc()->deleteRole((int)$this->admin['id'], (int)$req->param('id'), $req->ip());
+        } catch (UserError $e) {
+            return $this->adminsPage($req, $e->getMessage());
+        }
+        return $this->back('/admins', 'role_deleted');
+    }
+
+    private function adminRole(Request $req): Response
+    {
+        try {
+            $this->svc()->setAdminRole((int)$this->admin['id'], (int)$req->param('id'), (int)$req->input('role_id'), $req->ip());
+        } catch (UserError $e) {
+            return $this->adminsPage($req, $e->getMessage());
+        }
+        return $this->back('/admins', 'saved');
+    }
+
+    // ------------------------------------------------------------------ backup
+    private function backupPage(Request $req, ?string $error = null): Response
+    {
+        $s = $this->app->settings();
+        $db = $this->app->db();
+        $size = (int)$db->scalar('SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema = DATABASE()');
+        return $this->page($req, 'admin/backup', $this->vars(['error' => $error, 'nav' => 'backup', 'msg' => $this->msg($req),
+            'last' => (string)$s->get('backup.last_at'), 'remind' => $s->int('backup.reminder_days'), 'gzip' => \PM\Admin\Backup::gzipAvailable(),
+            'db_size' => $size, 'root' => $this->app->root, 'retention' => $s->int('files.retention_days'),
+            'history' => $db->all("SELECT a.created_at, ad.username FROM audit_logs a LEFT JOIN admin_users ad ON ad.id = a.actor_id WHERE a.action = 'backup.download' ORDER BY a.id DESC LIMIT 10")]));
+    }
+
+    private function backupDownload(Request $req): Response
+    {
+        try {
+            $this->svc()->confirmPassword($this->admin, $req->input('password'), $req->ip());
+        } catch (UserError $e) {
+            return $this->backupPage($req, $e->getMessage());
+        }
+        $gzip = \PM\Admin\Backup::gzipAvailable();
+        $this->audit()->record('admin', (int)$this->admin['id'], 'backup.download', null, null, ['gzip' => $gzip], $req->ip());
+        $this->app->settings()->set('backup.last_at', Clock::now()->format('Y-m-d H:i:s'), (int)$this->admin['id']);
+        $backup = new \PM\Admin\Backup($this->app->db(), $this->app->root . '/database/migrations');
+        $name = 'backup-' . gmdate('Ymd-His') . ($gzip ? '.sql.gz' : '.sql');
+        return Response::generated(fn (callable $out) => $backup->write($out, $gzip), [
+            'Content-Type' => $gzip ? 'application/gzip' : 'application/sql',
+            'Content-Disposition' => 'attachment; filename="' . $name . '"',
+        ]);
+    }
+
+    private function backupSettings(Request $req): Response
+    {
+        $d = (int)\PM\Support\Fa::toLatinDigits($req->input('reminder_days'));
+        $d = max(0, min(365, $d));
+        $this->app->settings()->set('backup.reminder_days', $d, (int)$this->admin['id']);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'settings.update', null, null, ['keys' => ['backup.reminder_days']], $req->ip());
+        return $this->back('/backup', 'saved');
+    }
+
+    // ------------------------------------------------------------------ secret paths
+    private function pathChange(Request $req): Response
+    {
+        $which = $req->input('which') === 'admin' ? 'ADMIN_PATH' : 'APP_PATH';
+        try {
+            $this->svc()->confirmPassword($this->admin, $req->input('password'), $req->ip());
+            if ($req->input('confirm') !== 'تغییر') {
+                throw new UserError('برای تأیید، کلمه «تغییر» را بنویسید.');
+            }
+            $file = $this->app->root . '/config/.env';
+            $env = \PM\Support\Env::parseFile($file);
+            do {
+                $new = Random::string(16);
+            } while ($new === ($env['APP_PATH'] ?? '') || $new === ($env['ADMIN_PATH'] ?? ''));
+            $old = $env[$which] ?? '';
+            $env[$which] = $new;
+            $tmp = $file . '.tmp';
+            if (@file_put_contents($tmp, \PM\Support\Env::render($env)) === false || !@chmod($tmp, 0600) || !@rename($tmp, $file)) {
+                @unlink($tmp);
+                throw new UserError('نوشتن فایل config/.env ممکن نشد. مجوز نوشتن پوشه config را بررسی کنید.');
+            }
+        } catch (UserError $e) {
+            return $this->page($req, 'admin/error', $this->vars(['error' => $e->getMessage(), 'back' => '/system']), 422);
+        }
+        $this->audit()->record('admin', (int)$this->admin['id'], 'system.path_change', null, null, ['which' => strtolower(substr($which, 0, -5))], $req->ip());
+        $host = 'https://' . $req->host();
+        if ($which === 'ADMIN_PATH') {
+            return Response::html($this->view->render('admin/path-changed', ['url' => $host . '/' . $new . '/']))->forgetCookie(AdminService::COOKIE);
+        }
+        return $this->back('/system', 'path_app');
+    }
+
+    // ------------------------------------------------------------------ logo
+    private function logoUpload(Request $req): Response
+    {
+        $f = $_FILES['logo'] ?? null;
+        if (!is_array($f) || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
+            return $this->settingsPage($req, 'فایل لوگو انتخاب یا آپلود نشد.');
+        }
+        $dim = @getimagesize($f['tmp_name']);
+        if ($f['size'] > 1048576 || file_get_contents($f['tmp_name'], false, null, 0, 8) !== "\x89PNG\r\n\x1a\n" || !$dim || $dim[2] !== IMAGETYPE_PNG
+            || $dim[0] !== $dim[1] || $dim[0] < 192 || $dim[0] > 1024) {
+            return $this->settingsPage($req, 'لوگو باید فایل PNG مربعی بین ۱۹۲ تا ۱۰۲۴ پیکسل (ترجیحاً ۵۱۲×۵۱۲) و حداکثر ۱ مگابایت باشد.');
+        }
+        $dir = $this->app->root . '/storage/branding';
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+            return $this->settingsPage($req, 'پوشه storage/branding قابل ساخت نیست.');
+        }
+        if (!@move_uploaded_file($f['tmp_name'], $dir . '/logo.png')) {
+            return $this->settingsPage($req, 'ذخیره لوگو ممکن نشد؛ مجوز پوشه storage را بررسی کنید.');
+        }
+        @chmod($dir . '/logo.png', 0644);
+        $this->app->settings()->set('app.logo', bin2hex(random_bytes(4)), (int)$this->admin['id']);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'settings.logo_upload', null, null, ['size' => $dim[0]], $req->ip());
+        return $this->back('/settings', 'logo_saved');
+    }
+
+    private function logoDelete(Request $req): Response
+    {
+        @unlink($this->app->root . '/storage/branding/logo.png');
+        $this->app->settings()->set('app.logo', '', (int)$this->admin['id']);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'settings.logo_delete', null, null, [], $req->ip());
+        return $this->back('/settings', 'logo_deleted');
     }
 
     private function systemPage(Request $req): Response
     {
-        $checks = json_decode((string)json_encode($this->app->settings()->get('host.checks')), true) ?: [];
+        $checks = \PM\Install\HostCheck::run($this->app->root, $req); // live: the host may have changed since installation
         $runs = $this->app->db()->all('SELECT job, trigger_source, started_at, finished_at, status, stats FROM cron_runs ORDER BY id DESC LIMIT 20');
         $php = PHP_BINARY !== '' && !str_contains(PHP_BINARY, 'apache') && !str_contains(PHP_BINARY, 'fpm') ? PHP_BINARY : '/usr/local/bin/php';
         $fontDir = $this->app->root . '/app/resources/assets/fonts/';
@@ -603,7 +869,9 @@ final class AdminController extends Controller
             }
             $fonts[$w] = $found;
         }
-        return $this->page($req, 'admin/system', $this->vars(['checks' => $checks, 'runs' => $runs, 'nav' => 'system', 'fonts' => $fonts,
+        $host = 'https://' . $req->host();
+        return $this->page($req, 'admin/system', $this->vars(['checks' => $checks, 'runs' => $runs, 'nav' => 'system', 'fonts' => $fonts, 'msg' => $this->msg($req),
+            'paths' => AdminService::can($this->admin, 'system.paths.manage') ? ['app' => $host . '/' . $this->app->env('APP_PATH') . '/', 'admin' => $host . '/' . $this->app->env('ADMIN_PATH') . '/'] : null,
             'cron' => '*/15 * * * * ' . $php . ' ' . $this->app->root . '/app/Cli/cron.php maintenance']));
     }
 

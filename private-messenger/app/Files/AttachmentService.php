@@ -191,7 +191,7 @@ final class AttachmentService
         rename($part, $this->path($a['storage_key']));
         $permanent = (int)$this->db->scalar('SELECT permanent_file_retention FROM users WHERE id = ?', [$userId]) === 1;
         $now = Clock::db();
-        $expires = $permanent ? null : Clock::dbIn('+' . self::RETENTION_DAYS . ' days');
+        $expires = $permanent ? null : Clock::dbIn('+' . max(1, $this->settings->int('files.retention_days')) . ' days');
         $this->db->run("UPDATE attachments SET upload_status = 'complete', uploaded_at = ?, expires_at = ?, retention_permanent = ?,
                         ciphertext_sha256 = ? WHERE id = ?", [$now, $expires, $permanent ? 1 : 0, hash_file('sha256', $this->path($a['storage_key']), true), $a['id']]);
         $this->db->run('DELETE FROM upload_chunks WHERE attachment_id = ?', [$a['id']]);

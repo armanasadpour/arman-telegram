@@ -36,12 +36,14 @@ final class PasswordLogin
 
         if ($user !== null && $user['locked_until'] !== null && strtotime($user['locked_until'] . ' UTC') > Clock::now()->getTimestamp()) {
             Passwords::verify($password, null); // keep timing uniform
+            \PM\Admin\Stats::bump($this->db, 'login.failed');
             return [self::INVALID, null];
         }
         if (!Passwords::verify($password, $user['password_hash'] ?? null)) {
             if ($user !== null) {
                 $this->registerFailure($user, $ip);
             }
+            \PM\Admin\Stats::bump($this->db, 'login.failed');
             return [self::INVALID, null];
         }
         $this->db->run('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = ?', [$user['id']]);

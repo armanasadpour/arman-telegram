@@ -2,7 +2,7 @@
 <header class="topbar">
   <nav>
     <?php foreach ([['dash', '/', 'داشبورد', 'dashboard.view'], ['users', '/users', 'کاربران', 'users.view'], ['settings', '/settings', 'تنظیمات', 'settings.view'], ['storage', '/storage', 'فضا و فایل‌ها', 'storage.view'], ['fonts', '/fonts', 'فونت', 'settings.view'],
-                    ['admins', '/admins', 'مدیران', 'admins.manage'], ['audit', '/audit', 'گزارش ممیزی', 'audit.view'],
+                    ['admins', '/admins', 'مدیران', 'admins.manage'], ['reports', '/reports', 'گزارش‌ها', 'reports.view'], ['audit', '/audit', 'گزارش ممیزی', 'audit.view'], ['backup', '/backup', 'پشتیبان‌گیری', 'backup.download'],
                     ['system', '/system', 'سیستم', 'system.capabilities.view'], ['account', '/account', 'حساب من', null]] as [$k, $href, $label, $perm]):
         if ($perm === null || A::can($admin, $perm)): ?>
       <a href="<?= e($base . $href) ?>" class="<?= $nav === $k ? 'on' : '' ?>"><?= e($label) ?></a>

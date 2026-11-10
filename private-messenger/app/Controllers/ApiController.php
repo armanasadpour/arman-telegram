@@ -34,7 +34,7 @@ final class ApiController extends Controller
         $r->post('/api/v1/keys/upload', fn (Request $q) => $this->auth($q, fn () => $this->upload($q), true));
         $r->get('/api/v1/users/{id}/keys', fn (Request $q) => $this->auth($q, fn () => $this->userKeys($q), true));
         $r->post('/api/v1/keys/claim', fn (Request $q) => $this->auth($q, fn () => $this->claim($q), true));
-        $r->get('/api/v1/users/search', fn (Request $q) => $this->auth($q, fn () => $this->limiter()->hit('usersearch:' . $this->s['id'], 300, 3600)
+        $r->get('/api/v1/users/search', fn (Request $q) => $this->auth($q, fn () => $this->limiter()->hit('usersearch:' . $this->s['id'], $this->app->settings()->int('limits.search_per_hour'), 3600)
             ? Response::json(['users' => self::users($this->msgs()->searchUsers((int)$this->s['id'], $q->queryString('q')))]) : self::err('rate_limited', 429)));
         $r->get('/api/v1/contacts', fn (Request $q) => $this->auth($q, fn () => Response::json(['users' => self::users($this->msgs()->contacts((int)$this->s['id']))])));
         $r->post('/api/v1/contacts', fn (Request $q) => $this->auth($q, fn () => $this->follow($q, true)));
@@ -228,6 +228,7 @@ final class ApiController extends Controller
             'identity' => ['msk' => $msk ? rtrim(base64_encode($msk['public_key']), '=') : null],
             'device' => $dev ? ['id' => $dev['public_id'], 'status' => $dev['status'], 'otk_count' => $this->keys()->otkCount((int)$this->s['session_device_id'])] : null,
             'name' => (string)$this->app->settings()->get('app.internal_name'),
+            'notify' => ['enabled' => (bool)$this->app->settings()->get('notify.enabled'), 'preview' => (string)$this->app->settings()->get('notify.preview')],
         ]);
     }
 
@@ -259,7 +260,7 @@ final class ApiController extends Controller
 
     private function claim(Request $req): Response
     {
-        if (!$this->limiter()->hit('claim:' . $this->s['id'], 600, 3600)) {
+        if (!$this->limiter()->hit('claim:' . $this->s['id'], $this->app->settings()->int('limits.claim_per_hour'), 3600)) {
             return self::err('rate_limited', 429);
         }
         return Response::json(['keys' => (object)$this->keys()->claim((array)($this->json($req)['device_ids'] ?? []), (int)$this->s['session_device_id'])]);
@@ -277,7 +278,7 @@ final class ApiController extends Controller
 
     private function send(Request $req): Response
     {
-        if (!$this->limiter()->hit('send:' . $this->s['id'], 3000, 3600)) {
+        if (!$this->limiter()->hit('send:' . $this->s['id'], $this->app->settings()->int('limits.send_per_hour'), 3600)) {
             return self::err('rate_limited', 429);
         }
         return Response::json($this->msgs()->send((int)$this->s['id'], (int)$this->s['session_device_id'], $this->json($req), $this->files()), 201);

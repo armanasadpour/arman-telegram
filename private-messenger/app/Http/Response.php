@@ -11,6 +11,16 @@ final class Response
     private array $cookies = [];
     /** @var array{0:string,1:int,2:int}|null file path, offset, length — streamed by send() */
     private ?array $stream = null;
+    /** @var (callable(callable(string):void):void)|null generator streamed by send() */
+    private $writer = null;
+
+    /** Streams generated content (e.g. a backup) without building it in memory. */
+    public static function generated(callable $writer, array $headers): self
+    {
+        $r = new self('', 200, $headers + ['Cache-Control' => 'private, no-store']);
+        $r->writer = $writer;
+        return $r;
+    }
 
     /**
      * Streams (part of) a file without loading it into memory. Supports a single HTTP Range.
@@ -139,6 +149,17 @@ final class Response
             foreach ($this->cookies as $c) {
                 header('Set-Cookie: ' . $c, false);
             }
+        }
+        if ($this->writer !== null) {
+            @set_time_limit(0);
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            ($this->writer)(static function (string $chunk): void {
+                echo $chunk;
+                flush();
+            });
+            return;
         }
         if ($this->stream !== null) {
             [$path, $offset, $len] = $this->stream;

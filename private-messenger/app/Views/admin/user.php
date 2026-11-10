@@ -31,6 +31,18 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
     <?= (int)$u['must_change_password'] === 1 ? ' — <span class="tag warn">باید رمز موقت را تغییر دهد</span>' : '' ?></p>
 </div>
 
+<div class="panel">
+  <h2>آمار غیرمحتوایی</h2>
+  <div class="stats">
+    <div class="stat"><span class="small muted">پیام/رویداد ارسالی (۷ روز / کل)</span><b><?= e(Fa::digits($ustats['messages_7d'])) ?> / <?= e(Fa::digits($ustats['messages'])) ?></b></div>
+    <div class="stat"><span class="small muted">فایل‌های روی سرور</span><b><?= e(Fa::digits($ustats['files']['n'])) ?></b><span class="small"><?= e(Fa::bytes($ustats['files']['b'])) ?></span></div>
+    <div class="stat"><span class="small muted">تماس‌ها</span><b><?= e(Fa::digits($ustats['calls'])) ?></b></div>
+    <div class="stat"><span class="small muted">دنبال‌شده‌ها / گروه‌ها</span><b><?= e(Fa::digits($ustats['contacts'])) ?> / <?= e(Fa::digits($ustats['groups'])) ?></b></div>
+    <div class="stat"><span class="small muted">آخرین همگام‌سازی دستگاه</span><b class="small"><?= e(Fa::dateTime($ustats['last_seen'])) ?></b></div>
+  </div>
+  <p class="small muted">با چه کسی و چه چیزی گفت‌وگو شده، در این پنل نمایش داده نمی‌شود.</p>
+</div>
+
 <?php if ($u['status'] !== 'deleted'): ?>
 <div class="panel">
   <h2>وضعیت و دسترسی</h2>
@@ -64,9 +76,9 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
   <p>نگهداری دائمی فایل‌های این حساب: <b><?= $u['permanent_file_retention'] ? 'فعال' : 'غیرفعال' ?></b></p>
   <p class="small muted"><?= $u['permanent_file_retention']
       ? 'فایل‌های آپلودشده توسط این حساب تا لغو این گزینه به‌صورت خودکار حذف نمی‌شوند.'
-      : 'فایل‌ها ۷ روز پس از آپلود به‌صورت خودکار و غیرقابل بازیابی از سرور حذف می‌شوند.' ?>
+      : 'فایل‌ها ' . Fa::digits($retention_days) . ' روز پس از آپلود به‌صورت خودکار و غیرقابل بازیابی از سرور حذف می‌شوند.' ?>
     <?php if ($u['retention_changed_at']): ?> آخرین تغییر: <?= e(Fa::dateTime($u['retention_changed_at'])) ?> توسط <span class="ltr"><?= e((string)$retention_by) ?></span>.<?php endif; ?>
-    با لغو نگهداری دائمی، مهلت ۷ روزه از <b>زمان لغو</b> محاسبه می‌شود. (بارگذاری فایل در فاز ۴ فعال می‌شود.)</p>
+    با لغو نگهداری دائمی، مهلت <?= e(Fa::digits($retention_days)) ?> روزه از <b>زمان لغو</b> محاسبه می‌شود.</p>
   <?php if (A::can($admin, 'users.retention.manage')): ?>
   <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/retention"><?php include __DIR__ . '/../_csrf.php'; ?>
     <input type="hidden" name="permanent" value="<?= $u['permanent_file_retention'] ? '0' : '1' ?>">

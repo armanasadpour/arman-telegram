@@ -47,9 +47,12 @@ final class AdminService
         'audit.view' => 'مشاهده گزارش ممیزی',
         'admins.manage' => 'مدیریت مدیران (فقط مدیرکل)',
         'system.capabilities.view' => 'مشاهده قابلیت‌های میزبان',
+        'reports.view' => 'مشاهده گزارش‌های آماری (غیرمحتوایی)',
+        'backup.download' => 'دریافت نسخه پشتیبان دیتابیس (فقط مدیرکل)',
+        'system.paths.manage' => 'تغییر آدرس‌های مخفی (فقط مدیرکل)',
     ];
     /** Permissions that only a super role may ever hold, regardless of role configuration. */
-    public const SUPER_ONLY = ['users.retention.manage', 'admins.manage'];
+    public const SUPER_ONLY = ['users.retention.manage', 'admins.manage', 'backup.download', 'system.paths.manage'];
 
     public function __construct(
         private readonly Database $db,
@@ -168,9 +171,94 @@ final class AdminService
         return $this->db->all('SELECT id, name, is_super FROM roles ORDER BY is_super DESC, id');
     }
 
+    /** @return list<array{id:int,name:string,is_super:int,admins:int,permissions:list<string>}> */
+    public function rolesDetailed(): array
+    {
+        $roles = $this->db->all('SELECT r.id, r.name, r.is_super, (SELECT COUNT(*) FROM admin_users a WHERE a.role_id = r.id) AS admins FROM roles r ORDER BY r.is_super DESC, r.id');
+        $perms = [];
+        foreach ($this->db->all('SELECT rp.role_id, p.code FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id') as $r) {
+            $perms[(int)$r['role_id']][] = $r['code'];
+        }
+        foreach ($roles as &$r) {
+            $r['permissions'] = (int)$r['is_super'] === 1 ? array_keys(self::PERMISSIONS) : array_values(array_diff($perms[(int)$r['id']] ?? [], self::SUPER_ONLY));
+        }
+        return $roles;
+    }
+
+    /** Creates ($roleId = null) or updates a non-super role. Super-only permissions can never be granted. */
+    public function saveRole(int $actorId, ?int $roleId, string $name, array $codes, string $ip): int
+    {
+        $name = trim($name);
+        if (mb_strlen($name) < 2 || mb_strlen($name) > 50) {
+            throw new UserError('نام نقش باید بین ۲ تا ۵۰ کاراکتر باشد.');
+        }
+        $codes = array_values(array_intersect(array_unique(array_map('strval', $codes)), array_diff(array_keys(self::PERMISSIONS), self::SUPER_ONLY)));
+        return $this->db->transaction(function () use ($actorId, $roleId, $name, $codes, $ip): int {
+            if ($roleId !== null) {
+                $role = $this->db->one('SELECT id, is_super FROM roles WHERE id = ? FOR UPDATE', [$roleId]);
+                if ($role === null) {
+                    throw new UserError('نقش پیدا نشد.');
+                }
+                if ((int)$role['is_super'] === 1) {
+                    throw new UserError('نقش مدیرکل همه مجوزها را دارد و قابل ویرایش نیست.');
+                }
+            }
+            $dup = $this->db->scalar('SELECT id FROM roles WHERE name = ? AND id <> ?', [$name, $roleId ?? 0]);
+            if ($dup !== null) {
+                throw new UserError('نقشی با این نام وجود دارد.');
+            }
+            if ($roleId === null) {
+                $roleId = $this->db->insert('INSERT INTO roles (name, is_super) VALUES (?, 0)', [$name]);
+            } else {
+                $this->db->run('UPDATE roles SET name = ? WHERE id = ?', [$name, $roleId]);
+                $this->db->run('DELETE FROM role_permissions WHERE role_id = ?', [$roleId]);
+            }
+            foreach ($codes as $c) {
+                $this->db->run('INSERT INTO role_permissions (role_id, permission_id) SELECT ?, id FROM permissions WHERE code = ?', [$roleId, $c]);
+            }
+            $this->audit->record('admin', $actorId, 'role.save', 'role', $roleId, ['name' => $name, 'permissions' => $codes], $ip);
+            return $roleId;
+        });
+    }
+
+    public function deleteRole(int $actorId, int $roleId, string $ip): void
+    {
+        $role = $this->db->one('SELECT id, name, is_super FROM roles WHERE id = ?', [$roleId]);
+        if ($role === null || (int)$role['is_super'] === 1) {
+            throw new UserError('این نقش قابل حذف نیست.');
+        }
+        if ((int)$this->db->scalar('SELECT COUNT(*) FROM admin_users WHERE role_id = ?', [$roleId]) > 0) {
+            throw new UserError('ابتدا نقش مدیرانی را که این نقش را دارند تغییر دهید.');
+        }
+        $this->db->run('DELETE FROM roles WHERE id = ?', [$roleId]);
+        $this->audit->record('admin', $actorId, 'role.delete', 'role', $roleId, ['name' => $role['name']], $ip);
+    }
+
+    /** Changes another admin's role. The last active super admin can never lose the super role. */
+    public function setAdminRole(int $actorId, int $id, int $roleId, string $ip): void
+    {
+        if ($id === $actorId) {
+            throw new UserError('نقش حساب خودتان را نمی‌توانید تغییر دهید.');
+        }
+        $this->db->transaction(function () use ($actorId, $id, $roleId, $ip): void {
+            $a = $this->db->one('SELECT a.id, a.role_id, r.is_super FROM admin_users a JOIN roles r ON r.id = a.role_id WHERE a.id = ? FOR UPDATE', [$id]);
+            $role = $this->db->one('SELECT id, is_super FROM roles WHERE id = ?', [$roleId]);
+            if ($a === null || $role === null) {
+                throw new UserError('مدیر یا نقش پیدا نشد.');
+            }
+            if ((int)$a['is_super'] === 1 && (int)$role['is_super'] === 0
+                && (int)$this->db->scalar("SELECT COUNT(*) FROM admin_users a JOIN roles r ON r.id = a.role_id WHERE r.is_super = 1 AND a.status = 'active' AND a.id <> ?", [$id]) === 0) {
+                throw new UserError('حداقل یک مدیرکل فعال باید باقی بماند.');
+            }
+            $this->db->run('UPDATE admin_users SET role_id = ? WHERE id = ?', [$roleId, $id]);
+            $this->db->run('UPDATE admin_sessions SET revoked_at = ? WHERE admin_id = ? AND revoked_at IS NULL', [Clock::db(), $id]);
+            $this->audit->record('admin', $actorId, 'admin.role', 'admin', $id, ['from' => (int)$a['role_id'], 'to' => $roleId], $ip);
+        });
+    }
+
     public function listAdmins(): array
     {
-        return $this->db->all('SELECT a.id, a.username, a.display_name, a.status, a.totp_enabled, a.last_login_at, r.name AS role_name, r.is_super
+        return $this->db->all('SELECT a.id, a.username, a.display_name, a.status, a.totp_enabled, a.last_login_at, a.role_id, r.name AS role_name, r.is_super
                                  FROM admin_users a JOIN roles r ON r.id = a.role_id ORDER BY a.id');
     }
 
@@ -219,6 +307,19 @@ final class AdminService
             $this->db->run('UPDATE admin_sessions SET revoked_at = ? WHERE admin_id = ? AND revoked_at IS NULL', [Clock::db(), $id]);
         }
         $this->audit->record('admin', $actorId, 'admin.status', 'admin', $id, ['to' => $status], $ip);
+    }
+
+    /** Re-authentication for sensitive actions (backup download, changing secret paths). */
+    public function confirmPassword(array $admin, string $password, string $ip): void
+    {
+        if (!$this->limiter->hit('admin:reauth:' . $admin['id'], 10, 900)) {
+            throw new UserError('تلاش‌های زیادی انجام شده است. چند دقیقه بعد دوباره تلاش کنید.');
+        }
+        $hash = $this->db->scalar('SELECT password_hash FROM admin_users WHERE id = ?', [$admin['id']]);
+        if (!Passwords::verify($password, is_string($hash) ? $hash : null)) {
+            $this->audit->record('admin', (int)$admin['id'], 'admin.reauth_failed', 'admin', (int)$admin['id'], [], $ip);
+            throw new UserError('رمز عبور نادرست است.');
+        }
     }
 
     public function changePassword(array $admin, string $current, string $new, string $confirm, string $ip): void

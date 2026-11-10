@@ -718,7 +718,7 @@ async function start() {
   if (!self.indexedDB || !self.crypto?.subtle || !self.WebAssembly || !navigator.locks) return { state: 'unsupported' };
   await init();
   const boot = await api('/bootstrap');
-  me = boot.me;
+  me = boot.me; notifyCfg = boot.notify || notifyCfg;
   // One tab at a time: two tabs advancing the same ratchet would corrupt it.
   const got = await new Promise((resolve) => {
     navigator.locks.request(`pm-e2ee-${me.id}`, { ifAvailable: true }, (lock) => {
@@ -747,6 +747,7 @@ async function start() {
   }
   return ready(boot.name);
 }
+let notifyCfg = { enabled: true, preview: 'none' };
 async function ready(name) {
   const st = await api('/bootstrap');
   await replenish(st.device?.otk_count ?? OTK_TARGET);
@@ -758,7 +759,7 @@ async function ready(name) {
   syncOnce().then(schedule);
   let needsRecovery = false;
   try { await api('/me/key-backup'); } catch (e) { needsRecovery = e.status === 404; }
-  return { state: 'ready', me, device_id: deviceId, name, needs_recovery: needsRecovery };
+  return { state: 'ready', me, device_id: deviceId, name, needs_recovery: needsRecovery, notify: notifyCfg };
 }
 
 async function conversations() {
