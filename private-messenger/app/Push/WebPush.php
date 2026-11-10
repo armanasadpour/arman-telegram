@@ -17,7 +17,7 @@ final class WebPush
     private const SPKI_P256_PREFIX = '3059301306072a8648ce3d020106082a8648ce3d030107034200';
 
     public function __construct(private readonly string $vapidPrivatePem, private readonly string $vapidPublicRaw, private readonly string $subject,
-                                private readonly array $extraHosts = [], private readonly ?string $caInfo = null)
+                                private readonly array $extraHosts = [], private readonly ?string $caInfo = null, private readonly string $proxy = '')
     {
     }
 
@@ -111,7 +111,7 @@ final class WebPush
     /**
      * Sends to many subscriptions in parallel (curl_multi), bounded to a few seconds in total.
      * @param list<array{id:int, endpoint:string, p256dh:string, auth:string, payload:string, ttl:int, urgency:string}> $jobs
-     * @return array<int, int> subscription id => HTTP status (0 = network error)
+     * @return array<int, array{0:int, 1:string}> subscription id => [HTTP status (0 = network error, -1 = bad keys), error text]
      */
     public function sendMany(array $jobs): array
     {
@@ -134,6 +134,9 @@ final class WebPush
                 CURLOPT_PROTOCOLS => CURLPROTO_HTTPS, CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/octet-stream', 'Content-Encoding: aes128gcm', 'TTL: ' . $j['ttl'],
                     'Urgency: ' . $j['urgency'], 'Authorization: ' . $auth]];
+            if ($this->proxy !== '') {
+                $opts[CURLOPT_PROXY] = $this->proxy; // e.g. a server abroad when the host cannot reach the push services
+            }
             if ($this->extraHosts !== []) {
                 $opts[CURLOPT_NOPROXY] = implode(',', $this->extraHosts); // self-hosted push services are reached directly
             }
@@ -154,14 +157,35 @@ final class WebPush
         $out = [];
         foreach ($handles as $id => $ch) {
             if ($ch === null) {
-                $out[$id] = -1; // malformed subscription keys
+                $out[$id] = [-1, 'invalid subscription keys']; // malformed subscription keys
                 continue;
             }
-            $out[$id] = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $err = $code === 0 ? (curl_error($ch) ?: 'no response (timeout)') : ($code >= 300 ? mb_substr(trim(preg_replace('/\s+/', ' ', (string)curl_multi_getcontent($ch))), 0, 250) : '');
+            $out[$id] = [$code, $err];
             curl_multi_remove_handle($mh, $ch);
             curl_close($ch);
         }
         curl_multi_close($mh);
+        return $out;
+    }
+
+    /** Can this server open an HTTPS connection to the push services? (diagnostics; any HTTP answer = reachable) */
+    public function reachability(): array
+    {
+        $out = [];
+        foreach (['fcm.googleapis.com' => 'گوگل (Chrome، Edge، اندروید)', 'updates.push.services.mozilla.com' => 'موزیلا (Firefox)', 'web.push.apple.com' => 'اپل (Safari، آیفون)'] as $host => $label) {
+            $ch = curl_init('https://' . $host . '/');
+            $o = [CURLOPT_NOBODY => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS];
+            if ($this->proxy !== '') {
+                $o[CURLOPT_PROXY] = $this->proxy;
+            }
+            curl_setopt_array($ch, $o);
+            curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $out[] = ['host' => $host, 'label' => $label, 'ok' => $code > 0, 'code' => $code, 'error' => $code > 0 ? '' : curl_error($ch)];
+            curl_close($ch);
+        }
         return $out;
     }
 

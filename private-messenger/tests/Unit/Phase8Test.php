@@ -90,3 +90,27 @@ test('P8: push targets: other members only, not muted (except calls), not curren
     ok($s->hasSecret('push.vapid_private') && strlen((string)WebPush::b64uDecode((string)$s->get('push.vapid_public'))) === 65, 'VAPID key created once, private part sealed');
     ok(!str_contains((string)$db->scalar("SELECT setting_value FROM system_settings WHERE setting_key = 'secret.push.vapid_private'"), 'PRIVATE KEY'), 'not stored in clear');
 });
+
+test('P8.2: profile photos are stored only as ciphertext and only visible to people who share a chat or follow', function () {
+    [$db, $users] = svc();
+    [$a] = $users->create(1, 'alice', 'A', '', true, '');
+    [$b] = $users->create(1, 'bob', 'B', '', true, '');
+    [$c] = $users->create(1, 'carol', 'C', '', true, '');
+    $pub = fn ($id) => (string)$db->scalar('SELECT public_id FROM users WHERE id = ?', [$id]);
+    $av = new \PM\Users\AvatarService($db);
+    throws(fn () => $av->put($a, 'not base64!'), UserError::class);
+    throws(fn () => $av->put($a, base64_encode(str_repeat('x', 10))), UserError::class);
+    throws(fn () => $av->put($a, base64_encode(random_bytes(\PM\Users\AvatarService::MAX_BYTES + 1))), UserError::class);
+    $ct = random_bytes(5000);
+    eq(1, $av->put($a, base64_encode($ct)));
+    eq(2, $av->put($a, base64_encode($ct)));
+    eq(null, $av->get($b, $pub($a)), 'a stranger cannot fetch it');
+    $conv = $db->insert("INSERT INTO conversations (public_id, type, created_by, created_at) VALUES ('01AVATARCONV00000000000000', 'direct', ?, NOW(3))", [$a]);
+    foreach ([$a, $b] as $u) { $db->run('INSERT INTO conversation_members (conversation_id, user_id, role, joined_at) VALUES (?, ?, ?, NOW(3))', [$conv, $u, 'member']); }
+    eq(['version' => 2, 'ciphertext' => base64_encode($ct)], $av->get($b, $pub($a)), 'a chat partner can');
+    $db->run('INSERT INTO user_contacts (user_id, contact_user_id, created_at) VALUES (?, ?, NOW(3))', [$c, $a]);
+    ok($av->get($c, $pub($a)) !== null, 'a follower can');
+    $av->remove($a);
+    eq(null, $av->get($b, $pub($a)));
+    eq(3, $av->put($a, base64_encode($ct)), 'versions never repeat after removal');
+});

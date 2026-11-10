@@ -33,6 +33,10 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
     </select></label>
     <input type="hidden" name="_notify_section" value="1">
     <label class="check"><input type="checkbox" name="push_enabled" value="1" <?= $v('push.enabled') ? 'checked' : '' ?> <?= $dis ?>> اعلان وقتی برنامه بسته است (Web Push از طریق سرویس اعلان گوگل/اپل/موزیلا/مایکروسافت)</label>
+    <label class="field"><span>پراکسی اعلان (اختیاری؛ وقتی هاست به سرویس‌های اعلان گوگل/اپل دسترسی ندارد) — مثلاً socks5h://user:pass@1.2.3.4:1080 یا http://1.2.3.4:3128 · خالی = حفظ مقدار فعلی</span>
+      <input type="text" name="push_proxy" class="ltr" autocomplete="off" placeholder="<?= $s->hasSecret('push.proxy') ? '•••••• (ذخیره شده)' : 'بدون پراکسی' ?>" <?= $dis ?>></label>
+    <?php if ($s->hasSecret('push.proxy')): ?><label class="check"><input type="checkbox" name="push_proxy_clear" value="1" <?= $dis ?>> حذف پراکسی اعلان</label><?php endif; ?>
+    <p class="small muted">از پراکسی فقط برای ارسال اعلان به سرویس‌های اعلان استفاده می‌شود؛ محتوای اعلان رمزنگاری‌شده است و پراکسی هم چیزی جز «یک اعلان برای یک دستگاه» نمی‌بیند. وضعیت دسترسی را در صفحه «سیستم» بررسی کنید.</p>
     <p class="small muted">در Web Push فقط «نوع رویداد + شناسه گفتگو» به‌صورت رمزنگاری‌شده برای دستگاه فرستاده می‌شود؛ سرویس اعلان نه متن را می‌بیند و نه نام را. اما می‌فهمد که یک دستگاه در چه زمانی اعلان گرفته است. اگر سرور شما به این سرویس‌ها دسترسی نداشته باشد (مثلاً فیلتر)، اعلان فقط وقتی برنامه باز است کار می‌کند.</p>
     <p class="small muted">متن پیام هرگز در اعلان نمایش داده نمی‌شود (اعلان روی صفحه قفل گوشی دیده می‌شود). اعلان فقط وقتی برنامه باز است (حتی در پس‌زمینه) کار می‌کند؛ اعلان در حالت بسته (Web Push) در این نسخه وجود ندارد.</p>
   </div>

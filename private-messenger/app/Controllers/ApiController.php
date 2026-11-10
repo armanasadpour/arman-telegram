@@ -81,6 +81,13 @@ final class ApiController extends Controller
         $r->post('/api/v1/conversations/{id}/prefs', fn (Request $q) => $this->auth($q, fn () => Response::json($this->msgs()->setPrefs((int)$this->s['id'], $q->param('id'), $this->json($q))), true));
         $r->get('/api/v1/push', fn (Request $q) => $this->auth($q, fn () => $this->pushConfig($q), true));
         $r->post('/api/v1/push', fn (Request $q) => $this->auth($q, fn () => $this->pushSubscribe($q), true));
+        $r->post('/api/v1/push/test', fn (Request $q) => $this->auth($q, fn () => $this->pushTest($q), true));
+        $r->post('/api/v1/me/avatar', fn (Request $q) => $this->auth($q, fn () => Response::json(['version' => (new \PM\Users\AvatarService($this->app->db()))->put((int)$this->s['id'], $this->json($q)['ciphertext'] ?? null)], 201), true));
+        $r->post('/api/v1/me/avatar/remove', fn (Request $q) => $this->auth($q, fn () => $this->ok((new \PM\Users\AvatarService($this->app->db()))->remove((int)$this->s['id'])), true));
+        $r->get('/api/v1/users/{id}/avatar', fn (Request $q) => $this->auth($q, function () use ($q) {
+            $a = (new \PM\Users\AvatarService($this->app->db()))->get((int)$this->s['id'], $q->param('id'));
+            return $a === null ? self::err('avatar_not_found', 404) : Response::json($a)->header('Cache-Control', 'private, no-store');
+        }, true));
         $r->post('/api/v1/push/remove', fn (Request $q) => $this->auth($q, fn () => $this->pushRemove(), true));
         $r->post('/api/v1/ephemeral', fn (Request $q) => $this->auth($q, fn () => Response::json(['sent' => $this->msgs()->sendEphemeral((int)$this->s['id'], (int)$this->s['session_device_id'], $this->json($q))]), true));
         return $r->dispatch($req);
@@ -198,7 +205,7 @@ final class ApiController extends Controller
             $code = $e->getMessage();
             $status = match ($code) {
                 'identity_exists' => 409, 'insufficient_storage' => 507, 'file_too_large' => 413,
-                'upload_not_found', 'attachment_not_found', 'call_not_found', 'user_not_found', 'link_not_found', 'group_not_found', 'device_not_found' => 404,
+                'upload_not_found', 'attachment_not_found', 'call_not_found', 'user_not_found', 'link_not_found', 'group_not_found', 'device_not_found', 'avatar_not_found' => 404,
                 'too_many_devices', 'group_full', 'push_disabled' => 409, 'channel_read_only' => 403, 'not_group_admin', 'not_group_owner' => 403, default => 400,
             };
             return self::err(preg_match('/^[a-z_]+$/', $code) ? $code : 'invalid_request', $status);
@@ -295,6 +302,15 @@ final class ApiController extends Controller
         $in = $this->json($req);
         $p->subscribe((int)$this->s['session_device_id'], $in['endpoint'] ?? null, $in['keys']['p256dh'] ?? null, $in['keys']['auth'] ?? null);
         return Response::json(['ok' => true], 201);
+    }
+
+    private function pushTest(Request $req): Response
+    {
+        $p = $this->push($req);
+        if (!$p->enabled()) {
+            return self::err('push_disabled', 409);
+        }
+        return Response::json($p->testDevice((int)$this->s['session_device_id']));
     }
 
     private function pushRemove(): Response

@@ -65,6 +65,10 @@ self.addEventListener('push', (e) => e.waitUntil((async () => {
   const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   const visible = wins.some((w) => w.visibilityState === 'visible');
   const cid = typeof p.c === 'string' ? p.c : '';
+  if (p.t === 't') { // test sent from «Settings → Notifications»
+    await self.registration.showNotification('اعلان آزمایشی ✓', { body: 'اعلان وقتی برنامه بسته است روی این دستگاه کار می‌کند.', tag: 'push-test', icon: m.icon || undefined, badge: m.badge || undefined });
+    return;
+  }
   if (p.t === 'c') {
     if (visible) return; // the open app is ringing already
     await self.registration.showNotification('📞 تماس ورودی', {

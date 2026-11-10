@@ -133,7 +133,7 @@ async function contact(userId, refresh = false) {
   if (userId === me.id) c = { user_id: userId, msk: msk.public_key(), verified: true, devices: k.msk === msk.public_key() ? devices : {}, fetched: Date.now() };
   else if (!c) c = { user_id: userId, msk: k.msk, verified: false, devices, pending_msk: null, pending_devices: null, fetched: Date.now() };
   else if (c.msk === k.msk) {
-    if (Object.keys(devices).some((d) => !(d in (c.devices || {})))) emit('device_added', { user_id: userId });
+    if (Object.keys(devices).some((d) => !(d in (c.devices || {})))) { emit('device_added', { user_id: userId }); newDevicePeers.add(userId); }
     c = { ...c, devices, pending_msk: null, pending_devices: null, fetched: Date.now() };
   }
   else {
@@ -258,11 +258,93 @@ async function deliver(cid, peerId, mid, payload, attachmentIds = [], attempt = 
 }
 const payloadOf = (cid, mid, t, body, ts = Date.now()) => JSON.stringify({ v: 1, t, cid, mid, su: me.id, sd: deviceId, ts, body });
 
+// ------------------------------------------------------------------ profile photos (end-to-end encrypted)
+// The photo is encrypted here with a fresh AES-256-GCM key; the server stores only ciphertext. The key reaches
+// contacts inside normal end-to-end encrypted messages ({t:'profile', body:{v, key}}), so only they can see it.
+const avatarCache = new Map(); // user id -> data URL | null (this session)
+const AV_AAD = (uid) => enc.encode('pm-avatar-v1|' + uid);
+async function myAvatar() { const b = await get('kv', 'my_avatar'); return b ? unseal(b) : null; }
+async function setAvatar(bytes, mime) {
+  const key = crypto.getRandomValues(new Uint8Array(32)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: AV_AAD(me.id) }, k, bytes));
+  const { version } = await api('/me/avatar', { method: 'POST', body: { ciphertext: b64(concat(iv, ct)) } });
+  const url = `data:${/^image\/(jpeg|png|webp)$/.test(mime) ? mime : 'image/jpeg'};base64,` + b64(bytes);
+  await write([['kv', await seal({ v: version, key: b64(key), url }), 'my_avatar']]);
+  avatarCache.set(me.id, url);
+  broadcastProfile().catch(() => {});
+  return url;
+}
+async function removeAvatar() {
+  await api('/me/avatar/remove', { method: 'POST', body: {} });
+  await write([['kv', await seal({ v: 0 }), 'my_avatar']]);
+  avatarCache.set(me.id, null);
+  broadcastProfile().catch(() => {});
+}
+/** Sends my current photo key to one conversation (direct peer or the encrypted group roster). */
+async function sendProfile(cid, peerId, info) {
+  const g = peerId ? null : await get('groups', cid);
+  if (!peerId && !g) return;
+  const mid = newId(), body = info.v ? { v: info.v, key: info.key } : { v: 0 };
+  await write([['events', { mid, applied: true }]]);
+  await deliver(cid, peerId, mid, payloadOf(cid, mid, 'profile', body), [], 0, g ? g.members : null);
+  await write([['kv', { v: info.v, at: Date.now() }, 'avsent:' + cid]]);
+}
+async function broadcastProfile() {
+  const info = await myAvatar();
+  if (!info) return;
+  for (const c of (await api('/conversations')).conversations) {
+    try { await sendProfile(c.id, c.peer?.id || null, info); } catch { /* peer without devices etc. */ }
+  }
+}
+/** Before a message goes to a chat that has not got my current photo key (new chat, or older than 3 days). */
+const newDevicePeers = new Set(); // contacts that added a device: that device has no photo key yet
+async function maybeSendProfile(cid, peerId) {
+  const info = await myAvatar();
+  if (!info?.v) return;
+  const sent = await get('kv', 'avsent:' + cid);
+  const fresh = peerId && newDevicePeers.delete(peerId);
+  if (!fresh && sent && sent.v === info.v && Date.now() - sent.at < 3 * 86400000) return;
+  try { await sendProfile(cid, peerId, info); } catch { /* best effort */ }
+}
+async function acceptProfile(uid, body) {
+  const old = await get('kv', 'avk:' + uid);
+  const cur = old ? await unseal(old) : null;
+  if (cur && body.v < cur.v && body.v !== 0) return; // never go back to an older photo
+  await write([['kv', await seal(body), 'avk:' + uid], ['kv', undefined, 'avimg:' + uid]]);
+  avatarCache.delete(uid);
+  emit('avatar', { user_id: uid });
+}
+async function getAvatar(uid) {
+  if (uid === me.id) { const m = await myAvatar(); return m?.url || null; }
+  if (avatarCache.has(uid)) return avatarCache.get(uid);
+  const kb = await get('kv', 'avk:' + uid);
+  const k = kb ? await unseal(kb) : null;
+  if (!k?.v) { avatarCache.set(uid, null); return null; }
+  const ib = await get('kv', 'avimg:' + uid);
+  const cached = ib ? await unseal(ib) : null;
+  if (cached?.v === k.v) { avatarCache.set(uid, cached.url); return cached.url; }
+  let r;
+  try { r = await api(`/users/${encodeURIComponent(uid)}/avatar`); } catch { avatarCache.set(uid, null); return null; }
+  if (r.version !== k.v) { avatarCache.set(uid, null); return null; } // photo changed; the new key is on its way
+  const raw = b64dec(r.ciphertext.replace(/=+$/, ''));
+  try {
+    const key = await crypto.subtle.importKey('raw', b64dec(k.key), 'AES-GCM', false, ['decrypt']);
+    const img = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.subarray(0, 12), additionalData: AV_AAD(uid) }, key, raw.subarray(12)));
+    if (!(img[0] === 0xff && img[1] === 0xd8) && !(img[0] === 0x89 && img[1] === 0x50)) throw new Error('not an image');
+    const url = 'data:image/' + (img[0] === 0xff ? 'jpeg' : 'png') + ';base64,' + b64(img);
+    await write([['kv', await seal({ v: k.v, url }), 'avimg:' + uid]]);
+    avatarCache.set(uid, url);
+    return url;
+  } catch { avatarCache.set(uid, null); return null; }
+}
+
 /** Sends a new visible message (text or file). */
 async function sendMessage(cid, peerId, t, body, extra = {}, mid = newId()) {
   const ts = Date.now();
   const m = { mid, cid, ts, dir: 'out', status: 'sending', from: me.id, text: body.text || '', reply_to: body.reply_to || null, att: body.att || null, fwd: body.fwd || false, ...extra };
   await putMessage(m); emit('message', m);
+  await maybeSendProfile(cid, peerId);
   try {
     await deliver(cid, peerId, mid, payloadOf(cid, mid, t, body, ts), body.att ? [body.att.id] : []);
     m.status = 'sent'; m.flag = null; pendingStatus.add(mid);
@@ -404,6 +486,7 @@ function validPayload(p, env) {
     case 'group_state': return validStr(b.name, 100) && Number.isSafeInteger(b.version) && b.version > 0 && validStr(b.owner, 26)
       && Array.isArray(b.members) && b.members.length <= 64 && b.members.every((x) => validStr(x, 26))
       && Array.isArray(b.admins) && b.admins.every((x) => b.members.includes(x)) && typeof (b.channel ?? false) === 'boolean';
+    case 'profile': return Number.isSafeInteger(b.v) && b.v >= 0 && (b.v === 0 || (validStr(b.key, 64) && b64dec(b.key).length === 32));
     case 'call': return validStr(b.call_id, 26) && CALL_ACTIONS.includes(b.action) && (b.sdp == null || validStr(b.sdp, 30000)) && typeof (b.video ?? false) === 'boolean';
     default: return EVENT_TYPES.includes(p.t) && validStr(b.target, 30);
   }
@@ -473,6 +556,11 @@ async function receive(env) {
     await applyGroupState(p.cid, p.su, p.body, p.ts);
     return;
   }
+  if (p.t === 'profile') {
+    await write([...ops, ['events', { mid: p.mid, applied: true }]]);
+    await acceptProfile(p.su, p.body);
+    return;
+  }
   if (p.t === 'call') {
     await write([...ops, ['events', { mid: p.mid, applied: true }]]);
     // Offers older than 90 s are stale (e.g. delivered after the device was offline): never ring for them.
@@ -528,7 +616,7 @@ async function applyGroupState(cid, from, st, ts) {
   // "channel" is fixed when the group is created and can never be switched later.
   const next = { cid, name: st.name, version: st.version, members: [...new Set(st.members)], admins: [...new Set(st.admins)], owner: st.owner, updated: ts,
     channel: local ? !!local.channel : st.channel === true };
-  await write([['groups', next]]);
+  await write([['groups', next], ['kv', undefined, 'avsent:' + cid]]); // new members get my photo key with my next message
   serverMembers.delete(cid);
   const mine = from === me.id, fa = (n) => n.toLocaleString('fa-IR'), kind = next.channel ? 'کانال' : 'گروه';
   if (!local) await sysMessage(cid, mine ? `${kind} «${st.name}» را ساختید.` : `شما به ${kind} «${st.name}» اضافه شدید.`);
@@ -800,6 +888,10 @@ const commands = {
   async link_reject({ id }) { await api(`/device-links/${id}/reject`, { method: 'POST', body: {} }); },
   async my_devices() { return (await api('/me/devices')).devices; },
   async revoke_device({ id }) { await api(`/devices/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: {} }); await contact(me.id, true); },
+  set_avatar: async ({ blob }) => setAvatar(new Uint8Array(await blob.arrayBuffer()), blob.type),
+  remove_avatar: () => removeAvatar(),
+  avatar: ({ user_id }) => getAvatar(user_id),
+  push_test: () => api('/push/test', { method: 'POST', body: {} }),
   conv_prefs: ({ cid, prefs }) => api(`/conversations/${encodeURIComponent(cid)}/prefs`, { method: 'POST', body: prefs }),
   async presence({ cid }) { const r = await api(`/conversations/${encodeURIComponent(cid)}/presence`); return { online: r.devices.length > 0, seen: r.peer_seen }; },
   push_config: () => api('/push'),

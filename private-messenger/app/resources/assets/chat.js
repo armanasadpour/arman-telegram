@@ -133,11 +133,21 @@ function toast(text) {
 // Avatars: initials on a gradient chosen from the id (no photos are uploaded anywhere).
 function hash(s) { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h; }
 function initials(n) { const w = String(n || '?').trim().split(/\s+/); return (w.length > 1 ? w[0][0] + '‌' + w[1][0] : [...w[0]][0] || '?'); }
+const avatarUrls = new Map(); // user id -> Promise<data URL | null> (decrypted in the worker)
+const loadAvatar = (id) => { if (!avatarUrls.has(id)) avatarUrls.set(id, call('avatar', { user_id: id }).catch(() => null)); return avatarUrls.get(id); };
 function avatar(name, id, kind = 'user', cls = '') {
-  const a = el('span', { class: `c-av g${hash(id || name) % 8} ${cls}`, 'aria-hidden': 'true' });
+  const a = el('span', { class: `c-av g${hash(id || name) % 8} ${cls}`, 'aria-hidden': 'true', 'data-uid': kind === 'user' && id ? id : null });
   if (kind === 'group' || kind === 'channel') a.append(ico(kind === 'channel' ? 'channel' : 'users'));
   else a.textContent = initials(name);
+  if (kind === 'user' && id && me) loadAvatar(id).then((url) => { if (url) { a.classList.add('photo'); a.replaceChildren(el('img', { src: url, alt: '' })); } });
   return a;
+}
+function refreshAvatars(uid) {
+  avatarUrls.delete(uid);
+  loadAvatar(uid).then((url) => document.querySelectorAll(`.c-av[data-uid="${CSS.escape(uid)}"]`).forEach((a) => {
+    if (url) { a.classList.add('photo'); a.replaceChildren(el('img', { src: url, alt: '' })); }
+    else { a.classList.remove('photo'); a.textContent = initials(names.get(uid) || (uid === me?.id ? me.display_name : '?')); }
+  }));
 }
 function when(ts) {
   const d = new Date(ts), now = new Date();
@@ -173,6 +183,7 @@ worker.onmessage = ({ data }) => {
   if (event === 'link_request') { document.querySelector('.c-tab[data-tab=settings]')?.classList.add('dot'); document.querySelector('.c-devbtn')?.classList.add('dot'); toast('درخواست اتصال دستگاه جدید — تنظیمات ← «دستگاه‌های متصل».'); }
   if (event === 'device_added' && d.user_id !== me?.id) toast(`دستگاه جدیدی برای ${names.get(d.user_id) || 'یک مخاطب'} اضافه شد.`);
   if (event === 'skipped') toast(`پیام برای ${d.users.map((u) => names.get(u) || 'یک عضو').join('، ')} ارسال نشد (کلید تغییر کرده؛ در «اطلاعات گروه» تأیید کنید).`);
+  if (event === 'avatar') refreshAvatars(d.user_id);
   if (event === 'group_changed') { scheduleRefresh(); if (current?.id === d.cid) call('conversations').then((l) => { const c = l.find((x) => x.id === d.cid); if (c) { Object.assign(current, { name: c.name, has_state: c.has_state, is_admin: c.is_admin, channel: c.channel, member_count: c.member_count }); renderHead(); renderBanner(); } }); }
 };
 worker.onerror = () => status('خطا در بارگذاری موتور رمزنگاری. صفحه را دوباره بارگذاری کنید.');
@@ -259,6 +270,26 @@ async function enablePush() {
   if (sub && btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey || []))).replace(/=+$/, '') !== btoa(String.fromCharCode(...key)).replace(/=+$/, '')) { await sub.unsubscribe(); sub = null; }
   sub ||= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   await call('push_subscribe', { sub: sub.toJSON() });
+}
+const SVC = (h) => /fcm|google/.test(h) ? 'گوگل' : /mozilla/.test(h) ? 'موزیلا' : /apple/.test(h) ? 'اپل' : /windows/.test(h) ? 'مایکروسافت' : h;
+/** Asks the server to push to this device now and explains the answer in plain words. */
+async function pushDiagnose() {
+  const r = await call('push_test');
+  const svc = SVC(r.host || '');
+  if (!r.subscribed) return { ok: false, text: 'این دستگاه هنوز برای اعلان پس‌زمینه ثبت نشده است. «اعلان وقتی برنامه بسته است» را روشن کنید.' };
+  if (r.status >= 200 && r.status < 300) return { ok: true, text: `سرور اعلان را با موفقیت به سرویس اعلان ${svc} تحویل داد و تا چند ثانیه باید اعلان «آزمایشی» را ببینید. اگر ندیدید، مشکل از سمت گوشی است: در تنظیمات گوشی اعلان‌های مرورگر (یا برنامه نصب‌شده) و «بهینه‌سازی باتری» آن را بررسی کنید؛ در اندروید، گوشی باید به سرویس‌های گوگل (Google Play) وصل باشد.` };
+  if (r.status === 0) return { ok: false, text: `سرور نتوانست به سرویس اعلان ${svc} وصل شود (${r.error}). احتمالاً هاست شما به سرورهای ${svc} دسترسی ندارد — مثلاً هاست داخل ایران. مدیر سامانه می‌تواند در «پنل مدیریت ← تنظیمات ← پراکسی اعلان» یک سرور واسط تنظیم کند.` };
+  if (r.status === 403) return { ok: false, text: `سرویس اعلان ${svc} درخواست سرور را رد کرد (۴۰۳). معمولاً یعنی IP سرور شما (مثلاً دیتاسنتر داخل ایران) توسط ${svc} مسدود شده است. راه‌حل: «پراکسی اعلان» در پنل مدیریت.` };
+  if (r.status === 404 || r.status === 410 || r.status === 400 || r.status === 401) {
+    await disablePush().catch(() => {}); await enablePush().catch(() => {});
+    return { ok: false, retry: true, text: 'اشتراک اعلان این دستگاه منقضی یا نامعتبر بود و دوباره ساخته شد. یک بار دیگر «تست» را بزنید.' };
+  }
+  return { ok: false, text: `پاسخ غیرمنتظره از سرویس اعلان ${svc}: ${r.status} ${r.error || ''}` };
+}
+/** Subscribes silently when the user already allowed notifications (e.g. after reinstall or re-login). */
+async function ensurePush() {
+  if (!notifyCfg.enabled || window.Notification?.permission !== 'granted' || !('PushManager' in window)) return;
+  try { const cfg = await call('push_config'); if (cfg.enabled && !cfg.subscribed) await enablePush(); } catch { /* push service unreachable */ }
 }
 async function disablePush() {
   try { await (await (swReg || await navigator.serviceWorker.ready).pushManager.getSubscription())?.unsubscribe(); } catch { /* none */ }
@@ -452,6 +483,7 @@ function renderApp() {
   root.replaceChildren(el('div', { class: 'c-app' }, sideEl, mainEl, tabsEl));
   renderSide();
   installHint();
+  ensurePush();
 }
 function emptyMain() {
   return el('div', { class: 'c-empty' }, el('div', { class: 'onb-logo' }, ico('chat')),
@@ -716,7 +748,8 @@ function toggle(label, sub, on, onchange) {
 function renderSettingsTab() {
   sideEl.replaceChildren(sideHead('تنظیمات'),
     el('div', { class: 'c-list c-settings' },
-      el('div', { class: 'c-me' }, avatar(me.display_name, me.id, 'user', 'xl'), el('div', {}, el('h2', { text: me.display_name }), el('p', { class: 'ltr', text: '@' + me.username }))),
+      el('div', { class: 'c-me' }, el('button', { class: 'c-me-av', 'aria-label': 'تغییر عکس پروفایل', onclick: photoSheet }, avatar(me.display_name, me.id, 'user', 'xl'), el('span', { class: 'c-cam' }, ico('camera'))),
+        el('div', {}, el('h2', { text: me.display_name }), el('p', { class: 'ltr', text: '@' + me.username }))),
       group(
         row('devices', 'دستگاه‌های متصل', 'گوشی‌ها و مرورگرهای حساب شما', showDevices, 'c-devbtn'),
         row('shield', 'حریم خصوصی و امنیت', 'رمزنگاری، کلید بازیابی، نشست‌ها', privacyPage),
@@ -727,6 +760,46 @@ function renderSettingsTab() {
         row('download', 'نصب برنامه', installEvt ? 'روی صفحه اصلی یا دسکتاپ' : isStandalone() ? 'برنامه نصب شده است' : 'راهنمای نصب', installApp),
         row('info', 'درباره', 'نسخه ' + (info.version || '—'), aboutPage)),
       group(row('logout', 'خروج از حساب', 'فقط از همین دستگاه', logout, 'danger'))));
+}
+// ---- profile photo: cropped to a square on this device, re-encoded (no EXIF/location), encrypted before upload
+function photoSheet() {
+  const pickInput = (capture) => {
+    const i = el('input', { type: 'file', accept: 'image/*', hidden: true, capture: capture || null, onchange: () => { const f = i.files[0]; i.remove(); if (f) photoEditor(f); } });
+    document.body.append(i); i.click();
+  };
+  loadAvatar(me.id).then((has) => sheet('عکس پروفایل',
+    sheetItem('image', 'انتخاب از گالری', () => pickInput(null)),
+    sheetItem('camera', 'گرفتن عکس', () => pickInput('user')),
+    has ? sheetItem('trash', 'حذف عکس', async () => { await call('remove_avatar'); refreshAvatars(me.id); toast('عکس پروفایل حذف شد.'); }, 'danger') : null,
+    el('p', { class: 'small muted', text: '🔒 عکس روی همین دستگاه رمزنگاری می‌شود؛ فقط مخاطبان و هم‌گروهی‌هایتان آن را می‌بینند — سرور و مدیر سامانه نه.' })));
+}
+async function photoEditor(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { return toast('این فایل تصویر قابل خواندن نیست.'); }
+  const side = Math.min(bmp.width, bmp.height);
+  let zoom = 1, ox = 0.5, oy = 0.5;
+  const c = el('canvas', { width: '512', height: '512', class: 'c-crop' });
+  const draw = () => {
+    const s2 = side / zoom, sx = (bmp.width - s2) * ox, sy = (bmp.height - s2) * oy;
+    c.getContext('2d').drawImage(bmp, sx, sy, s2, s2, 0, 0, 512, 512);
+  };
+  draw();
+  let drag = null;
+  c.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, ox, oy }; c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove', (e) => { if (!drag) return; const r = c.getBoundingClientRect(), k = 1 / zoom;
+    ox = Math.min(1, Math.max(0, drag.ox - (e.clientX - drag.x) / r.width * k)); oy = Math.min(1, Math.max(0, drag.oy - (e.clientY - drag.y) / r.height * k)); draw(); });
+  c.addEventListener('pointerup', () => { drag = null; });
+  const dlg = dialog('عکس پروفایل',
+    el('div', { class: 'c-crop-wrap' }, c),
+    el('label', { class: 'field' }, el('span', { text: 'بزرگ‌نمایی (برای جابه‌جایی، تصویر را بکشید)' }),
+      el('input', { type: 'range', min: '1', max: '3', step: '0.05', value: '1', oninput: (e) => { zoom = +e.target.value; draw(); } })),
+    el('button', { class: 'btn block', text: 'ذخیره عکس', onclick: async (e) => {
+      e.target.disabled = true; e.target.textContent = 'در حال رمزنگاری و ارسال…';
+      const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.86));
+      try { await call('set_avatar', { blob }); close(dlg); refreshAvatars(me.id); toast('عکس پروفایل ذخیره شد (رمزنگاری‌شده).'); }
+      catch (x) { toast(errText(x)); e.target.disabled = false; e.target.textContent = 'ذخیره عکس'; }
+    } }));
+  dlg.showModal();
 }
 function privacyPage() {
   subPage('حریم خصوصی و امنیت',
@@ -775,6 +848,11 @@ async function notificationsPage() {
     el('div', { class: 'c-group' },
       toggle('ساعات سکوت', 'در این بازه اعلان‌ها بی‌صدا هستند', quietOn, (on) => { prefs.quiet = on ? { from: mins(from.value), to: mins(to.value) } : null; savePrefs(); }),
       el('div', { class: 'c-row' }, el('span', { class: 'c-name grow', text: 'از' }), from, el('span', { class: 'c-name', text: 'تا' }), to)),
+    pushState?.enabled ? el('button', { class: 'btn block mt', text: 'تست اعلان وقتی برنامه بسته است (از سرور)', onclick: async (e) => {
+      e.target.disabled = true; status.textContent = 'در حال ارسال اعلان آزمایشی از سرور…';
+      try { const d = await pushDiagnose(); status.textContent = (d.ok ? '✓ ' : '⚠ ') + d.text; status.className = 'small ' + (d.ok ? 'ok-text' : 'alert warn'); } catch (x) { status.textContent = errText(x); }
+      e.target.disabled = false;
+    } }) : null,
     el('button', { class: 'btn secondary block mt', text: 'ارسال اعلان آزمایشی', onclick: async () => {
       if (window.Notification?.permission !== 'granted') return toast('ابتدا «اعلان سیستم» را روشن کنید.');
       await systemNotify('اعلان آزمایشی', { body: 'اعلان‌ها روی این دستگاه کار می‌کنند ✓', tag: 'test' }); chime(); buzz();
@@ -842,7 +920,27 @@ async function registerSw() {
 }
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; installHint(); });
 window.addEventListener('appinstalled', () => { installEvt = null; installHint(); toast('برنامه نصب شد.'); });
-function installSlot() { return el('div', { class: 'c-install-slot' }); }
+function installSlot() { const s2 = el('div', { class: 'c-install-slot' }); setTimeout(notifyHint, 0); return s2; }
+async function notifyHint() {
+  const slot = document.querySelector('.c-install-slot');
+  if (!slot || !notifyCfg.enabled || !('Notification' in window) || Notification.permission === 'denied') return;
+  let dismissed = false; try { dismissed = localStorage.getItem('pm-notify-dismissed') === '1'; } catch { /* ignore */ }
+  if (dismissed) return;
+  let cfg = null; try { cfg = await call('push_config'); } catch { /* offline */ }
+  if (Notification.permission === 'granted' && (!cfg?.enabled || cfg.subscribed)) return;
+  if (slot.querySelector('.c-notify-card')) return;
+  slot.prepend(el('div', { class: 'c-install c-notify-card' }, el('span', { class: 'c-ico-box' }, ico('bell')),
+    el('span', { class: 'c-body' }, el('b', { text: 'اعلان‌ها را روشن کنید' }), el('span', { class: 'c-prev', text: 'تا وقتی برنامه بسته است هم پیام و تماس را ببینید' })),
+    el('button', { class: 'btn sm', text: 'روشن کردن', onclick: async (e) => {
+      e.target.disabled = true;
+      try {
+        if (cfg?.enabled && 'PushManager' in window) await enablePush(); else await Notification.requestPermission();
+        e.target.closest('.c-notify-card').remove();
+        if (cfg?.enabled) { const d = await pushDiagnose(); if (!d.ok) dialog('اعلان پس‌زمینه', el('p', { text: d.text })).showModal(); else toast('اعلان‌ها روشن شد ✓'); }
+      } catch (x) { toast(x.message); e.target.disabled = false; }
+    } }),
+    iconBtn('x', 'بستن', () => { try { localStorage.setItem('pm-notify-dismissed', '1'); } catch { /* ignore */ } slot.querySelector('.c-notify-card')?.remove(); })));
+}
 function installHint() {
   const slot = document.querySelector('.c-install-slot');
   if (!slot) return;

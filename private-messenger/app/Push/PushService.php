@@ -54,7 +54,28 @@ final class PushService
     {
         $pub = WebPush::b64uDecode($this->publicKey());
         return new WebPush($this->settings->secret('push.vapid_private'), (string)$pub, 'https://' . ($this->host !== '' ? $this->host : 'localhost'),
-            $this->env['extra'] ?? [], $this->env['ca'] ?? null);
+            $this->env['extra'] ?? [], $this->env['ca'] ?? null, $this->settings->secret('push.proxy'));
+    }
+
+    public function reachability(): array
+    {
+        return $this->sender()->reachability();
+    }
+
+    /**
+     * Sends a test push to one device right now and reports what the push service answered.
+     * @return array{status:int, error:string, host:string, subscribed:bool}
+     */
+    public function testDevice(int $deviceId): array
+    {
+        $r = $this->db->one('SELECT id, endpoint, p256dh, auth_secret FROM push_subscriptions WHERE device_id = ?', [$deviceId]);
+        if ($r === null) {
+            return ['status' => 0, 'error' => 'not_subscribed', 'host' => '', 'subscribed' => false];
+        }
+        $res = $this->sendAndRecord([(int)$r['id'] => ['id' => (int)$r['id'], 'endpoint' => $r['endpoint'], 'p256dh' => $r['p256dh'], 'auth' => $r['auth_secret'],
+            'payload' => json_encode(['t' => 't']), 'ttl' => 300, 'urgency' => 'high']]);
+        [$status, $err] = $res[(int)$r['id']] ?? [0, 'not sent'];
+        return ['status' => $status, 'error' => $err, 'host' => (string)parse_url($r['endpoint'], PHP_URL_HOST), 'subscribed' => true];
     }
 
     public function subscribe(int $deviceId, mixed $endpoint, mixed $p256dh, mixed $auth): void
@@ -137,19 +158,44 @@ final class PushService
         if ($jobs === []) {
             return [];
         }
+        return array_map(fn ($r) => $r[0], $this->sendAndRecord($jobs));
+    }
+
+    /** @return array<int, array{0:int,1:string}> */
+    private function sendAndRecord(array $jobs): array
+    {
         $res = $this->sender()->sendMany(array_values($jobs));
-        foreach ($res as $id => $status) {
+        $now = Clock::now()->format('Y-m-d H:i:s');
+        foreach ($res as $id => [$status, $err]) {
             if ($status >= 200 && $status < 300) {
-                $this->db->run('UPDATE push_subscriptions SET last_success_at = ?, failure_count = 0 WHERE id = ?', [Clock::now()->format('Y-m-d H:i:s'), $id]);
+                $this->db->run('UPDATE push_subscriptions SET last_success_at = ?, failure_count = 0, last_status = ?, last_error = NULL, last_attempt_at = ? WHERE id = ?', [$now, $status, $now, $id]);
             } elseif ($status === 404 || $status === 410 || $status === -1) {
-                $this->db->run('DELETE FROM push_subscriptions WHERE id = ?', [$id]); // expired / unsubscribed
+                $this->db->run('DELETE FROM push_subscriptions WHERE id = ?', [$id]); // expired / unsubscribed: the app subscribes again on its next start
             } else {
-                $this->db->run('UPDATE push_subscriptions SET failure_count = failure_count + 1 WHERE id = ?', [$id]);
-                $this->db->run('DELETE FROM push_subscriptions WHERE id = ? AND failure_count >= 50', [$id]);
+                $this->db->run('UPDATE push_subscriptions SET failure_count = failure_count + 1, last_status = ?, last_error = ?, last_attempt_at = ? WHERE id = ?',
+                    [$status, mb_substr($err, 0, 300), $now, $id]);
+                $this->db->run('DELETE FROM push_subscriptions WHERE id = ? AND failure_count >= 200', [$id]);
             }
         }
-        \PM\Admin\Stats::bump($this->db, 'push.sent', count(array_filter($res, fn ($s) => $s >= 200 && $s < 300)));
-        \PM\Admin\Stats::bump($this->db, 'push.failed', count(array_filter($res, fn ($s) => $s < 200 || $s >= 300)));
+        \PM\Admin\Stats::bump($this->db, 'push.sent', count(array_filter($res, fn ($r) => $r[0] >= 200 && $r[0] < 300)));
+        \PM\Admin\Stats::bump($this->db, 'push.failed', count(array_filter($res, fn ($r) => $r[0] < 200 || $r[0] >= 300)));
         return $res;
+    }
+
+    /** For the admin panel: subscriptions per push service with the last answer. */
+    public function overview(): array
+    {
+        $out = [];
+        foreach ($this->db->all('SELECT endpoint, last_status, last_error, last_attempt_at, last_success_at FROM push_subscriptions') as $r) {
+            $h = (string)parse_url($r['endpoint'], PHP_URL_HOST);
+            $o = &$out[$h];
+            $o ??= ['host' => $h, 'devices' => 0, 'ok' => 0, 'failing' => 0, 'last_error' => null, 'last_success' => null];
+            $o['devices']++;
+            if ($r['last_status'] !== null && (int)$r['last_status'] >= 200 && (int)$r['last_status'] < 300) { $o['ok']++; }
+            if ($r['last_status'] !== null && ((int)$r['last_status'] < 200 || (int)$r['last_status'] >= 300)) { $o['failing']++; $o['last_error'] = 'HTTP ' . $r['last_status'] . ' ' . $r['last_error']; }
+            if ($r['last_success_at'] !== null && $r['last_success_at'] > ($o['last_success'] ?? '')) { $o['last_success'] = $r['last_success_at']; }
+            unset($o);
+        }
+        return array_values($out);
     }
 }

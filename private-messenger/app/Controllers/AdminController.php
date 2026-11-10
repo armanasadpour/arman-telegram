@@ -467,6 +467,17 @@ final class AdminController extends Controller
                 $changed[] = $key;
             }
         }
+        $proxy = trim($req->input('push_proxy'));
+        if ($proxy !== '') {
+            if (!preg_match('#^(https?|socks5h?)://[^\s/]+$#i', $proxy)) {
+                return $this->settingsPage($req, 'آدرس پراکسی اعلان نامعتبر است (نمونه: socks5h://1.2.3.4:1080).');
+            }
+            $s->setSecret('push.proxy', $proxy, (int)$this->admin['id']);
+            $changed[] = 'push.proxy';
+        } elseif ($req->input('push_proxy_clear') === '1') {
+            $s->setSecret('push.proxy', '', (int)$this->admin['id']);
+            $changed[] = 'push.proxy';
+        }
         if ($req->input('sms_api_key') !== '') {
             $s->setSecret('sms.api_key', $req->input('sms_api_key'), (int)$this->admin['id']);
             $changed[] = 'sms.api_key';
@@ -871,7 +882,13 @@ final class AdminController extends Controller
             $fonts[$w] = $found;
         }
         $host = 'https://' . $req->host();
-        return $this->page($req, 'admin/system', $this->vars(['checks' => $checks, 'runs' => $runs, 'nav' => 'system', 'fonts' => $fonts, 'msg' => $this->msg($req),
+        $push = \PM\Push\PushService::for($this->app, $req->host());
+        $reach = $req->queryString('push') === '1' && \PM\Push\WebPush::available() ? $push->reachability() : null;
+        if ($reach !== null) {
+            $this->audit()->record('admin', (int)$this->admin['id'], 'system.push_check', null, null, [], $req->ip());
+        }
+        return $this->page($req, 'admin/system', $this->vars(['reach' => $reach, 'push_overview' => $push->overview(), 'push_on' => $push->enabled(),
+            'push_proxy' => $this->app->settings()->hasSecret('push.proxy'), 'checks' => $checks, 'runs' => $runs, 'nav' => 'system', 'fonts' => $fonts, 'msg' => $this->msg($req),
             'paths' => AdminService::can($this->admin, 'system.paths.manage') ? ['app' => $host . '/' . $this->app->env('APP_PATH') . '/', 'admin' => $host . '/' . $this->app->env('ADMIN_PATH') . '/'] : null,
             'cron' => '*/15 * * * * ' . $php . ' ' . $this->app->root . '/app/Cli/cron.php maintenance']));
     }

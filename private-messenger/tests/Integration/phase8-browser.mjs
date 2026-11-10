@@ -31,7 +31,10 @@ chmodSync(`${dir}/push-ca.pem`, 0o644);
 const pushes = [];
 const server = https.createServer({ key: readFileSync(`${dir}/push-key.pem`), cert: readFileSync(`${dir}/push-ca.pem`) }, (req, res) => {
   const chunks = []; req.on('data', (c) => chunks.push(c));
-  req.on('end', () => { pushes.push({ path: req.url, headers: req.headers, body: Buffer.concat(chunks) }); res.writeHead(201); res.end(); });
+  req.on('end', () => {
+    if (req.url.includes('blocked')) { res.writeHead(403); res.end('{"reason":"forbidden in your region (test)"}'); return; } // like a push service refusing the server's IP
+    pushes.push({ path: req.url, headers: req.headers, body: Buffer.concat(chunks) }); res.writeHead(201); res.end();
+  });
 }).listen(9443, '127.0.0.1');
 
 // ---------------------------------------------------------------- setup
@@ -241,6 +244,55 @@ check('the server refuses posts from non-admins in a channel', forged.error?.cod
 await bob.goBack().catch(() => {});
 
 // ---------------------------------------------------------------- appearance & local tools
+console.log('\n# Push diagnostics (Settings → Notifications → test from server)');
+const sb = newSubscriber();
+await apiPost(bob, 'push', { endpoint: 'https://push.test:9443/sub/blocked-bob', keys: { p256dh: sb.p256dh, auth: sb.auth } });
+await bob.click('.c-tab[data-tab=settings]'); await bob.click('text=اعلان‌ها');
+await bob.click('text=تست اعلان وقتی برنامه بسته است (از سرور)');
+await bob.waitForSelector('.c-settings :text("۴۰۳")', { timeout: T });
+check('push service refuses (403) → user sees a plain explanation (blocked server IP, use the push proxy)', (await bob.textContent('.c-settings')).includes('پراکسی اعلان'));
+check('the failure is recorded for the admin', sql("SELECT last_status FROM push_subscriptions WHERE endpoint LIKE '%blocked-bob'") === '403');
+await apiPost(bob, 'push', { endpoint: 'https://push.test:9443/sub/bob', keys: { p256dh: sb.p256dh, auth: sb.auth } });
+const nt = pushes.length;
+await bob.click('text=تست اعلان وقتی برنامه بسته است (از سرور)');
+await bob.waitForSelector('.c-settings .ok-text', { timeout: T });
+check('working path → «delivered to the push service» and a real test push arrives', pushes.length === nt + 1 && JSON.parse(decrypt(sb.jwk, Buffer.from(sb.auth, 'base64url'), pushes[pushes.length - 1].body)).t === 't');
+await bob.click('[aria-label="بازگشت"]'); await bob.click('.c-tab[data-tab=chats]');
+await admin.goto(ADM + 'system');
+check('admin «System» page lists push services with the last error', (await admin.textContent('main')).includes('push.test'));
+
+console.log('\n# Profile photo (end-to-end encrypted)');
+function png(size) {
+  const zlib = createRequire(import.meta.url)('node:zlib');
+  const crcT = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (b) => { let c = 0xffffffff; for (const x of b) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => { const t = Buffer.from(type); const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc(Buffer.concat([t, data]))); return Buffer.concat([len, t, data, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const raw = Buffer.alloc((size * 3 + 1) * size); for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) raw.set([240, (x * 255 / size) | 0, (y * 255 / size) | 0], y * (size * 3 + 1) + 1 + x * 3);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+await a2.click('.c-tab[data-tab=settings]').catch(() => {});
+if (!(await a2.isVisible('.c-me-av'))) { await a2.click('[aria-label="بازگشت"]').catch(() => {}); await a2.click('.c-tab[data-tab=settings]'); }
+await a2.click('.c-me-av');
+const [chooser] = await Promise.all([a2.waitForEvent('filechooser'), a2.click('.c-sheet >> text=انتخاب از گالری')]);
+await chooser.setFiles({ name: 'me.png', mimeType: 'image/png', buffer: png(400) });
+await a2.waitForSelector('dialog canvas.c-crop', { timeout: T });
+await a2.click('dialog >> text=ذخیره عکس');
+await a2.waitForSelector('.c-me .c-av.photo img', { timeout: T });
+check('photo cropped, encrypted and saved; shown in my profile', true);
+const stored = Buffer.from(sql("SELECT HEX(ciphertext) FROM user_avatars u JOIN users x ON x.id = u.user_id WHERE x.username = 'alice'"), 'hex');
+check('server holds only ciphertext (no JPEG/PNG header, no JFIF marker)', stored.length > 1000 && stored[12] !== 0xff && !stored.includes(Buffer.from('JFIF')) && !stored.includes(Buffer.from('PNG')));
+if (await bob.isVisible('[aria-label="بازگشت"]')) await bob.goBack();
+await bob.waitForSelector('.c-list .c-item:has-text("آلیس") .c-av.photo img', { timeout: T });
+check('a chat partner sees the photo (key arrived end-to-end encrypted)', true);
+const strangerSees = await iph.evaluate(async (uid) => (await fetch(location.pathname + 'api/v1/users/' + uid + '/avatar', { headers: { 'X-PM-Request': '1' } })).status,
+  sql("SELECT public_id FROM users WHERE username = 'alice'"));
+check('people who share a chat with her can fetch the (encrypted) photo', strangerSees === 200);
+await a2.click('.c-me-av'); await a2.click('.c-sheet >> text=حذف عکس');
+await bob.waitForFunction(() => !document.querySelector('.c-list .c-item .c-av.photo'), null, { timeout: T });
+check('removing the photo removes it for contacts too', sql("SELECT COUNT(*) FROM user_avatars") === '0');
+await a2.click('.c-tab[data-tab=chats]');
+
 console.log('\n# Appearance and storage');
 await a2.click('.c-tab[data-tab=settings]'); await a2.click('text=ظاهر و پوسته'); await a2.click('.seg >> text=تیره');
 check('dark mode switch', (await a2.getAttribute('html', 'data-theme')) === 'dark');

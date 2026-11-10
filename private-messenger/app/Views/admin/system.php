@@ -16,6 +16,20 @@
 </div>
 <?php endif; ?>
 <div class="panel">
+  <h2>اعلان وقتی برنامه بسته است (Web Push)</h2>
+  <p class="small">وضعیت: <b><?= $push_on ? 'فعال' : 'غیرفعال (تنظیمات یا افزونه‌های PHP)' ?></b> · پراکسی اعلان: <b><?= $push_proxy ? 'تنظیم شده' : 'ندارد' ?></b></p>
+  <?php if ($push_overview): ?><div class="table-wrap"><table><tr><th>سرویس</th><th>دستگاه</th><th>آخرین ارسال موفق</th><th>خطا</th></tr>
+    <?php foreach ($push_overview as $o): ?><tr><td class="ltr"><?= e($o['host']) ?></td><td><?= e(Fa::digits($o['devices'])) ?></td><td><?= e(Fa::dateTime($o['last_success'])) ?></td>
+      <td class="ltr small"><?= $o['failing'] ? e(Fa::digits($o['failing']) . ' — ' . (string)$o['last_error']) : '—' ?></td></tr><?php endforeach; ?></table></div>
+  <?php else: ?><p class="small muted">هنوز هیچ دستگاهی برای اعلان پس‌زمینه ثبت نشده است.</p><?php endif; ?>
+  <?php if ($reach !== null): ?><div class="health mt"><?php foreach ($reach as $r): ?>
+    <div><span class="tag <?= $r['ok'] ? 'ok' : 'fail' ?>"><?= $r['ok'] ? 'در دسترس' : 'در دسترس نیست' ?></span><b><?= e($r['label']) ?></b><span class="small muted ltr"><?= e($r['host'] . ($r['ok'] ? ' (HTTP ' . $r['code'] . ')' : ' — ' . $r['error'])) ?></span></div>
+  <?php endforeach; ?></div>
+  <p class="small muted">«در دسترس» یعنی این سرور می‌تواند به آن سرویس وصل شود. اگر سرویس گوگل در دسترس نیست، اعلان پس‌زمینه روی Chrome و اندروید نمی‌رسد؛ «پراکسی اعلان» را در تنظیمات وارد کنید. اگر وصل می‌شود ولی ارسال‌ها خطای ۴۰۳ می‌گیرند، معمولاً IP سرور (مثلاً داخل ایران) مسدود است و باز هم پراکسی راه‌حل است.</p>
+  <?php endif; ?>
+  <a class="btn secondary sm mt" href="<?= e($base) ?>/system?push=1">بررسی دسترسی سرور به سرویس‌های اعلان</a>
+</div>
+<div class="panel">
   <h2>دستور Cron (cPanel ← Cron Jobs)</h2>
   <div class="secret"><?= e($cron) ?></div>
   <p class="small muted">کارها: پاک‌سازی کدهای OTP قدیمی، شمارنده‌های محدودیت نرخ و نشست‌های منقضی. مسیر php را با مسیر هاست خود تطبیق دهید.</p>
