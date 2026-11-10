@@ -180,3 +180,15 @@ body:has(#app) { display: flex; flex-direction: column; height: 100vh; height: 1
 .cl-btn.off { background: #fff; color: #0b1220; }
 .cl-btn.red { background: #e5484d; }
 .cl-btn.green { background: #22a06b; }
+
+/* ---------------- Devices, recovery, groups (phase 6) ---------------- */
+.c-rk { font-size: 15px; letter-spacing: .5px; line-height: 2; }
+.c-code { font-size: 28px; letter-spacing: 4px; }
+.c-devbtn.dot { position: relative; }
+.c-devbtn.dot::after { content: ''; position: absolute; top: -2px; inset-inline-start: -2px; width: 10px; height: 10px; background: #e5484d; border-radius: 50%; }
+.c-av.grp { background: #7c3aed; font-size: 20px; }
+.c-sender { font-size: 12px; font-weight: 700; color: var(--accent); }
+.c-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.c-chips .tag { border: 0; cursor: pointer; padding: 4px 10px; }
+.c-side-head .row { gap: 4px; }
+.c-side-head { flex-wrap: wrap; }

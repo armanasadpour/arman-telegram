@@ -11,6 +11,14 @@ const [BASE, ROOT, DBN, DBU, DBP] = process.argv.slice(2);
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 const browser = await chromium.launch({ ...(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {}),
   args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
+async function appReady(p, timeout = 30000) {
+  await p.waitForSelector('.c-side-head h1, .c-rk', { timeout });
+  if (await p.$('.c-rk')) { // first device: confirm the recovery key like a user would
+    const k = (await p.textContent('.c-rk')).trim();
+    await p.fill('input[placeholder="چهار کاراکتر آخر"]', k.slice(-4)); await p.click('text=ذخیره کردم');
+    await p.waitForSelector('.c-side-head h1', { timeout });
+  }
+}
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => { if (cond) { pass++; console.log('  \x1b[32m✔\x1b[0m', name); } else { fail++; console.log('  \x1b[31m✘', name, '\x1b[0m', extra); } };
 const sql = (q) => execFileSync('mysql', ['-N', '-u', DBU, `-p${DBP}`, '-h', '127.0.0.1', DBN, '-e', q]).toString().trim();
@@ -44,7 +52,7 @@ async function login(user, pw) {
   await p.goto(APP);
   await p.fill('input[name=username]', user); await p.fill('input[name=password]', temp[user]); await p.click('button');
   await p.fill('input[name=current]', temp[user]); await p.fill('input[name=new]', pw); await p.fill('input[name=confirm]', pw); await p.click('form button');
-  await p.waitForSelector('.c-side-head h1', { timeout: T });
+  await appReady(p);
   return p;
 }
 const alice = await login('alice', 'Alice strong pass 1');

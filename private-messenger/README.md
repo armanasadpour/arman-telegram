@@ -1,8 +1,8 @@
 # Private Messenger — پیام‌رسان خصوصی با رمزنگاری سرتاسری
 
-> وضعیت: **فاز ۵ (تماس صوتی و تصویری درون‌برنامه‌ای، جست‌وجو و دنبال کردن کاربر، بارگذاری فونت)** — پیاده‌سازی و تست شد (۲۵۸ تست).
+> وضعیت: **فاز ۶ (چنددستگاهی، کلید بازیابی، گروه‌های رمزنگاری‌شده سرتاسری)** — پیاده‌سازی و تست شد (۲۹۳ تست).
 > نصب: فقط فایل `install.php` را در public_html آپلود و باز کنید — [docs/12-installation-guide.md](docs/12-installation-guide.md)
-> گزارش‌ها: [فاز ۲](docs/13-phase-2-report.md) · [فاز ۳](docs/14-phase-3-report.md) · [فاز ۴](docs/15-phase-4-report.md) · [فاز ۵](docs/16-phase-5-report.md)
+> گزارش‌ها: [فاز ۲](docs/13-phase-2-report.md) · [فاز ۳](docs/14-phase-3-report.md) · [فاز ۴](docs/15-phase-4-report.md) · [فاز ۵](docs/16-phase-5-report.md) · [فاز ۶](docs/17-phase-6-report.md)
 
 پیام‌رسان خصوصی، فارسی و راست‌چین برای اعضای یک مجموعه، قابل نصب روی هاست cPanel،
 با رمزنگاری سرتاسری (E2EE) پیام‌ها و فایل‌ها در دستگاه کاربران.
@@ -29,6 +29,7 @@
 | [docs/14-phase-3-report.md](docs/14-phase-3-report.md) | گزارش فاز ۳: E2EE، نتیجه Spike، تست‌ها و محدودیت‌ها |
 | [docs/15-phase-4-report.md](docs/15-phase-4-report.md) | گزارش فاز ۴: امکانات پیام، فایل و رسانه، نگهداری ۷ روزه |
 | [docs/16-phase-5-report.md](docs/16-phase-5-report.md) | گزارش فاز ۵: تماس، جست‌وجوی کاربر، بارگذاری فونت |
+| [docs/17-phase-6-report.md](docs/17-phase-6-report.md) | گزارش فاز ۶: چنددستگاهی، کلید بازیابی، گروه‌ها |
 | [tools/host-probe/](tools/host-probe/) | اسکریپت بررسی واقعی قابلیت‌های هاست cPanel (ابزار فاز ۱) |
 | [prototype/](prototype/) | نمونه اولیه رابط کاربری (HTML/CSS/JS ایستا، بدون سرور) |
 

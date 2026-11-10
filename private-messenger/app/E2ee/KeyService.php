@@ -283,6 +283,202 @@ final class KeyService
                                  FROM devices d WHERE d.user_id = ? ORDER BY d.id DESC LIMIT 20', [$userId]);
     }
 
+    public const MAX_DEVICES = 5;
+
+    private function assertDeviceSlot(int $userId): void
+    {
+        if ((int)$this->db->scalar("SELECT COUNT(*) FROM devices WHERE user_id = ? AND status = 'active'", [$userId]) >= self::MAX_DEVICES) {
+            throw new UserError('too_many_devices');
+        }
+    }
+
+    /** Validates a device's public keys and returns them raw. */
+    private function deviceKeys(array $dev): array
+    {
+        $ik = B64::dec($dev['identity_key'] ?? null, 32);
+        $sk = B64::dec($dev['signing_key'] ?? null, 32);
+        if ($ik === null || $sk === null) {
+            throw new UserError('invalid_keys');
+        }
+        return [$ik, $sk];
+    }
+
+    /**
+     * Adds another device to an EXISTING identity (after restoring the master key from the recovery key).
+     * The certificate must verify against the user's current master key, so contacts accept the device
+     * without a key-change warning (they are only told that a device was added).
+     */
+    public function addDevice(array $user, int $sessionId, array $dev, string $userAgent): string
+    {
+        $msk = $this->currentMasterKey((int)$user['id']);
+        if ($msk === null) {
+            throw new UserError('no_identity');
+        }
+        [$ik, $sk] = $this->deviceKeys($dev);
+        $cert = self::certificateString((string)$user['public_id'], B64::enc($ik), B64::enc($sk));
+        $sig = B64::dec($dev['certificate_sig'] ?? null, 64);
+        if (!self::verify($msk['public_key'], $cert, $sig)) {
+            throw new UserError('bad_certificate');
+        }
+        $otks = $this->validatedPrekeys($sk, $dev['one_time_keys'] ?? [], 'pm-otk-v1');
+        $fbk = $this->validatedPrekeys($sk, isset($dev['fallback_key']) ? [$dev['fallback_key']] : [], 'pm-fbk-v1');
+        return $this->db->transaction(function () use ($user, $sessionId, $ik, $sk, $cert, $sig, $otks, $fbk, $userAgent): string {
+            $this->assertDeviceSlot((int)$user['id']);
+            $now = Clock::db();
+            $pub = Ulid::generate();
+            $id = $this->db->insert('INSERT INTO devices (public_id, user_id, label, status, identity_key, signing_key, certificate, certificate_sig, protocols, created_at, activated_at, last_seen_at)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$pub, $user['id'], UserAgent::summary($userAgent), 'active', $ik, $sk, $cert, $sig, 'olm-v1', $now, $now, Clock::now()->format('Y-m-d H:i:s')]);
+            $this->insertPrekeys($id, $otks, 'one_time');
+            $this->insertPrekeys($id, $fbk, 'fallback');
+            $this->db->run("UPDATE user_sessions SET device_id = ?, state = 'active' WHERE id = ?", [$id, $sessionId]);
+            $this->notifyContacts((int)$user['id'], 'contact_device_added');
+            $this->db->insert('INSERT INTO notifications (user_id, type, created_at) VALUES (?, ?, ?)', [$user['id'], 'device_added', $now]);
+            return $pub;
+        });
+    }
+
+    /** New device asks to be linked; an existing device of the same user must approve it. */
+    public function linkCreate(array $user, int $sessionId, array $dev, string $userAgent): string
+    {
+        if ($this->currentMasterKey((int)$user['id']) === null) {
+            throw new UserError('no_identity');
+        }
+        [$ik, $sk] = $this->deviceKeys($dev);
+        $otks = $this->validatedPrekeys($sk, $dev['one_time_keys'] ?? [], 'pm-otk-v1');
+        if (count($otks) < 1 || count($otks) > 5) {
+            throw new UserError('missing_prekeys');
+        }
+        return $this->db->transaction(function () use ($user, $sessionId, $ik, $sk, $otks, $userAgent): string {
+            $now = Clock::db();
+            // one open request per user at a time
+            foreach ($this->db->all("SELECT new_device_id FROM device_link_requests WHERE user_id = ? AND status = 'waiting'", [$user['id']]) as $old) {
+                $this->db->run("DELETE FROM devices WHERE id = ? AND status = 'pending'", [$old['new_device_id']]);
+            }
+            $this->db->run("UPDATE device_link_requests SET status = 'expired' WHERE user_id = ? AND status = 'waiting'", [$user['id']]);
+            $devId = $this->db->insert('INSERT INTO devices (public_id, user_id, label, status, identity_key, signing_key, protocols, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [Ulid::generate(), $user['id'], UserAgent::summary($userAgent), 'pending', $ik, $sk, 'olm-v1', $now]);
+            $this->insertPrekeys($devId, $otks, 'one_time');
+            $pub = Ulid::generate();
+            $this->db->insert('INSERT INTO device_link_requests (public_id, user_id, new_device_id, creator_session_id, status, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [$pub, $user['id'], $devId, $sessionId, 'waiting', $now, Clock::dbIn('+10 minutes')]);
+            $this->db->insert('INSERT INTO notifications (user_id, type, created_at) VALUES (?, ?, ?)', [$user['id'], 'device_link_request', $now]);
+            return $pub;
+        });
+    }
+
+    /** Pending requests, shown on the user's existing devices (with one prekey so they can open an Olm channel). */
+    public function linkList(int $userId): array
+    {
+        $out = [];
+        foreach ($this->db->all("SELECT r.public_id, r.created_at, d.id AS dev_id, d.public_id AS device_id, d.label, d.identity_key, d.signing_key
+                                   FROM device_link_requests r JOIN devices d ON d.id = r.new_device_id
+                                  WHERE r.user_id = ? AND r.status = 'waiting' AND r.expires_at > ?", [$userId, Clock::db()]) as $r) {
+            $k = $this->db->one("SELECT key_id, public_key, signature FROM device_public_keys WHERE device_id = ? AND key_type = 'one_time' AND claimed_at IS NULL ORDER BY id LIMIT 1", [$r['dev_id']]);
+            $out[] = ['id' => $r['public_id'], 'device_id' => $r['device_id'], 'label' => $r['label'], 'created_at' => $r['created_at'],
+                'identity_key' => B64::enc($r['identity_key']), 'signing_key' => B64::enc($r['signing_key']),
+                'otk' => $k ? ['id' => $k['key_id'], 'key' => B64::enc($k['public_key']), 'sig' => B64::enc($k['signature'])] : null];
+        }
+        return $out;
+    }
+
+    /** Existing device approves: certificate signed by the master key + an Olm message carrying the master key. */
+    public function linkApprove(array $user, int $approverDeviceId, string $linkId, mixed $certSig, mixed $payloadType, mixed $payload): void
+    {
+        $this->db->transaction(function () use ($user, $approverDeviceId, $linkId, $certSig, $payloadType, $payload): void {
+            $r = $this->db->one("SELECT r.*, d.identity_key, d.signing_key FROM device_link_requests r JOIN devices d ON d.id = r.new_device_id
+                                  WHERE r.public_id = ? AND r.user_id = ? AND r.status = 'waiting' AND r.expires_at > ? FOR UPDATE", [$linkId, $user['id'], Clock::db()]);
+            $msk = $this->currentMasterKey((int)$user['id']);
+            if ($r === null || $msk === null) {
+                throw new UserError('link_not_found');
+            }
+            $cert = self::certificateString((string)$user['public_id'], B64::enc($r['identity_key']), B64::enc($r['signing_key']));
+            $sig = B64::dec($certSig, 64);
+            $ct = B64::dec($payload, null, 65536);
+            if (!self::verify($msk['public_key'], $cert, $sig) || $ct === null || !in_array($payloadType, [0, 1], true)) {
+                throw new UserError('bad_certificate');
+            }
+            $this->assertDeviceSlot((int)$user['id']);
+            $now = Clock::db();
+            $this->db->run("UPDATE devices SET status = 'active', certificate = ?, certificate_sig = ?, activated_at = ?, last_seen_at = ? WHERE id = ?",
+                [$cert, $sig, $now, Clock::now()->format('Y-m-d H:i:s'), $r['new_device_id']]);
+            // The approver encrypted the link payload to the pending device's first unclaimed one-time key
+            // (the one linkList() offered; nobody else can claim keys of a pending device). Consume it, or a
+            // contact could later claim the same key and build a session the new device can no longer open.
+            $this->db->run("UPDATE device_public_keys SET claimed_at = ?, claimed_by_device = ? WHERE device_id = ? AND key_type = 'one_time' AND claimed_at IS NULL ORDER BY id LIMIT 1",
+                [$now, $approverDeviceId, $r['new_device_id']]);
+            $this->db->run("UPDATE device_link_requests SET status = 'approved', approver_device_id = ?, payload_type = ?, payload = ?, completed_at = ? WHERE id = ?",
+                [$approverDeviceId, $payloadType, $ct, $now, $r['id']]);
+            if ($r['creator_session_id']) {
+                $this->db->run("UPDATE user_sessions SET device_id = ?, state = 'active' WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+                    [$r['new_device_id'], $r['creator_session_id'], $user['id']]);
+            }
+            $this->notifyContacts((int)$user['id'], 'contact_device_added');
+            $this->db->insert('INSERT INTO notifications (user_id, type, created_at) VALUES (?, ?, ?)', [$user['id'], 'device_added', $now]);
+        });
+    }
+
+    public function linkReject(int $userId, string $linkId): void
+    {
+        $r = $this->db->one("SELECT id, new_device_id FROM device_link_requests WHERE public_id = ? AND user_id = ? AND status = 'waiting'", [$linkId, $userId]);
+        if ($r !== null) {
+            $this->db->run("UPDATE device_link_requests SET status = 'rejected', completed_at = ? WHERE id = ?", [Clock::db(), $r['id']]);
+            $this->db->run("DELETE FROM devices WHERE id = ? AND status = 'pending'", [$r['new_device_id']]);
+        }
+    }
+
+    /** Polled by the new device (only from the login session that created the request). */
+    public function linkStatus(int $userId, int $sessionId, string $linkId): array
+    {
+        $r = $this->db->one('SELECT r.*, nd.public_id AS new_device, ad.public_id AS approver, ad.identity_key AS approver_ik
+                               FROM device_link_requests r JOIN devices nd ON nd.id = r.new_device_id LEFT JOIN devices ad ON ad.id = r.approver_device_id
+                              WHERE r.public_id = ? AND r.user_id = ? AND r.creator_session_id = ?', [$linkId, $userId, $sessionId]);
+        if ($r === null) {
+            throw new UserError('link_not_found');
+        }
+        $status = $r['status'] === 'waiting' && strtotime($r['expires_at'] . ' UTC') < Clock::now()->getTimestamp() ? 'expired' : $r['status'];
+        return ['status' => $status, 'device_id' => $r['new_device'], 'approver_device_id' => $r['approver'],
+            'approver_identity_key' => $r['approver_ik'] ? B64::enc($r['approver_ik']) : null,
+            'payload_type' => $r['payload_type'] === null ? null : (int)$r['payload_type'], 'payload' => $r['payload'] === null ? null : base64_encode($r['payload'])];
+    }
+
+    /** Stores the master-key backup, encrypted on the device with a key derived from the recovery key. */
+    public function backupPut(int $userId, mixed $algorithm, mixed $ciphertext): int
+    {
+        $msk = $this->currentMasterKey($userId);
+        $ct = B64::dec($ciphertext, null, 8192);
+        if ($msk === null || $ct === null || !is_string($algorithm) || !preg_match('/^[a-z0-9\/.-]{3,50}$/', $algorithm)) {
+            throw new UserError('invalid_backup');
+        }
+        $version = (int)$this->db->scalar('SELECT COALESCE(MAX(version), 0) + 1 FROM key_backups WHERE user_id = ?', [$userId]);
+        $this->db->insert('INSERT INTO key_backups (user_id, master_key_id, version, algorithm, ciphertext, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [$userId, $msk['id'], $version, $algorithm, $ct, Clock::db()]);
+        $this->db->run('DELETE FROM key_backups WHERE user_id = ? AND version < ?', [$userId, $version]);
+        return $version;
+    }
+
+    public function backupGet(int $userId): ?array
+    {
+        $msk = $this->currentMasterKey($userId);
+        $b = $msk === null ? null : $this->db->one('SELECT version, algorithm, ciphertext, created_at FROM key_backups WHERE user_id = ? AND master_key_id = ? ORDER BY version DESC LIMIT 1',
+            [$userId, $msk['id']]);
+        return $b === null ? null : ['version' => (int)$b['version'], 'algorithm' => $b['algorithm'], 'ciphertext' => base64_encode($b['ciphertext']), 'created_at' => $b['created_at']];
+    }
+
+    /** User revokes one of their OTHER devices (e.g. a lost phone). */
+    public function revokeOwnDevice(int $userId, int $currentDeviceId, string $devicePublicId): void
+    {
+        $d = $this->db->one("SELECT id FROM devices WHERE user_id = ? AND public_id = ? AND status = 'active'", [$userId, $devicePublicId]);
+        if ($d === null || (int)$d['id'] === $currentDeviceId) {
+            throw new UserError('device_not_found');
+        }
+        $this->db->transaction(function () use ($d, $userId): void {
+            $this->revokeDeviceRow((int)$d['id'], 'user');
+            $this->notifyContacts($userId, 'contact_device_added');
+            $this->db->insert('INSERT INTO notifications (user_id, type, created_at) VALUES (?, ?, ?)', [$userId, 'device_revoked', Clock::db()]);
+        });
+    }
+
     /** Short fingerprint for display (admin cannot use this to read anything; it only identifies a key). */
     public static function fingerprint(string $raw): string
     {

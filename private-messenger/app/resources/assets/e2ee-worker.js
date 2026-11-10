@@ -44,7 +44,7 @@ async function api(path, { method = 'GET', body } = {}) {
 // ------------------------------------------------------------------ local encrypted storage (IndexedDB)
 function openDb(name) {
   return new Promise((res, rej) => {
-    const r = indexedDB.open(name, 2);
+    const r = indexedDB.open(name, 3);
     r.onupgradeneeded = (ev) => {
       const d = r.result;
       if (ev.oldVersion < 1) {
@@ -52,6 +52,7 @@ function openDb(name) {
         d.createObjectStore('messages', { keyPath: 'mid' }).createIndex('conv', ['cid', 'ts']);
       }
       if (ev.oldVersion < 2) d.createObjectStore('events', { keyPath: 'mid' });
+      if (ev.oldVersion < 3) d.createObjectStore('groups', { keyPath: 'cid' });
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -131,7 +132,10 @@ async function contact(userId, refresh = false) {
   }
   if (userId === me.id) c = { user_id: userId, msk: msk.public_key(), verified: true, devices: k.msk === msk.public_key() ? devices : {}, fetched: Date.now() };
   else if (!c) c = { user_id: userId, msk: k.msk, verified: false, devices, pending_msk: null, pending_devices: null, fetched: Date.now() };
-  else if (c.msk === k.msk) c = { ...c, devices, pending_msk: null, pending_devices: null, fetched: Date.now() };
+  else if (c.msk === k.msk) {
+    if (Object.keys(devices).some((d) => !(d in (c.devices || {})))) emit('device_added', { user_id: userId });
+    c = { ...c, devices, pending_msk: null, pending_devices: null, fetched: Date.now() };
+  }
   else {
     const isNew = c.pending_msk !== k.msk;
     c = { ...c, pending_msk: k.msk, pending_devices: devices, fetched: Date.now() };
@@ -183,17 +187,44 @@ async function convRows(cid, limit = Infinity, dir = 'prev') {
 async function messages(cid, limit = 300) { return Promise.all((await convRows(cid, limit)).reverse().map(readMessage)); }
 
 // ------------------------------------------------------------------ encrypting and delivering payloads
-async function targetsFor(peerId, refresh) {
-  const peer = await contact(peerId, refresh);
-  if (peer.pending_msk) throw new Error('key_changed');
+// ---- groups: the roster comes ONLY from end-to-end encrypted state messages of a group admin.
+const serverMembers = new Map(); // cid -> { at, list }
+async function membersOf(cid, refresh = false) {
+  const c = serverMembers.get(cid);
+  if (c && !refresh && Date.now() - c.at < 30000) return c.list;
+  const { members } = await api(`/groups/${encodeURIComponent(cid)}/members`);
+  serverMembers.set(cid, { at: Date.now(), list: members });
+  return members;
+}
+async function targetsFor(cid, peerId, refresh, users = null) {
   const own = await contact(me.id, refresh);
-  const t = { ...peer.devices };
+  const t = {};
+  if (peerId) {
+    const peer = await contact(peerId, refresh);
+    if (peer.pending_msk) throw new Error('key_changed');
+    Object.assign(t, peer.devices);
+    if (!Object.keys(peer.devices).length) throw new Error('peer_has_no_devices');
+  } else {
+    const g = await get('groups', cid);
+    if (!g) throw new Error('group_state_missing');
+    const onServer = new Set((await membersOf(cid, refresh)).map((m) => m.id));
+    const skipped = [];
+    // Intersection: a member the server added WITHOUT an admin's encrypted announcement gets nothing;
+    // a member the server removed gets nothing either.
+    for (const u of users || g.members) {
+      if (u === me.id || !onServer.has(u)) continue;
+      let c;
+      try { c = await contact(u, refresh); } catch { skipped.push(u); continue; }
+      if (c.pending_msk) { skipped.push(u); continue; }
+      Object.assign(t, c.devices);
+    }
+    if (skipped.length) emit('skipped', { cid, users: skipped });
+  }
   for (const [d, v] of Object.entries(own.devices)) if (d !== deviceId) t[d] = v;
-  if (!Object.keys(peer.devices).length) throw new Error('peer_has_no_devices');
   return t;
 }
-async function deliver(cid, peerId, mid, payload, attachmentIds = [], attempt = 0) {
-  const targets = await targetsFor(peerId, attempt > 0);
+async function deliver(cid, peerId, mid, payload, attachmentIds = [], attempt = 0, users = null) {
+  const targets = await targetsFor(cid, peerId, attempt > 0, users);
   const need = [];
   for (const d of Object.keys(targets)) if (!(await sessionsFor(d)).length) need.push(d);
   if (need.length) {
@@ -218,7 +249,7 @@ async function deliver(cid, peerId, mid, payload, attachmentIds = [], attempt = 
   } catch (e) {
     if (e.message === 'devices_mismatch' && attempt < 2) {
       for (const d of e.data.stale || []) sessions.delete(d);
-      return deliver(cid, peerId, mid, payload, attachmentIds, attempt + 1);
+      return deliver(cid, peerId, mid, payload, attachmentIds, attempt + 1, users);
     }
     throw e;
   }
@@ -368,6 +399,9 @@ function validPayload(p, env) {
     case 'text': return validStr(b.text, MAX_TEXT) && (b.reply_to == null || validStr(b.reply_to, 30));
     case 'file': return validStr(b.text ?? '', MAX_TEXT) && validStr(b.att?.id, 64) && validStr(b.att?.key, 64) && validStr(b.att?.prefix, 16) && Number.isSafeInteger(b.att?.size);
     case 'read': return Array.isArray(b.mids) && b.mids.length <= 200 && b.mids.every((x) => validStr(x, 30));
+    case 'group_state': return validStr(b.name, 100) && Number.isSafeInteger(b.version) && b.version > 0 && validStr(b.owner, 26)
+      && Array.isArray(b.members) && b.members.length <= 64 && b.members.every((x) => validStr(x, 26))
+      && Array.isArray(b.admins) && b.admins.every((x) => b.members.includes(x));
     case 'call': return validStr(b.call_id, 26) && CALL_ACTIONS.includes(b.action) && (b.sdp == null || validStr(b.sdp, 30000)) && typeof (b.video ?? false) === 'boolean';
     default: return EVENT_TYPES.includes(p.t) && validStr(b.target, 30);
   }
@@ -419,9 +453,18 @@ async function receive(env) {
   const { p, ops, flag } = r;
   if (!p || !validPayload(p, env)) return fail('invalid_payload', ops);
   if (p.t === 'text' || p.t === 'file') {
-    const m = { ...base, text: p.body.text || '', reply_to: p.body.reply_to || null, flag, fwd: p.body.fwd === true, att: p.t === 'file' ? sanitizeAtt(p.body.att) : null };
+    const mine = p.su === me.id; // sent from another of my devices
+    let rflag = flag;
+    if (!mine) { const g = await get('groups', p.cid); if (g && !g.members.includes(p.su)) rflag = 'not_in_roster'; }
+    const m = { ...base, dir: mine ? 'out' : 'in', status: mine ? 'sent' : 'received', ts: mine ? p.ts : base.ts, text: p.body.text || '', reply_to: p.body.reply_to || null,
+      flag: rflag, fwd: p.body.fwd === true, att: p.t === 'file' ? sanitizeAtt(p.body.att) : null };
     await putMessage(m, ops); emit('message', m);
     await applyPendingEvents(m.mid);
+    return;
+  }
+  if (p.t === 'group_state') {
+    await write([...ops, ['events', { mid: p.mid, applied: true }]]);
+    await applyGroupState(p.cid, p.su, p.body, p.ts);
     return;
   }
   if (p.t === 'call') {
@@ -434,7 +477,9 @@ async function receive(env) {
   if (p.t === 'read') {
     for (const mid of p.body.mids) {
       const row = await get('messages', mid);
-      if (row && row.cid === p.cid && row.dir === 'out' && row.status !== 'read') {
+      if (row && row.cid === p.cid && p.su === me.id && row.dir === 'in' && row.status === 'received') { // read on another of my devices
+        row.status = 'read'; await write([['messages', row]]); emit('conversations_changed', {});
+      } else if (row && row.cid === p.cid && row.dir === 'out' && row.status !== 'read' && p.su !== me.id) {
         row.status = 'read'; pendingStatus.delete(mid);
         await write([['messages', row]]); emit('status', { mid, status: 'read' });
       }
@@ -462,6 +507,157 @@ async function receiveEphemeral(env) {
   }
 }
 
+// ------------------------------------------------------------------ groups
+async function sysMessage(cid, text) {
+  const m = { mid: 'sys-' + newId(), cid, ts: Date.now(), dir: 'sys', status: 'sys', from: '', text };
+  await putMessage(m); emit('message', m);
+}
+/**
+ * Accepts a roster only from an admin of the CURRENT roster with a higher version. For a group we know
+ * nothing about yet (just created / we were just added), the first state must come from one of its admins.
+ */
+async function applyGroupState(cid, from, st, ts) {
+  const local = await get('groups', cid);
+  if (local ? !(local.admins.includes(from) && st.version > local.version) : !st.admins.includes(from)) return false;
+  const next = { cid, name: st.name, version: st.version, members: [...new Set(st.members)], admins: [...new Set(st.admins)], owner: st.owner, updated: ts };
+  await write([['groups', next]]);
+  serverMembers.delete(cid);
+  const mine = from === me.id, fa = (n) => n.toLocaleString('fa-IR');
+  if (!local) await sysMessage(cid, mine ? `گروه «${st.name}» را ساختید.` : `شما به گروه «${st.name}» اضافه شدید.`);
+  else {
+    const added = next.members.filter((x) => !local.members.includes(x)).length, removed = local.members.filter((x) => !next.members.includes(x)).length;
+    if (local.name !== next.name) await sysMessage(cid, mine ? `نام گروه را به «${next.name}» تغییر دادید.` : `یک مدیر نام گروه را به «${next.name}» تغییر داد.`);
+    if (added) await sysMessage(cid, mine ? `${fa(added)} عضو جدید اضافه کردید.` : `یک مدیر ${fa(added)} عضو جدید اضافه کرد.`);
+    if (removed) await sysMessage(cid, !next.members.includes(me.id) ? 'شما از گروه حذف شدید.' : mine ? `${fa(removed)} عضو را از گروه حذف کردید.` : `${fa(removed)} عضو از گروه حذف شد.`);
+    if (next.admins.length !== local.admins.length) await sysMessage(cid, 'مدیران گروه تغییر کردند.');
+  }
+  emit('group_changed', { cid });
+  return true;
+}
+/** Admin publishes a new roster version to every member in it (and my other devices). */
+async function publishGroupState(cid, mutate) {
+  const g = await get('groups', cid);
+  if (!g || !g.admins.includes(me.id)) throw new Error('not_group_admin');
+  const next = mutate({ ...g, members: [...g.members], admins: [...g.admins] });
+  next.version = g.version + 1;
+  const body = { name: next.name, version: next.version, members: next.members, admins: next.admins.filter((a) => next.members.includes(a)), owner: next.owner };
+  const mid = newId();
+  await write([['events', { mid, applied: true }]]);
+  await applyGroupState(cid, me.id, body, Date.now());
+  serverMembers.delete(cid);
+  await deliver(cid, null, mid, payloadOf(cid, mid, 'group_state', body), [], 0, body.members);
+}
+
+// ------------------------------------------------------------------ recovery key (Crockford base32, 256 bits)
+const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+function b32enc(u8) { let bits = 0, val = 0, out = ''; for (const x of u8) { val = (val << 8) | x; bits += 8; while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; } } if (bits) out += B32[(val << (5 - bits)) & 31]; return out; }
+function b32dec(s) {
+  s = s.toUpperCase().replace(/[\s-]/g, '').replace(/[IL]/g, '1').replace(/O/g, '0').replace(/U/g, 'V');
+  let bits = 0, val = 0; const out = [];
+  for (const ch of s) { const i = B32.indexOf(ch); if (i < 0) throw new Error('invalid_recovery_key'); val = (val << 5) | i; bits += 5; if (bits >= 8) { out.push((val >>> (bits - 8)) & 255); bits -= 8; } }
+  if (out.length !== 32) throw new Error('invalid_recovery_key');
+  return new Uint8Array(out);
+}
+async function backupKey(rk, userId) {
+  const base = await crypto.subtle.importKey('raw', rk, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: enc.encode(userId), info: enc.encode('pm/key-backup/v1') }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function createRecovery() {
+  const rk = crypto.getRandomValues(new Uint8Array(32));
+  const key = await backupKey(rk, me.id);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(`pm-backup-v1|${me.id}|${msk.public_key()}`) }, key,
+    enc.encode(JSON.stringify({ v: 1, msk: b64(Uint8Array.from(msk.to_bytes())) }))));
+  await api('/me/key-backup', { method: 'POST', body: { algorithm: 'pm-backup-v1/hkdf-aes256gcm', ciphertext: btoa(String.fromCharCode(...concat(iv, ct))) } });
+  return b32enc(rk).match(/.{1,4}/g).join('-');
+}
+/** Registers this browser as ANOTHER device of the existing identity (master key restored or received). */
+async function joinIdentity(registerFn) {
+  account = new Account();
+  account.generate_one_time_keys(OTK_TARGET); account.generate_fallback_key();
+  const ik = account.curve25519_key(), sk = account.ed25519_key();
+  const device = { identity_key: ik, signing_key: sk, certificate_sig: msk.sign(certificate(me.id, ik, sk)),
+    one_time_keys: signedPrekeys(account.one_time_keys(), 'pm-otk-v1'), fallback_key: signedPrekeys(account.fallback_key(), 'pm-fbk-v1')[0] };
+  deviceId = await registerFn(device);
+  account.mark_keys_as_published();
+  sessions.clear();
+  await saveAccount([['kv', await seal([...msk.to_bytes()]), 'msk'], ['kv', deviceId, 'device_id'], ['kv', me.id, 'user'], ['kv', 0, 'cursor'], ['kv', 0, 'ncursor']]);
+  cursor = 0; ncursor = 0;
+}
+async function restoreFromRecovery(code) {
+  const rk = b32dec(code);
+  const boot = await api('/bootstrap');
+  let b;
+  try { b = await api('/me/key-backup'); } catch { throw new Error('no_backup'); }
+  const raw = Uint8Array.from(atob(b.ciphertext), (c) => c.charCodeAt(0));
+  let data;
+  try {
+    data = JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.subarray(0, 12), additionalData: enc.encode(`pm-backup-v1|${me.id}|${boot.identity.msk}`) },
+      await backupKey(rk, me.id), raw.subarray(12))));
+  } catch { throw new Error('wrong_recovery_key'); }
+  msk = SigningKey.from_bytes(b64dec(data.msk));
+  if (msk.public_key() !== boot.identity.msk) throw new Error('wrong_recovery_key');
+  await joinIdentity(async (device) => (await api('/devices/add', { method: 'POST', body: { device } })).device_id);
+}
+
+// ------------------------------------------------------------------ linking a new device
+async function linkCode(id, ik, sk) {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`pm-link-v1|${id}|${ik}|${sk}`)));
+  const n = (h[0] * 2 ** 32 + h[1] * 2 ** 24 + h[2] * 2 ** 16 + h[3] * 2 ** 8 + h[4]) % 1e8;
+  return String(n).padStart(8, '0').replace(/(\d{4})(\d{4})/, '$1 $2');
+}
+async function linkStart() {
+  const acc = new Account();
+  acc.generate_one_time_keys(1);
+  const ik = acc.curve25519_key(), sk = acc.ed25519_key();
+  account = acc;
+  const otks = signedPrekeys(acc.one_time_keys(), 'pm-otk-v1');
+  const { id } = await api('/device-links', { method: 'POST', body: { device: { identity_key: ik, signing_key: sk, one_time_keys: otks } } });
+  acc.mark_keys_as_published();
+  await write([['kv', { id, account: acc.pickle(pk) }, 'pending_link']]);
+  return { id, code: await linkCode(id, ik, sk) };
+}
+async function linkPoll() {
+  const pend = await get('kv', 'pending_link');
+  if (!pend) return { status: 'none' };
+  const st = await api(`/device-links/${pend.id}`);
+  if (st.status !== 'approved') { if (st.status !== 'waiting') await write([['kv', undefined, 'pending_link']]); return { status: st.status }; }
+  account = Account.from_pickle(pend.account, pk);
+  const boot = await api('/bootstrap');
+  const r = account.create_inbound_session(st.approver_identity_key, Uint8Array.from(atob(st.payload), (c) => c.charCodeAt(0)));
+  const data = JSON.parse(r.plaintext);
+  const m = SigningKey.from_bytes(b64dec(data.msk));
+  if (data.t !== 'link' || data.link !== pend.id || m.public_key() !== boot.identity.msk) throw new Error('link_invalid');
+  // The approving device must itself be certified by this master key.
+  const mine = await api(`/users/${encodeURIComponent(me.id)}/keys`);
+  const ap = mine.devices.find((d) => d.id === st.approver_device_id);
+  if (!ap || ap.identity_key !== st.approver_identity_key || !verify_ed25519(m.public_key(), certificate(me.id, ap.identity_key, ap.signing_key), ap.certificate_sig)) throw new Error('link_invalid');
+  msk = m; deviceId = st.device_id;
+  sessions.clear(); sessions.set(ap.id, [r.take_session()]);
+  account.generate_fallback_key();
+  await api('/keys/upload', { method: 'POST', body: { one_time_keys: [], fallback_key: signedPrekeys(account.fallback_key(), 'pm-fbk-v1')[0] } });
+  account.mark_keys_as_published();
+  await saveAccount([['kv', await seal([...msk.to_bytes()]), 'msk'], ['kv', deviceId, 'device_id'], ['kv', me.id, 'user'], ['kv', 0, 'cursor'], ['kv', 0, 'ncursor'],
+    ['kv', undefined, 'pending_link'], ...sessionOps([ap.id])]);
+  cursor = 0; ncursor = 0;
+  return { status: 'approved', ...(await ready('')) };
+}
+async function linkRequests() {
+  const { requests } = await api('/device-links');
+  for (const r of requests) r.code = await linkCode(r.id, r.identity_key, r.signing_key);
+  return requests;
+}
+async function linkApprove(id) {
+  const r = (await api('/device-links')).requests.find((x) => x.id === id);
+  if (!r?.otk || !verify_ed25519(r.signing_key, `pm-otk-v1:${r.otk.id}:${r.otk.key}`, r.otk.sig)) throw new Error('link_not_found');
+  const s = account.create_outbound_session(r.identity_key, r.otk.key);
+  const e = s.encrypt(JSON.stringify({ v: 1, t: 'link', link: id, msk: b64(Uint8Array.from(msk.to_bytes())) }));
+  await api(`/device-links/${id}/approve`, { method: 'POST', body: { certificate_sig: msk.sign(certificate(me.id, r.identity_key, r.signing_key)), payload_type: e.message_type, payload: b64(e.ciphertext) } });
+  sessions.set(r.device_id, [s]);
+  await write(sessionOps([r.device_id]));
+  await contact(me.id, true);
+}
+
 // ------------------------------------------------------------------ sync loop
 async function syncOnce() {
   if (syncing || stopped) return;
@@ -475,6 +671,9 @@ async function syncOnce() {
     for (const n of r.notifications) {
       if ((n.type === 'contact_identity_changed' || n.type === 'contact_device_added') && n.subject_user_id) { try { await contact(n.subject_user_id, true); } catch { /* gone */ } }
       if (n.type === 'admin_reset') emit('state', { state: 'revoked' });
+      if (n.type === 'device_link_request') emit('link_request', {});
+      if (n.type === 'group_changed') { serverMembers.clear(); emit('conversations_changed', {}); }
+      if (n.type === 'device_added' || n.type === 'device_revoked') { try { await contact(me.id, true); } catch { /* ignore */ } }
     }
     cursor = r.cursor; ncursor = r.ncursor;
     await write([['kv', cursor, 'cursor'], ['kv', ncursor, 'ncursor']]);
@@ -540,6 +739,8 @@ async function start() {
     if (boot.identity.msk !== msk.public_key()) return { state: 'revoked', me };
     if (boot.device?.id !== deviceId) { try { await bindDevice(); } catch { return { state: 'revoked', me }; } }
   } else if (boot.identity.msk) {
+    const pend = await get('kv', 'pending_link');
+    if (pend) { account = Account.from_pickle(pend.account, pk); return { state: 'link_waiting', me, id: pend.id, code: await linkCode(pend.id, account.curve25519_key(), account.ed25519_key()) }; }
     return { state: 'identity_elsewhere', me };
   } else {
     await createIdentity(false);
@@ -555,7 +756,9 @@ async function ready(name) {
   }
   stopped = false;
   syncOnce().then(schedule);
-  return { state: 'ready', me, device_id: deviceId, name };
+  let needsRecovery = false;
+  try { await api('/me/key-backup'); } catch (e) { needsRecovery = e.status === 404; }
+  return { state: 'ready', me, device_id: deviceId, name, needs_recovery: needsRecovery };
 }
 
 async function conversations() {
@@ -565,6 +768,7 @@ async function conversations() {
     const last = rows.length ? await readMessage(rows[0]) : null;
     c.last = last ? { text: last.deleted ? '' : last.text, att: last.att ? last.att.kind : null, deleted: !!last.deleted, flag: last.flag, ts: last.ts, dir: last.dir } : null;
     c.unread = rows.filter((r) => r.dir === 'in' && r.status === 'received').length;
+    if (c.type === 'group') { const g = await get('groups', c.id); c.name = g?.name || 'گروه'; c.is_admin = !!g?.admins.includes(me.id); c.has_state = !!g; }
   }
   return list;
 }
@@ -573,6 +777,57 @@ const commands = {
   start,
   async reset_identity() { if (!db) { db = await openDb(`pm-e2ee-${me.id}`); await loadLocalKeys(); } await createIdentity(true); cursor = 0; ncursor = 0; return ready(''); },
   conversations,
+  recovery_create: () => createRecovery(),
+  async recovery_restore({ code }) {
+    if (!db) { db = await openDb(`pm-e2ee-${me.id}`); await loadLocalKeys(); }
+    await restoreFromRecovery(code);
+    return ready('');
+  },
+  link_start: () => linkStart(),
+  link_poll: () => linkPoll(),
+  async link_cancel() { await write([['kv', undefined, 'pending_link']]); },
+  link_requests: () => linkRequests(),
+  link_approve: ({ id }) => linkApprove(id),
+  async link_reject({ id }) { await api(`/device-links/${id}/reject`, { method: 'POST', body: {} }); },
+  async my_devices() { return (await api('/me/devices')).devices; },
+  async revoke_device({ id }) { await api(`/devices/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: {} }); await contact(me.id, true); },
+  async create_group({ name, members }) {
+    const { id } = await api('/groups', { method: 'POST', body: { members } });
+    const body = { name: String(name).trim().slice(0, 100) || 'گروه', version: 1, members: [me.id, ...members], admins: [me.id], owner: me.id };
+    const mid = newId();
+    await write([['events', { mid, applied: true }]]);
+    await applyGroupState(id, me.id, body, Date.now());
+    await deliver(id, null, mid, payloadOf(id, mid, 'group_state', body), [], 0, body.members);
+    return id;
+  },
+  async group_info({ cid }) {
+    const g = await get('groups', cid);
+    const members = await membersOf(cid, true);
+    for (const m of members) {
+      m.in_roster = !!g?.members.includes(m.id);
+      try { const c = m.id === me.id ? null : await contact(m.id); m.key_changed = !!c?.pending_msk; } catch { m.key_changed = false; }
+    }
+    return { name: g?.name || 'گروه', admins: g?.admins || [], owner: g?.owner, members, me: me.id, is_admin: !!g?.admins.includes(me.id) };
+  },
+  async group_add({ cid, user_id }) {
+    await api(`/groups/${cid}/members`, { method: 'POST', body: { user_id } });
+    await publishGroupState(cid, (g) => { if (!g.members.includes(user_id)) g.members.push(user_id); return g; });
+  },
+  async group_remove({ cid, user_id }) {
+    await publishGroupState(cid, (g) => { g.members = g.members.filter((x) => x !== user_id); g.admins = g.admins.filter((x) => x !== user_id); return g; });
+    await api(`/groups/${cid}/members/remove`, { method: 'POST', body: { user_id } });
+  },
+  async group_admin({ cid, user_id, admin }) {
+    await api(`/groups/${cid}/role`, { method: 'POST', body: { user_id, role: admin ? 'admin' : 'member' } });
+    await publishGroupState(cid, (g) => { g.admins = admin ? [...new Set([...g.admins, user_id])] : g.admins.filter((x) => x !== user_id); return g; });
+  },
+  group_rename: ({ cid, name }) => publishGroupState(cid, (g) => ({ ...g, name: String(name).trim().slice(0, 100) || g.name })),
+  async group_leave({ cid }) {
+    const g = await get('groups', cid);
+    if (g?.admins.includes(me.id) && g.admins.length > 1) { try { await publishGroupState(cid, (x) => { x.members = x.members.filter((y) => y !== me.id); x.admins = x.admins.filter((y) => y !== me.id); return x; }); } catch { /* best effort */ } }
+    await api(`/groups/${cid}/leave`, { method: 'POST', body: {} });
+    await sysMessage(cid, 'شما گروه را ترک کردید.');
+  },
   async search_users({ q }) { return (await api('/users/search?q=' + encodeURIComponent(q))).users; },
   async contacts() { return (await api('/contacts')).users; },
   async follow({ user_id, on }) { await api(on ? '/contacts' : '/contacts/remove', { method: 'POST', body: { user_id } }); },
@@ -614,6 +869,12 @@ const commands = {
     return m.att ? sendMessage(cid, peer, 'file', { att: m.att, text: m.text, fwd: true }, { fwd: true }) : sendMessage(cid, peer, 'text', { text: m.text, fwd: true }, { fwd: true });
   },
   async mark_read({ cid, peer }) {
+    if (!peer) { // groups: read state is kept locally (no receipts to everyone)
+      const rows = (await convRows(cid, 500)).filter((r) => r.dir === 'in' && r.status === 'received');
+      for (const r of rows) r.status = 'read';
+      if (rows.length) await write(rows.map((r) => ['messages', r]));
+      return rows.length;
+    }
     const rows = (await convRows(cid, 500)).filter((r) => r.dir === 'in' && r.status === 'received');
     if (!rows.length) return 0;
     for (const r of rows) r.status = 'read';

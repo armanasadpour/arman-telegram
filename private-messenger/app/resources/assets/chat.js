@@ -8,6 +8,11 @@ const faNum = new Intl.NumberFormat('fa-IR');
 const EMOJI = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 let seq = 0, me = null, convs = [], current = null, refreshTimer = null, readTimer = null, typingTimer = null;
 let reply = null, editing = null;
+const names = new Map(); // user id -> display name (group members, contacts)
+const pid = () => current?.peer?.id || null;           // null for groups
+const cname = () => current?.peer?.display_name || current?.name || 'گروه';
+const nameOf = (u) => u === me?.id ? 'شما' : names.get(u) || (current?.peer?.id === u ? current.peer.display_name : 'عضو گروه');
+const isGroup = () => current?.type === 'group';
 const pending = new Map(), byMid = new Map(), urls = new Map();
 
 function el(tag, attrs = {}, ...children) {
@@ -28,7 +33,8 @@ const ERR = {
   key_changed: 'کلید امنیتی مخاطب تغییر کرده است', file_expired: 'فایل از سرور حذف شده است (بیش از ۷ روز گذشته)', insufficient_storage: 'فضای سرور کافی نیست؛ با مدیر تماس بگیرید',
   file_too_large: 'حجم فایل از سقف تعیین‌شده توسط مدیر بیشتر است', file_missing: 'برای ارسال دوباره، فایل را دوباره انتخاب کنید', attachment_not_found: 'فایل دیگر روی سرور نیست',
   peer_has_no_devices: 'مخاطب هنوز وارد برنامه نشده است', target_not_found: 'پیام پیدا نشد',
-  rate_limited: 'درخواست‌های زیادی ارسال شده؛ کمی بعد دوباره تلاش کنید', query_too_short: 'حداقل ۳ حرف وارد کنید',
+  rate_limited: 'درخواست‌های زیادی ارسال شده؛ کمی بعد دوباره تلاش کنید', too_many_devices: 'حداکثر ۵ دستگاه برای هر حساب مجاز است',
+  not_group_admin: 'فقط مدیران گروه این کار را می‌توانند انجام دهند', group_state_missing: 'اطلاعات رمزنگاری‌شده گروه هنوز دریافت نشده است', link_not_found: 'درخواست منقضی شده است', query_too_short: 'حداقل ۳ حرف وارد کنید',
 };
 const errText = (e) => ERR[e] || ERR[e?.message] || 'خطا: ' + (e?.message || e);
 function toast(text) {
@@ -48,6 +54,10 @@ worker.onmessage = ({ data }) => {
   if (event === 'conversations_changed') scheduleRefresh();
   if (event === 'state') handleState(d);
   if (event === 'call') onCallSignal(d);
+  if (event === 'link_request') { document.querySelector('.c-devbtn')?.classList.add('dot'); toast('درخواست اتصال دستگاه جدید — «دستگاه‌ها» را بزنید.'); }
+  if (event === 'device_added' && d.user_id !== me?.id) toast(`دستگاه جدیدی برای ${names.get(d.user_id) || 'یک مخاطب'} اضافه شد.`);
+  if (event === 'skipped') toast(`پیام برای ${d.users.map((u) => names.get(u) || 'یک عضو').join('، ')} ارسال نشد (کلید تغییر کرده؛ در «اطلاعات گروه» تأیید کنید).`);
+  if (event === 'group_changed') { scheduleRefresh(); if (current?.id === d.cid) call('conversations').then((l) => { const c = l.find((x) => x.id === d.cid); if (c) { current.name = c.name; current.has_state = c.has_state; renderBanner(); } }); }
 };
 worker.onerror = () => status('خطا در بارگذاری موتور رمزنگاری. صفحه را دوباره بارگذاری کنید.');
 
@@ -60,15 +70,160 @@ const resetButton = () => el('button', { class: 'btn', text: 'ساخت کلید�
 } });
 function handleState(s) {
   switch (s.state) {
-    case 'ready': me = s.me; renderApp(); return;
+    case 'ready': me = s.me; if (s.needs_recovery) return showRecovery(true); renderApp(); return;
+    case 'link_waiting': me = s.me; return linkWaiting(s);
     case 'unsupported': return status('این مرورگر امکانات لازم برای رمزنگاری سرتاسری را ندارد. از نسخه جدید Chrome، Firefox یا Safari استفاده کنید.');
     case 'locked': return status('برنامه در یک تب یا پنجره دیگر باز است. برای جلوگیری از خرابی کلیدها فقط یک تب در هر زمان مجاز است. آن تب را ببندید و این صفحه را دوباره بارگذاری کنید.',
       el('button', { class: 'btn secondary', text: 'بارگذاری دوباره', onclick: () => location.reload() }));
-    case 'identity_elsewhere': return status('حساب شما قبلاً روی دستگاه یا مرورگر دیگری فعال شده است و کلیدهای رمزنگاری آنجا هستند. اتصال چند دستگاه به یک حساب در مرحله بعد (فاز ۶) اضافه می‌شود. اگر دیگر به آن دستگاه دسترسی ندارید، می‌توانید کلیدهای جدید روی همین دستگاه بسازید.', resetButton());
-    case 'revoked': return status('کلیدهای رمزنگاری این دستگاه دیگر معتبر نیستند (هویت روی دستگاه دیگری بازنشانی شده یا مدیر آن را لغو کرده است).', resetButton());
+    case 'identity_elsewhere': me = s.me; return status('حساب شما روی دستگاه دیگری فعال است. این دستگاه را چطور اضافه کنیم؟',
+      el('button', { class: 'btn block', text: '۱. اتصال با دستگاه قبلی (پیشنهادی — پیام‌های جدید روی هر دو)', onclick: startLink }),
+      el('button', { class: 'btn secondary block mt', text: '۲. بازیابی با کلید بازیابی', onclick: restoreScreen }),
+      el('details', { class: 'mt small' }, el('summary', { text: '۳. به هیچ‌کدام دسترسی ندارم' }),
+        el('p', { class: 'muted', text: 'ساخت کلید جدید یعنی دستگاه‌های قبلی از کار می‌افتند و مخاطبان هشدار «کلید امنیتی تغییر کرد» می‌بینند.' }), resetButton()));
+    case 'revoked': return status('کلیدهای رمزنگاری این دستگاه دیگر معتبر نیستند (دستگاه لغو شده یا هویت بازنشانی شده است).',
+      el('button', { class: 'btn secondary block', text: 'بازیابی با کلید بازیابی', onclick: restoreScreen }), el('div', { class: 'mt' }, resetButton()));
     case 'logged_out': location.reload(); return;
     default: status('وضعیت ناشناخته');
   }
+}
+
+// ------------------------------------------------------------------ recovery key, device linking, devices
+async function showRecovery(first) {
+  let key;
+  try { key = await call('recovery_create'); } catch (e) { toast(errText(e)); return renderApp(); }
+  const last = key.slice(-4);
+  const input = el('input', { type: 'text', class: 'ltr', placeholder: 'چهار کاراکتر آخر', maxlength: '4', autocomplete: 'off' });
+  const err = el('p', { class: 'small', role: 'alert' });
+  const box = el('div', { class: 'secret c-rk', text: key });
+  const done = () => { if (input.value.trim().toUpperCase() !== last) { err.textContent = 'درست نیست؛ کلید را دوباره بررسی کنید.'; return; } dlg?.close(); dlg?.remove(); if (first) renderApp(); else toast('کلید بازیابی جدید ذخیره شد؛ کلید قبلی دیگر کار نمی‌کند.'); };
+  const body = [
+    el('p', { text: 'این کلید تنها راه بازگرداندن حساب شما روی گوشی یا مرورگر جدید است، اگر دستگاه فعلی در دسترس نباشد. سرور و مدیر سامانه آن را ندارند و نمی‌توانند بازیابی کنند.' }),
+    box,
+    el('div', { class: 'row mt' },
+      el('button', { class: 'btn secondary sm', text: 'کپی', onclick: () => navigator.clipboard?.writeText(key).then(() => toast('کپی شد')) }),
+      el('a', { class: 'btn secondary sm', href: URL.createObjectURL(new Blob([`کلید بازیابی\n${key}\n`], { type: 'text/plain' })), download: 'recovery-key.txt', text: 'ذخیره در فایل' })),
+    el('p', { class: 'alert warn small', text: 'آن را روی کاغذ یا در مدیر رمز نگه دارید و به کسی ندهید.' }),
+    el('label', { class: 'field' }, el('span', { text: 'برای اطمینان، چهار کاراکتر آخر کلید را بنویسید' }), input), err,
+    el('button', { class: 'btn block', text: 'ذخیره کردم', onclick: done })];
+  let dlg = null;
+  if (first) root.replaceChildren(el('div', { class: 'chat-status' }, el('div', { class: 'panel' }, el('h2', { text: '🔑 کلید بازیابی' }), ...body)));
+  else { dlg = el('dialog', { class: 'c-dialog' }, el('h2', { text: '🔑 کلید بازیابی جدید' }), ...body); document.body.append(dlg); dlg.showModal(); }
+}
+function restoreScreen() {
+  const input = el('textarea', { class: 'ltr', rows: '3', placeholder: 'XXXX-XXXX-…', autocomplete: 'off', spellcheck: 'false' });
+  const err = el('p', { class: 'small', role: 'alert' });
+  status('کلید بازیابی ۵۲ کاراکتری را وارد کنید (فاصله و خط تیره مهم نیست).', input, err,
+    el('button', { class: 'btn block mt', text: 'بازیابی', onclick: async (e) => {
+      e.target.disabled = true; err.textContent = 'در حال بازیابی…';
+      try { handleState(await call('recovery_restore', { code: input.value })); }
+      catch (x) { err.textContent = x.message === 'wrong_recovery_key' || x.message === 'invalid_recovery_key' ? 'کلید بازیابی درست نیست.' : x.message === 'no_backup' ? 'برای این حساب پشتیبانی وجود ندارد.' : errText(x); e.target.disabled = false; }
+    } }),
+    el('button', { class: 'btn secondary block mt', text: 'بازگشت', onclick: () => location.reload() }));
+}
+async function startLink() {
+  status('در حال ساخت کلیدهای این دستگاه…');
+  try { linkWaiting(await call('link_start')); } catch (e) { status('خطا: ' + errText(e), el('button', { class: 'btn', text: 'بازگشت', onclick: () => location.reload() })); }
+}
+function linkWaiting(s) {
+  status('روی دستگاه قبلی‌تان (همان‌جا که برنامه باز است) دکمه «دستگاه‌ها» را بزنید و درخواست اتصال را تأیید کنید. پیش از تأیید، مطمئن شوید این کد روی هر دو صفحه یکسان است:',
+    el('div', { class: 'secret c-code', text: s.code }),
+    el('p', { class: 'small muted', text: 'این درخواست ۱۰ دقیقه اعتبار دارد.' }),
+    el('button', { class: 'btn secondary block', text: 'لغو', onclick: async () => { await call('link_cancel'); location.reload(); } }));
+  const poll = async () => {
+    try {
+      const r = await call('link_poll');
+      if (r.status === 'approved') { toast('این دستگاه به حساب شما متصل شد.'); return handleState(r); }
+      if (r.status === 'rejected' || r.status === 'expired' || r.status === 'none') return status(r.status === 'rejected' ? 'درخواست رد شد.' : 'زمان درخواست تمام شد.', el('button', { class: 'btn', text: 'دوباره', onclick: () => location.reload() }));
+    } catch (e) { return status('اتصال ناموفق بود: ' + errText(e), el('button', { class: 'btn', text: 'دوباره', onclick: () => location.reload() })); }
+    setTimeout(poll, 2000);
+  };
+  setTimeout(poll, 2000);
+}
+async function showDevices() {
+  document.querySelector('.c-devbtn')?.classList.remove('dot');
+  const [devices, requests] = await Promise.all([call('my_devices'), call('link_requests').catch(() => [])]);
+  const dlg = dialog('دستگاه‌های من',
+    ...requests.map((r) => el('div', { class: 'alert warn' },
+      el('b', { text: 'درخواست اتصال دستگاه جدید: ' + r.label }),
+      el('p', { class: 'small', text: 'فقط اگر خودتان این درخواست را داده‌اید و کد زیر دقیقاً با کد روی دستگاه جدید یکسان است، تأیید کنید:' }),
+      el('div', { class: 'secret c-code', text: r.code }),
+      el('div', { class: 'row mt' },
+        el('button', { class: 'btn', text: 'کد یکسان است — تأیید', onclick: async () => { try { await call('link_approve', { id: r.id }); close(dlg); toast('دستگاه جدید متصل شد.'); } catch (e) { toast(errText(e)); } } }),
+        el('button', { class: 'btn danger', text: 'رد', onclick: async () => { await call('link_reject', { id: r.id }); close(dlg); } })))),
+    el('div', { class: 'c-dir' }, ...devices.map((d) => el('div', { class: 'c-item' }, el('span', { class: 'c-file-ico', text: '💻' }),
+      el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: d.label + (d.current ? ' (همین دستگاه)' : '') }), el('span', { class: 'c-prev', text: 'فعال از ' + faDay.format(new Date(d.created_at.replace(' ', 'T') + 'Z')) })),
+      d.current ? null : el('button', { class: 'btn danger sm', text: 'خروج', onclick: async () => {
+        if (!confirm('این دستگاه از حساب شما جدا شود؟ (برای گوشی گم‌شده)')) return;
+        try { await call('revoke_device', { id: d.id }); close(dlg); toast('دستگاه جدا شد.'); } catch (e) { toast(errText(e)); }
+      } })))),
+    el('p', { class: 'small muted', text: 'برای افزودن گوشی یا مرورگر دیگر: روی آن وارد شوید و «اتصال با دستگاه قبلی» را بزنید. حداکثر ۵ دستگاه.' }),
+    el('button', { class: 'btn secondary block', text: '🔑 ساخت کلید بازیابی جدید', onclick: () => { close(dlg); showRecovery(false); } }));
+  dlg.showModal();
+}
+
+// ------------------------------------------------------------------ groups
+function userPicker(onPick, excluded = new Set()) {
+  const listBox = el('div', { class: 'c-dir' });
+  const input = el('input', { type: 'search', placeholder: 'جست‌وجو: حداقل ۳ حرف از نام یا نام کاربری', 'aria-label': 'جست‌وجوی کاربر' });
+  const show = (users) => listBox.replaceChildren(...users.filter((u) => !excluded.has(u.id) && u.has_identity).map((u) => {
+    names.set(u.id, u.display_name);
+    return el('div', { class: 'c-item c-user' }, el('span', { class: 'c-av', text: u.display_name.slice(0, 1) }),
+      el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: u.display_name }), el('span', { class: 'c-prev', text: '@' + u.username })),
+      el('button', { class: 'btn sm', text: 'افزودن', onclick: () => { excluded.add(u.id); onPick(u); show(users); } }));
+  }));
+  let t;
+  input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(async () => { const q = input.value.trim(); show(q.length >= 3 ? await call('search_users', { q }).catch(() => []) : await call('contacts')); }, 300); });
+  call('contacts').then(show);
+  return [input, listBox];
+}
+function createGroup() {
+  const picked = new Map();
+  const nameIn = el('input', { type: 'text', placeholder: 'نام گروه', maxlength: '100' });
+  const chips = el('div', { class: 'c-chips' });
+  const renderChips = () => chips.replaceChildren(...[...picked.values()].map((u) => el('button', { class: 'tag', text: u.display_name + ' ✕', onclick: () => { picked.delete(u.id); renderChips(); } })));
+  const [search, list] = userPicker((u) => { picked.set(u.id, u); renderChips(); });
+  const dlg = dialog('گروه جدید',
+    el('label', { class: 'field' }, el('span', { text: 'نام گروه (فقط برای اعضا رمزنگاری می‌شود؛ سرور آن را نمی‌بیند)' }), nameIn),
+    el('p', { class: 'small muted', text: 'اعضا:' }), chips, search, list,
+    el('button', { class: 'btn block mt', text: 'ساخت گروه', onclick: async (e) => {
+      if (!nameIn.value.trim() || !picked.size) return toast('نام گروه و حداقل یک عضو لازم است.');
+      e.target.disabled = true;
+      try {
+        const id = await call('create_group', { name: nameIn.value, members: [...picked.keys()] });
+        close(dlg); await refreshList(); const c = convs.find((x) => x.id === id); if (c) openConversation(c);
+      } catch (x) { toast(errText(x)); e.target.disabled = false; }
+    } }));
+  dlg.showModal();
+}
+async function groupInfo() {
+  const g = await call('group_info', { cid: current.id });
+  for (const m of g.members) names.set(m.id, m.display_name);
+  const owner = g.members.find((m) => m.role === 'owner')?.id === g.me;
+  const role = (m) => m.role === 'owner' ? 'سازنده' : g.admins.includes(m.id) ? 'مدیر' : '';
+  const nameIn = el('input', { type: 'text', value: g.name, maxlength: '100' });
+  const dlg = dialog('اطلاعات گروه',
+    g.is_admin ? el('div', { class: 'row' }, nameIn, el('button', { class: 'btn sm', text: 'تغییر نام', onclick: async () => { try { await call('group_rename', { cid: current.id, name: nameIn.value }); close(dlg); refreshList(); } catch (e) { toast(errText(e)); } } }))
+      : el('h3', { text: g.name }),
+    el('p', { class: 'small muted', text: `${faNum.format(g.members.length)} عضو — پیام‌ها برای هر دستگاه هر عضو جداگانه رمزنگاری می‌شوند؛ عضو حذف‌شده پیام‌های بعدی را نمی‌تواند بخواند.` }),
+    el('div', { class: 'c-dir' }, ...g.members.map((m) => el('div', { class: 'c-item' },
+      el('span', { class: 'c-av', text: m.display_name.slice(0, 1) }),
+      el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: m.display_name + (m.id === g.me ? ' (شما)' : '') }),
+        el('span', { class: 'c-prev', text: ['@' + m.username, role(m)].filter(Boolean).join(' · ') }),
+        !m.in_roster ? el('span', { class: 'c-flag', text: '⚠ عضویت او توسط هیچ مدیری (به‌صورت رمزنگاری‌شده) اعلام نشده؛ پیامی برایش ارسال نمی‌شود.' }) : null,
+        m.key_changed ? el('span', { class: 'c-flag' }, el('span', { text: 'کلید امنیتی او تغییر کرده؛ تا تأیید شما پیامی برایش ارسال نمی‌شود. ' }),
+          el('button', { class: 'btn sm', text: 'پذیرفتن', onclick: async () => { await call('accept_key', { user_id: m.id }); close(dlg); groupInfo(); } })) : null),
+      g.is_admin && m.id !== g.me && m.role !== 'owner' ? el('button', { class: 'btn danger sm', text: 'حذف', onclick: async () => {
+        if (!confirm(m.display_name + ' از گروه حذف شود؟')) return;
+        try { await call('group_remove', { cid: current.id, user_id: m.id }); close(dlg); groupInfo(); } catch (e) { toast(errText(e)); } } }) : null,
+      owner && m.id !== g.me ? el('button', { class: 'btn secondary sm', text: g.admins.includes(m.id) ? 'لغو مدیر' : 'مدیر کن', onclick: async () => {
+        try { await call('group_admin', { cid: current.id, user_id: m.id, admin: !g.admins.includes(m.id) }); close(dlg); groupInfo(); } catch (e) { toast(errText(e)); } } }) : null))),
+    g.is_admin ? el('details', { class: 'mt' }, el('summary', { text: '+ افزودن عضو' }), ...userPicker(async (u) => {
+      try { await call('group_add', { cid: current.id, user_id: u.id }); toast(u.display_name + ' اضافه شد.'); } catch (e) { toast(errText(e)); }
+    }, new Set(g.members.map((m) => m.id)))) : null,
+    el('button', { class: 'btn danger block mt', text: 'ترک گروه', onclick: async () => {
+      if (!confirm('از این گروه خارج شوید؟')) return;
+      try { await call('group_leave', { cid: current.id }); close(dlg); current = null; renderApp(); } catch (e) { toast(errText(e)); } } }));
+  dlg.showModal();
 }
 
 // ------------------------------------------------------------------ layout
@@ -80,7 +235,11 @@ function renderApp() {
   root.replaceChildren(el('div', { class: 'c-app' },
     el('aside', { class: 'c-side' },
       el('div', { class: 'c-side-head' }, el('h1', { text: 'گفتگوها' }),
-        el('div', { class: 'row' }, el('button', { class: 'btn secondary sm', text: 'تماس‌ها', onclick: showCallHistory }), el('button', { class: 'btn sm', text: 'گفتگوی جدید', onclick: openDirectory }))),
+        el('div', { class: 'row' },
+          el('button', { class: 'btn secondary sm c-devbtn', text: 'دستگاه‌ها', onclick: showDevices }),
+          el('button', { class: 'btn secondary sm', text: 'تماس‌ها', onclick: showCallHistory }),
+          el('button', { class: 'btn secondary sm', text: 'گروه جدید', onclick: createGroup }),
+          el('button', { class: 'btn sm', text: 'گفتگوی جدید', onclick: openDirectory }))),
       el('div', { class: 'c-search-wrap' }, searchEl),
       listEl,
       el('p', { class: 'c-note', text: '🔒 پیام‌ها فقط روی همین دستگاه و به‌صورت رمزنگاری‌شده نگهداری می‌شوند. پاک کردن داده‌های مرورگر یعنی از دست رفتن پیام‌های قبلی این دستگاه.' })),
@@ -99,9 +258,10 @@ function preview(c) {
 async function refreshList() {
   if (!listEl || searchEl.value.trim().length >= 2) return;
   convs = await call('conversations');
-  listEl.replaceChildren(...convs.filter((c) => c.peer).map((c) => el('button', { class: 'c-item' + (current?.id === c.id ? ' on' : ''), role: 'listitem', onclick: () => openConversation(c) },
-    el('span', { class: 'c-av', text: (c.peer.display_name || '?').slice(0, 1) }),
-    el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: c.peer.display_name }), el('span', { class: 'c-prev', text: preview(c) })),
+  for (const c of convs) if (c.peer) names.set(c.peer.id, c.peer.display_name);
+  listEl.replaceChildren(...convs.filter((c) => c.peer || c.type === 'group').map((c) => el('button', { class: 'c-item' + (current?.id === c.id ? ' on' : ''), role: 'listitem', onclick: () => openConversation(c) },
+    el('span', { class: 'c-av' + (c.type === 'group' ? ' grp' : ''), text: c.type === 'group' ? '👥' : (c.peer.display_name || '?').slice(0, 1) }),
+    el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: c.peer ? c.peer.display_name : c.name }), el('span', { class: 'c-prev', text: preview(c) })),
     el('span', { class: 'c-side-meta' }, el('span', { class: 'c-time', text: c.last ? fa.format(c.last.ts) : '' }),
       c.unread && current?.id !== c.id ? el('span', { class: 'badge', text: faNum.format(c.unread) }) : null))));
   if (!convs.length) listEl.append(el('p', { class: 'muted small c-hint', text: 'هنوز گفتگویی ندارید. «گفتگوی جدید» را بزنید.' }));
@@ -187,15 +347,17 @@ async function openConversation(c, focusMid = null) {
   mainEl.replaceChildren(
     el('div', { class: 'c-head' },
       el('button', { class: 'btn secondary sm c-back', text: '→', 'aria-label': 'بازگشت', onclick: () => { current = null; root.querySelector('.c-app').classList.remove('show-chat'); refreshList(); } }),
-      el('div', { class: 'c-head-name' }, el('b', { text: c.peer.display_name }), typingEl,
-        el('button', { class: 'c-lock', text: '🔒 رمزنگاری سرتاسری — شماره امنیتی', onclick: showSafety })),
-      el('button', { class: 'btn secondary c-icon', text: '📞', 'aria-label': 'تماس صوتی', title: 'تماس صوتی', onclick: () => startCall(false) }),
-      el('button', { class: 'btn secondary c-icon', text: '🎥', 'aria-label': 'تماس تصویری', title: 'تماس تصویری', onclick: () => startCall(true) }),
+      el('div', { class: 'c-head-name' }, el('b', { text: c.peer ? c.peer.display_name : c.name }), typingEl,
+        c.type === 'group' ? el('button', { class: 'c-lock', text: `🔒 ${faNum.format(c.member_count)} عضو — اطلاعات گروه`, onclick: groupInfo })
+          : el('button', { class: 'c-lock', text: '🔒 رمزنگاری سرتاسری — شماره امنیتی', onclick: showSafety })),
+      c.type === 'group' ? null : el('button', { class: 'btn secondary c-icon', text: '📞', 'aria-label': 'تماس صوتی', title: 'تماس صوتی', onclick: () => startCall(false) }),
+      c.type === 'group' ? null : el('button', { class: 'btn secondary c-icon', text: '🎥', 'aria-label': 'تماس تصویری', title: 'تماس تصویری', onclick: () => startCall(true) }),
       el('button', { class: 'btn secondary sm', text: 'رسانه‌ها', onclick: showMedia })),
     bannerEl, pinEl, msgsEl, replyBar,
     el('div', { class: 'c-compose' },
       el('button', { class: 'btn secondary c-icon', text: '📎', 'aria-label': 'پیوست فایل یا تصویر', title: 'پیوست', onclick: () => fileInput.click() }),
       fileInput, composer, recorderButton(), sendBtn));
+  if (c.type === 'group') { try { for (const m of (await call('group_info', { cid: c.id })).members) names.set(m.id, m.display_name); } catch { /* names fall back */ } }
   const list = await call('messages', { cid: c.id });
   let lastDay = '';
   for (const m of list) {
@@ -213,7 +375,7 @@ async function openConversation(c, focusMid = null) {
 }
 function scheduleRead() {
   clearTimeout(readTimer);
-  readTimer = setTimeout(() => { if (current && document.visibilityState === 'visible') call('mark_read', { cid: current.id, peer: current.peer.id }).then((n) => n && scheduleRefresh()).catch(() => {}); }, 800);
+  readTimer = setTimeout(() => { if (current && document.visibilityState === 'visible') call('mark_read', { cid: current.id, peer: pid() }).then((n) => n && scheduleRefresh()).catch(() => {}); }, 800);
 }
 function showTyping() {
   typingEl.textContent = 'در حال نوشتن…';
@@ -221,12 +383,18 @@ function showTyping() {
 }
 async function renderBanner() {
   if (!current) return;
-  const st = await call('contact_state', { user_id: current.peer.id }).catch(() => ({ pending: false }));
+  if (isGroup()) {
+    const blocked = current.has_state === false;
+    composer.disabled = blocked; sendBtn.disabled = blocked;
+    bannerEl.replaceChildren(...(blocked ? [el('div', { class: 'alert c-banner', text: 'در انتظار دریافت اطلاعات رمزنگاری‌شده گروه از مدیر گروه…' })] : []));
+    return;
+  }
+  const st = await call('contact_state', { user_id: pid() }).catch(() => ({ pending: false }));
   const blocked = !!st.pending;
   composer.disabled = blocked; sendBtn.disabled = blocked;
   bannerEl.replaceChildren(...(blocked ? [el('div', { class: 'alert warn c-banner' },
-    el('span', { text: `کلید امنیتی ${current.peer.display_name} تغییر کرده است (ورود از دستگاه جدید یا بازنشانی حساب). تا تأیید شما پیامی برای او ارسال نمی‌شود. در صورت امکان شماره امنیتی را حضوری مقایسه کنید.` }),
-    el('button', { class: 'btn sm', text: 'پذیرفتن کلید جدید', onclick: async () => { await call('accept_key', { user_id: current.peer.id }); renderBanner(); } }))] : []));
+    el('span', { text: `کلید امنیتی ${cname()} تغییر کرده است (ورود از دستگاه جدید یا بازنشانی حساب). تا تأیید شما پیامی برای او ارسال نمی‌شود. در صورت امکان شماره امنیتی را حضوری مقایسه کنید.` }),
+    el('button', { class: 'btn sm', text: 'پذیرفتن کلید جدید', onclick: async () => { await call('accept_key', { user_id: pid() }); renderBanner(); } }))] : []));
 }
 function renderPinned() {
   const pinned = [...byMid.values()].filter((m) => m.pinned && !m.deleted).sort((a, b) => b.ts - a.ts)[0];
@@ -246,19 +414,22 @@ function upsertMessage(m, scroll = true) {
   byMid.set(m.mid, m);
   const old = msgsEl.querySelector(`[data-mid="${CSS.escape(m.mid)}"]`);
   let node;
-  if (m.dir === 'in' && FLAGS[m.flag]) node = el('div', { class: 'c-sys', 'data-mid': m.mid, text: '⚠ ' + FLAGS[m.flag] });
+  if (m.dir === 'sys') node = el('div', { class: 'c-sys', 'data-mid': m.mid, text: m.text });
+  else if (m.dir === 'in' && FLAGS[m.flag]) node = el('div', { class: 'c-sys', 'data-mid': m.mid, text: '⚠ ' + FLAGS[m.flag] });
   else {
     const target = m.reply_to ? byMid.get(m.reply_to) : null;
     const reacts = Object.entries(m.reactions || {});
     node = el('div', { class: 'c-msg ' + (m.dir === 'out' ? 'out' : 'in') + (m.deleted ? ' deleted' : ''), 'data-mid': m.mid },
+      isGroup() && m.dir === 'in' ? el('div', { class: 'c-sender', text: nameOf(m.from) }) : null,
+      m.flag === 'not_in_roster' ? el('div', { class: 'c-flag', text: '⚠ فرستنده در فهرست رمزنگاری‌شده اعضای گروه نیست' }) : null,
       m.fwd ? el('div', { class: 'c-flag', text: '↪ بازارسال‌شده' }) : null,
       target ? el('button', { class: 'c-quote', onclick: () => msgsEl.querySelector(`[data-mid="${CSS.escape(target.mid)}"]`)?.scrollIntoView({ block: 'center' }) },
-        el('b', { text: target.from === me.id ? 'شما' : current.peer.display_name }), el('span', { text: summary(target) })) : null,
+        el('b', { text: nameOf(target.from) }), el('span', { text: summary(target) })) : null,
       m.deleted ? el('div', { class: 'c-text muted', text: '🚫 این پیام حذف شد' }) : null,
       !m.deleted && m.att ? attachmentView(m) : null,
       !m.deleted && m.text ? el('div', { class: 'c-text', text: m.text }) : null,
       m.flag === 'new_key' ? el('div', { class: 'c-flag', text: 'از کلید امنیتی جدید و تأییدنشده فرستنده' }) : null,
-      reacts.length ? el('div', { class: 'c-reacts' }, ...reacts.map(([u, e]) => el('span', { title: u === me.id ? 'شما' : current.peer.display_name, text: e }))) : null,
+      reacts.length ? el('div', { class: 'c-reacts' }, ...reacts.map(([u, e]) => el('span', { title: nameOf(u), text: e }))) : null,
       el('div', { class: 'c-meta' },
         m.pinned ? el('span', { text: '📌' }) : null,
         m.edited ? el('span', { text: 'ویرایش‌شده' }) : null,
@@ -266,7 +437,7 @@ function upsertMessage(m, scroll = true) {
         m.dir === 'out' ? el('span', { class: 'st' + (m.status === 'read' ? ' read' : ''), title: { read: 'خوانده‌شده', delivered: 'تحویل‌شده', sent: 'ارسال‌شده' }[m.status] || '', text: statusIcon(m.status) }) : null,
         m.deleted || m.status === 'uploading' || m.status === 'sending' ? null : el('button', { class: 'c-more', 'aria-label': 'گزینه‌های پیام', text: '⋯', onclick: (e) => menu(m, e.currentTarget) })),
       m.status === 'failed' ? el('div', { class: 'c-flag' }, el('span', { text: 'ارسال نشد: ' + errText(m.flag) + ' ' }),
-        el('button', { class: 'btn sm secondary', text: 'تلاش دوباره', onclick: () => call('retry', { mid: m.mid, peer: current.peer.id }).catch((e) => toast(errText(e))) })) : null);
+        el('button', { class: 'btn sm secondary', text: 'تلاش دوباره', onclick: () => call('retry', { mid: m.mid, peer: pid() }).catch((e) => toast(errText(e))) })) : null);
   }
   if (old) old.replaceWith(node); else msgsEl.append(node);
   for (const x of byMid.values()) if (x.reply_to === m.mid && x.mid !== m.mid) { const n = msgsEl.querySelector(`[data-mid="${CSS.escape(x.mid)}"] .c-quote span`); if (n) n.textContent = summary(m); }
@@ -321,15 +492,15 @@ function menu(m, anchor) {
   const box = el('div', { class: 'c-menu', role: 'menu' },
     el('div', { class: 'c-emoji' }, ...EMOJI.map((e) => el('button', { text: e, 'aria-label': 'واکنش ' + e, onclick: async () => {
       box.remove(); const mine = m.reactions?.[me.id] === e;
-      try { await call('react', { cid: current.id, peer: current.peer.id, mid: m.mid, emoji: mine ? '' : e }); } catch (x) { toast(errText(x)); }
+      try { await call('react', { cid: current.id, peer: pid(), mid: m.mid, emoji: mine ? '' : e }); } catch (x) { toast(errText(x)); }
     } }))),
     act('↩ پاسخ', () => setReply(m)),
     m.text ? act('📋 کپی متن', () => navigator.clipboard.writeText(m.text)) : null,
     own && !m.att && m.text ? act('✏ ویرایش', () => setEdit(m)) : null,
-    act(m.pinned ? '📌 برداشتن سنجاق' : '📌 سنجاق', () => call('pin', { cid: current.id, peer: current.peer.id, mid: m.mid, pinned: !m.pinned })),
+    act(m.pinned ? '📌 برداشتن سنجاق' : '📌 سنجاق', () => call('pin', { cid: current.id, peer: pid(), mid: m.mid, pinned: !m.pinned })),
     act('↪ بازارسال', () => forwardDialog(m)),
     act('🗑 حذف برای من', () => call('delete_local', { mid: m.mid })),
-    own ? act('🗑 حذف برای همه', () => confirm('این پیام برای هر دو طرف حذف شود؟') && call('delete_all', { cid: current.id, peer: current.peer.id, mid: m.mid })) : null);
+    own ? act('🗑 حذف برای همه', () => confirm('این پیام برای همه حذف شود؟') && call('delete_all', { cid: current.id, peer: pid(), mid: m.mid })) : null);
   document.body.append(box);
   const r = anchor.getBoundingClientRect();
   box.style.top = Math.min(window.innerHeight - box.offsetHeight - 8, r.bottom + 4) + 'px';
@@ -351,8 +522,8 @@ async function doSend() {
   if (!text.trim() || !current) return;
   composer.value = '';
   try {
-    if (editing) await call('edit', { cid: current.id, peer: current.peer.id, mid: editing.mid, text });
-    else await call('send', { cid: current.id, peer: current.peer.id, text, reply_to: reply?.mid || null });
+    if (editing) await call('edit', { cid: current.id, peer: pid(), mid: editing.mid, text });
+    else await call('send', { cid: current.id, peer: pid(), text, reply_to: reply?.mid || null });
   } catch (e) { toast(errText(e)); }
   clearReply();
 }
@@ -411,7 +582,7 @@ async function sendDialog(files) {
     el('p', { class: 'small muted', text: 'فایل‌ها پیش از خروج از این دستگاه رمزنگاری می‌شوند و ۷ روز روی سرور می‌مانند.' }),
     el('button', { class: 'btn block', text: 'ارسال', onclick: async () => {
       close(dlg);
-      const cid = current.id, peer = current.peer.id;
+      const cid = current.id, peer = pid();
       for (const [n, i] of items.entries()) {
         let file = i.f, meta = { ...i.meta, name: i.f.name, mime: i.f.type };
         if (meta.kind === 'image') {
@@ -442,7 +613,7 @@ function recorderButton() {
       if (secs < 0.7 || !current) return;
       const mime = (chunks[0]?.type || type || 'audio/webm').split(';')[0];
       const file = new File(chunks, 'voice.' + (mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm'), { type: mime });
-      call('send_file', { cid: current.id, peer: current.peer.id, file, meta: { kind: 'audio', dur: secs, name: file.name, mime } }).catch((e) => toast(errText(e)));
+      call('send_file', { cid: current.id, peer: pid(), file, meta: { kind: 'audio', dur: secs, name: file.name, mime } }).catch((e) => toast(errText(e)));
     };
     rec.start();
     btn.classList.add('rec');
@@ -459,14 +630,14 @@ async function showMedia() {
   dlg.showModal();
 }
 async function showSafety() {
-  const s = await call('safety', { user_id: current.peer.id });
+  const s = await call('safety', { user_id: pid() });
   const state = el('p', { class: 'small', text: s.verified ? '✔ شما این مخاطب را تأیید کرده‌اید.' : 'هنوز تأیید نشده است.' });
-  const dlg = dialog(`شماره امنیتی شما و ${current.peer.display_name}`,
+  const dlg = dialog(`شماره امنیتی شما و ${cname()}`,
     el('p', { class: 'small muted', text: 'اگر این ۶۰ رقم روی گوشی مخاطب هم دقیقاً همین باشد، پیام‌ها مستقیماً بین شما دو نفر رمزنگاری می‌شوند و هیچ‌کس (حتی سرور) در میان نیست. مقایسه را حضوری یا تلفنی انجام دهید.' }),
     el('div', { class: 'c-safety' }, ...s.number.map((g) => el('span', { text: g }))),
     state,
     s.pending ? el('p', { class: 'alert warn small', text: 'کلید این مخاطب تغییر کرده و هنوز پذیرفته نشده است؛ این شماره مربوط به کلید قبلی است.' }) : null,
-    s.verified || s.pending ? null : el('button', { class: 'btn', text: 'اعداد یکسان است — تأیید', onclick: async () => { await call('verify', { user_id: current.peer.id }); state.textContent = '✔ شما این مخاطب را تأیید کرده‌اید.'; } }));
+    s.verified || s.pending ? null : el('button', { class: 'btn', text: 'اعداد یکسان است — تأیید', onclick: async () => { await call('verify', { user_id: pid() }); state.textContent = '✔ شما این مخاطب را تأیید کرده‌اید.'; } }));
   dlg.showModal();
 }
 
@@ -531,7 +702,7 @@ async function startCall(video) {
   if (cur) return toast('یک تماس در جریان است.');
   if (!current) return;
   if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) return toast('این مرورگر از تماس پشتیبانی نمی‌کند.');
-  cur = { cid: current.id, peer: current.peer.id, name: current.peer.display_name, video, outgoing: true, state: 'calling' };
+  cur = { cid: current.id, peer: pid(), name: cname(), video, outgoing: true, state: 'calling' };
   callUi();
   call('call_mode', { active: true });
   try {
@@ -554,6 +725,12 @@ async function startCall(video) {
 }
 const signal = (action, extra = {}) => cur && call('call_signal', { cid: cur.cid, peer: cur.peer, body: { call_id: cur.id, action, video: !!cur.video, ...extra } }).catch(() => {});
 async function onCallSignal(d) {
+  if (d.from === me.id) { // a signal from another of MY devices
+    if (cur && cur.id === d.call_id && cur.state === 'incoming' && (d.action === 'answer' || d.action === 'reject')) {
+      endCall(null, null, d.action === 'answer' ? 'تماس روی دستگاه دیگرتان پاسخ داده شد.' : 'تماس روی دستگاه دیگرتان رد شد.');
+    }
+    return;
+  }
   if (d.action === 'offer') {
     if (cur) { // already in a call: tell the caller we are busy
       call('call_signal', { cid: d.cid, peer: d.from, body: { call_id: d.call_id, action: 'busy', video: false } }).catch(() => {});

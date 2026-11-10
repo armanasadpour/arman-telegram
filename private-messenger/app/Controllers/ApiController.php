@@ -50,6 +50,26 @@ final class ApiController extends Controller
         $r->post('/api/v1/messages/status', fn (Request $q) => $this->auth($q, fn () => Response::json(['status' => $this->msgs()->status((int)$this->s['session_device_id'], (array)($this->json($q)['ids'] ?? []))]), true));
         $r->get('/api/v1/sync', fn (Request $q) => $this->auth($q, fn () => $this->sync($q), true));
         $r->post('/api/v1/sync/ack', fn (Request $q) => $this->auth($q, fn () => Response::json(['deleted' => $this->msgs()->ack((int)$this->s['id'], (int)$this->s['session_device_id'], (array)($this->json($q)['ids'] ?? []))]), true));
+        // ---- phase 6: more devices, linking, recovery backup
+        $r->get('/api/v1/me/devices', fn (Request $q) => $this->auth($q, fn () => $this->myDevices()));
+        $r->post('/api/v1/devices/add', fn (Request $q) => $this->auth($q, fn () => Response::json(['device_id' => $this->keys()->addDevice($this->s, (int)$this->s['session_id'], (array)($this->json($q)['device'] ?? []), $q->userAgent())], 201)));
+        $r->post('/api/v1/devices/{id}/revoke', fn (Request $q) => $this->auth($q, fn () => $this->ok($this->keys()->revokeOwnDevice((int)$this->s['id'], (int)$this->s['session_device_id'], $q->param('id'))), true));
+        $r->post('/api/v1/device-links', fn (Request $q) => $this->auth($q, fn () => Response::json(['id' => $this->keys()->linkCreate($this->s, (int)$this->s['session_id'], (array)($this->json($q)['device'] ?? []), $q->userAgent())], 201)));
+        $r->get('/api/v1/device-links', fn (Request $q) => $this->auth($q, fn () => Response::json(['requests' => $this->keys()->linkList((int)$this->s['id'])]), true));
+        $r->get('/api/v1/device-links/{id}', fn (Request $q) => $this->auth($q, fn () => Response::json($this->keys()->linkStatus((int)$this->s['id'], (int)$this->s['session_id'], $q->param('id')))));
+        $r->post('/api/v1/device-links/{id}/approve', fn (Request $q) => $this->auth($q, fn () => $this->ok($this->keys()->linkApprove($this->s, (int)$this->s['session_device_id'], $q->param('id'),
+            $this->json($q)['certificate_sig'] ?? null, $this->json($q)['payload_type'] ?? null, $this->json($q)['payload'] ?? null)), true));
+        $r->post('/api/v1/device-links/{id}/reject', fn (Request $q) => $this->auth($q, fn () => $this->ok($this->keys()->linkReject((int)$this->s['id'], $q->param('id'))), true));
+        $r->get('/api/v1/me/key-backup', fn (Request $q) => $this->auth($q, fn () => ($b = $this->keys()->backupGet((int)$this->s['id'])) ? Response::json($b) : self::err('no_backup', 404)));
+        $r->post('/api/v1/me/key-backup', fn (Request $q) => $this->auth($q, fn () => Response::json(['version' => $this->keys()->backupPut((int)$this->s['id'], $this->json($q)['algorithm'] ?? null, $this->json($q)['ciphertext'] ?? null)]), true));
+        // ---- groups
+        $r->post('/api/v1/groups', fn (Request $q) => $this->auth($q, fn () => Response::json(['id' => $this->groups()->create((int)$this->s['id'], (array)($this->json($q)['members'] ?? []))], 201), true));
+        $r->get('/api/v1/groups/{id}/members', fn (Request $q) => $this->auth($q, fn () => Response::json(['members' => $this->groups()->members((int)$this->s['id'], $q->param('id'))]), true));
+        $r->post('/api/v1/groups/{id}/members', fn (Request $q) => $this->auth($q, fn () => $this->ok($this->groups()->add((int)$this->s['id'], $q->param('id'), (string)($this->json($q)['user_id'] ?? ''))), true));
+        $r->post('/api/v1/groups/{id}/members/remove', fn (Request $q) => $this->auth($q, fn () => $this->ok($this->groups()->remove((int)$this->s['id'], $q->param('id'), (string)($this->json($q)['user_id'] ?? ''))), true));
+        $r->post('/api/v1/groups/{id}/leave', fn (Request $q) => $this->auth($q, fn () => $this->ok($this->groups()->remove((int)$this->s['id'], $q->param('id'), (string)$this->s['public_id'])), true));
+        $r->post('/api/v1/groups/{id}/role', fn (Request $q) => $this->auth($q, fn () => $this->ok($this->groups()->setRole((int)$this->s['id'], $q->param('id'),
+            (string)($this->json($q)['user_id'] ?? ''), (string)($this->json($q)['role'] ?? ''))), true));
         $r->post('/api/v1/attachments', fn (Request $q) => $this->auth($q, fn () => Response::json($this->files()->init((int)$this->s['id'],
             (int)$this->s['session_device_id'], (string)($this->json($q)['conversation_id'] ?? ''), $this->json($q)['size'] ?? null), 201), true));
         $r->post('/api/v1/attachments/{id}/chunks/{index}', fn (Request $q) => $this->auth($q, fn () => $this->chunk($q), true));
@@ -59,6 +79,26 @@ final class ApiController extends Controller
         $r->get('/api/v1/conversations/{id}/presence', fn (Request $q) => $this->auth($q, fn () => Response::json(['devices' => $this->msgs()->presentDevices((int)$this->s['id'], $q->param('id'))]), true));
         $r->post('/api/v1/ephemeral', fn (Request $q) => $this->auth($q, fn () => Response::json(['sent' => $this->msgs()->sendEphemeral((int)$this->s['id'], (int)$this->s['session_device_id'], $this->json($q))]), true));
         return $r->dispatch($req);
+    }
+
+    private function groups(): \PM\Groups\GroupService
+    {
+        return new \PM\Groups\GroupService($this->app->db());
+    }
+
+    private function ok(mixed $_ = null): Response
+    {
+        return Response::json(['ok' => true]);
+    }
+
+    private function myDevices(): Response
+    {
+        $out = [];
+        foreach ($this->app->db()->all("SELECT public_id, label, created_at, last_seen_at FROM devices WHERE user_id = ? AND status = 'active' ORDER BY id", [$this->s['id']]) as $d) {
+            $out[] = ['id' => $d['public_id'], 'label' => $d['label'], 'created_at' => $d['created_at'], 'last_seen_at' => $d['last_seen_at'],
+                'current' => (string)$this->app->db()->scalar('SELECT public_id FROM devices WHERE id = ?', [(int)$this->s['session_device_id']]) === $d['public_id']];
+        }
+        return Response::json(['devices' => $out]);
     }
 
     private function calls(): \PM\Calls\CallService
@@ -153,7 +193,8 @@ final class ApiController extends Controller
             $code = $e->getMessage();
             $status = match ($code) {
                 'identity_exists' => 409, 'insufficient_storage' => 507, 'file_too_large' => 413,
-                'upload_not_found', 'attachment_not_found', 'call_not_found', 'user_not_found' => 404, default => 400,
+                'upload_not_found', 'attachment_not_found', 'call_not_found', 'user_not_found', 'link_not_found', 'group_not_found', 'device_not_found' => 404,
+                'too_many_devices', 'group_full' => 409, 'not_group_admin', 'not_group_owner' => 403, default => 400,
             };
             return self::err(preg_match('/^[a-z_]+$/', $code) ? $code : 'invalid_request', $status);
         }
@@ -228,7 +269,7 @@ final class ApiController extends Controller
     {
         $out = [];
         foreach ($this->msgs()->conversations((int)$this->s['id']) as $c) {
-            $out[] = ['id' => $c['id'], 'type' => $c['type'], 'last_activity_at' => $c['last_activity_at'],
+            $out[] = ['id' => $c['id'], 'type' => $c['type'], 'last_activity_at' => $c['last_activity_at'], 'member_count' => (int)$c['member_count'], 'role' => $c['role'],
                 'peer' => $c['peer_id'] ? ['id' => $c['peer_id'], 'display_name' => $c['peer_name'], 'username' => $c['peer_username'], 'active' => $c['peer_status'] === 'active'] : null];
         }
         return Response::json(['conversations' => $out]);

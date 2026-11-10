@@ -28,7 +28,7 @@ final class CallService
     {
         $c = $this->db->one('SELECT c.id, (SELECT cm2.user_id FROM conversation_members cm2 WHERE cm2.conversation_id = c.id AND cm2.user_id <> ? LIMIT 1) AS peer
                                FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
-                              WHERE c.public_id = ? AND cm.user_id = ? AND cm.left_at IS NULL', [$meId, $convPublicId, $meId]);
+                              WHERE c.public_id = ? AND c.type = \'direct\' AND cm.user_id = ? AND cm.left_at IS NULL', [$meId, $convPublicId, $meId]);
         if ($c === null || $c['peer'] === null) {
             throw new UserError('conversation_not_found');
         }

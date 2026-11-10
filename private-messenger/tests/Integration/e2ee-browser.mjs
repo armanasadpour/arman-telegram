@@ -10,6 +10,14 @@ import { execFileSync } from 'node:child_process';
 const [BASE, ROOT, DBN, DBU, DBP] = process.argv.slice(2);
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 const browser = await chromium.launch(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {});
+async function appReady(p, timeout = 30000) {
+  await p.waitForSelector('.c-side-head h1, .c-rk', { timeout });
+  if (await p.$('.c-rk')) { // first device: confirm the recovery key like a user would
+    const k = (await p.textContent('.c-rk')).trim();
+    await p.fill('input[placeholder="چهار کاراکتر آخر"]', k.slice(-4)); await p.click('text=ذخیره کردم');
+    await p.waitForSelector('.c-side-head h1', { timeout });
+  }
+}
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => { if (cond) { pass++; console.log('  \x1b[32m✔\x1b[0m', name); } else { fail++; console.log('  \x1b[31m✘', name, '\x1b[0m', extra); } };
 const ctx = async () => (await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1200, height: 800 } }));
@@ -53,7 +61,7 @@ async function login(c, user, pw, newPw) {
   }
   return p;
 }
-const ready = (p) => p.waitForSelector('.c-side-head h1', { timeout: 20000 });
+const ready = (p) => appReady(p);
 
 // ---------------------------------------------------------------- keys created on device
 console.log('\n# Keys are generated on the device');
@@ -140,10 +148,10 @@ check('messaging works after re-login', true);
 // ---------------------------------------------------------------- key change warning
 console.log('\n# Key change');
 const b3 = await login(await ctx(), 'bob', 'Bob strong pass 12');
-await b3.waitForSelector('text=قبلاً روی دستگاه یا مرورگر دیگری فعال شده است', { timeout: 20000 });
+await b3.waitForSelector('text=حساب شما روی دستگاه دیگری فعال است', { timeout: 20000 });
 check('new browser for an existing account: explains instead of silently creating keys', true);
 b3.on('dialog', (d) => d.accept());
-await b3.click('text=ساخت کلیدهای جدید روی این دستگاه');
+await b3.click('text=۳. به هیچ‌کدام دسترسی ندارم'); await b3.click('text=ساخت کلیدهای جدید روی این دستگاه');
 await ready(b3);
 check('identity reset creates a new master key', sql('SELECT COUNT(*) FROM user_master_keys WHERE superseded_at IS NOT NULL') === '1');
 await alice.waitForTimeout(4000);

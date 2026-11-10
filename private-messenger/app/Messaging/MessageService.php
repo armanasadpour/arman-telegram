@@ -65,11 +65,12 @@ final class MessageService
 
     public function conversations(int $meId): array
     {
-        return $this->db->all("SELECT c.public_id AS id, c.type, c.last_activity_at, cm.archived, cm.muted_until,
-                                      p.public_id AS peer_id, p.display_name AS peer_name, p.username AS peer_username, p.status AS peer_status
+        return $this->db->all("SELECT c.public_id AS id, c.type, c.last_activity_at, cm.archived, cm.muted_until, cm.role,
+                                      p.public_id AS peer_id, p.display_name AS peer_name, p.username AS peer_username, p.status AS peer_status,
+                                      (SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id = c.id AND x.left_at IS NULL) AS member_count
                                  FROM conversation_members cm
                                  JOIN conversations c ON c.id = cm.conversation_id
-                                 LEFT JOIN conversation_members pm ON pm.conversation_id = c.id AND pm.user_id <> cm.user_id
+                                 LEFT JOIN conversation_members pm ON c.type = 'direct' AND pm.conversation_id = c.id AND pm.user_id <> cm.user_id
                                  LEFT JOIN users p ON p.id = pm.user_id
                                 WHERE cm.user_id = ? AND cm.left_at IS NULL
                                 ORDER BY c.last_activity_at IS NULL, c.last_activity_at DESC, c.id DESC", [$meId]);
@@ -103,7 +104,7 @@ final class MessageService
 
     private function membership(int $meId, string $convPublicId): ?array
     {
-        return $this->db->one('SELECT c.id FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
+        return $this->db->one('SELECT c.id, c.type FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
                                 WHERE c.public_id = ? AND cm.user_id = ? AND cm.left_at IS NULL', [$convPublicId, $meId]);
     }
 
@@ -156,7 +157,9 @@ final class MessageService
             }
             $given[$dev] = ['type' => $type, 'ct' => $ct];
         }
-        $missing = array_values(array_diff(array_keys($expected), array_keys($given)));
+        // Direct chats: every device must be covered. Groups: the client deliberately encrypts only for members
+        // announced in the end-to-end encrypted roster, so "missing" is allowed — but never a non-member device.
+        $missing = $conv['type'] === 'group' ? [] : array_values(array_diff(array_keys($expected), array_keys($given)));
         $stale = array_values(array_diff(array_keys($given), array_keys($expected)));
         if ($missing !== [] || $stale !== []) {
             throw new DeviceMismatch($missing, $stale);
