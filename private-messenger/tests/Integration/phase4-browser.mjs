@@ -10,7 +10,7 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 const [BASE, ROOT, DBN, DBU, DBP] = process.argv.slice(2);
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 const browser = await chromium.launch({ ...(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {}),
-  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+  args: ['--ignore-certificate-errors', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 async function appReady(p, timeout = 30000) {
   await p.waitForSelector('.c-side-head h1, .c-rk', { timeout });
   if (await p.$('.c-rk')) { // first device: confirm the recovery key like a user would
@@ -37,6 +37,7 @@ await admin.click('summary'); await admin.check('input[name=db_mode][value=manua
 await admin.fill('input[name=db_name]', DBN); await admin.fill('input[name=db_user]', DBU); await admin.fill('input[name=db_pass]', DBP); await admin.fill('input[name=db_host]', '127.0.0.1');
 await admin.fill('input[name=admin_password]', 'Admin strong pass 123'); await admin.fill('input[name=admin_password2]', 'Admin strong pass 123');
 await admin.click('form button');
+await admin.waitForSelector('text=نصب کامل شد', { timeout: 60000 });
 const [ADM, APP] = [...new Set((await admin.content()).match(/https:\/\/[^/"<]+\/[A-Za-z0-9]{16}\//g))];
 await admin.goto(ADM);
 await admin.fill('input[name=username]', 'admin'); await admin.fill('input[name=password]', 'Admin strong pass 123'); await admin.click('button');
@@ -59,13 +60,13 @@ const { p: alice, ctx: aCtx } = await login('alice', 'Alice strong pass 1');
 const { p: bob } = await login('bob', 'Bob strong pass 12');
 const { p: carol } = await login('carol', 'Carol strong pass 1');
 async function openWith(p, name) {
-  if (!(await p.$(`.c-item:has-text("${name}")`))) { await p.click('text=گفتگوی جدید'); await p.fill('dialog input[type=search]', name); await p.click(`dialog .c-user:has-text("${name}") button:text-is("گفتگو")`); }
+  if (!(await p.$(`.c-item:has-text("${name}")`))) { await p.click('[aria-label="گفتگوی جدید"]'); await p.fill('dialog input[type=search]', name); await p.click(`dialog .c-user:has-text("${name}") button:text-is("گفتگو")`); }
   else await p.click(`.c-list .c-item:has-text("${name}")`);
   await p.waitForSelector('.c-compose textarea', { timeout: T });
 }
 const send = async (p, text) => { await p.fill('.c-compose textarea', text); await p.press('.c-compose textarea', 'Enter'); };
 const msgOf = (p, text) => p.locator('.c-msg', { hasText: text }).last();
-const menuOn = async (p, text, label) => { await msgOf(p, text).locator('.c-more').click(); await p.click(`.c-menu >> text=${label}`); };
+const menuOn = async (p, text, label) => { await msgOf(p, text).locator('.c-more').click(); await p.click(`.c-menu >> text="${label}"`); };
 await openWith(alice, 'باب');
 await send(alice, 'اولین پیام آلیس');
 await bob.waitForSelector('.c-item:has-text("آلیس")', { timeout: T });
@@ -81,7 +82,7 @@ await bob.type('.c-compose textarea', 'در حال تایپ', { delay: 30 });
 await alice.waitForSelector('.c-typing:text("در حال نوشتن…")', { timeout: T });
 check('typing indicator reaches Alice (encrypted, only to online devices)', true);
 await bob.fill('.c-compose textarea', '');
-await menuOn(bob, 'اولین پیام آلیس', '↩ پاسخ');
+await menuOn(bob, 'اولین پیام آلیس', 'پاسخ');
 await send(bob, 'پاسخ باب');
 await alice.waitForSelector('.c-msg.in:has-text("پاسخ باب") .c-quote:has-text("اولین پیام آلیس")', { timeout: T });
 check('reply shows the quoted message on the other side', true);
@@ -90,7 +91,7 @@ await bob.waitForSelector('.c-msg.out:has-text("پاسخ باب") .c-reacts:has-
 check('reaction 👍 arrives', true);
 await send(alice, 'متن قبل از ویرایش');
 await bob.waitForSelector('.c-msg.in:has-text("متن قبل از ویرایش")', { timeout: T });
-await menuOn(alice, 'متن قبل از ویرایش', '✏ ویرایش');
+await menuOn(alice, 'متن قبل از ویرایش', 'ویرایش');
 await alice.fill('.c-compose textarea', 'متن بعد از ویرایش'); await alice.press('.c-compose textarea', 'Enter');
 await bob.waitForSelector('.c-msg.in:has-text("متن بعد از ویرایش"):has-text("ویرایش‌شده")', { timeout: T });
 await bob.waitForTimeout(500);
@@ -98,13 +99,13 @@ const bobText = await bob.evaluate(() => document.body.innerText);
 check('edit propagates and is marked «ویرایش‌شده»', !bobText.includes('متن قبل از ویرایش'), bobText.split('\n').filter((l) => l.includes('قبل از ویرایش')).join(' | '));
 await send(alice, 'این حذف می‌شود');
 await bob.waitForSelector('.c-msg.in:has-text("این حذف می‌شود")', { timeout: T });
-await menuOn(alice, 'این حذف می‌شود', '🗑 حذف برای همه');
+await menuOn(alice, 'این حذف می‌شود', 'حذف برای همه');
 await bob.waitForFunction(() => !document.body.innerText.includes('این حذف می‌شود'), null, { timeout: T });
 check('delete for everyone removes the text on the recipient device', (await bob.locator('.c-msg.in.deleted').count()) >= 1);
 const bobMenuForeign = async () => { await msgOf(bob, 'متن بعد از ویرایش').locator('.c-more').click(); const t = await bob.textContent('.c-menu'); await bob.keyboard.press('Escape'); await bob.mouse.click(5, 5); return t; };
 const fm = await bobMenuForeign();
 check('only the author is offered edit / delete-for-everyone', !fm.includes('ویرایش') && !fm.includes('حذف برای همه') && fm.includes('حذف برای من'));
-await menuOn(bob, 'متن بعد از ویرایش', '📌 سنجاق');
+await menuOn(bob, 'متن بعد از ویرایش', 'سنجاق');
 await alice.waitForSelector('.c-pinbar:has-text("متن بعد از ویرایش")', { timeout: T });
 check('pin shows the pinned bar on both sides', !!(await bob.$('.c-pinbar')));
 await alice.fill('.c-search', 'ویرایش');
@@ -167,10 +168,10 @@ check('files are stored outside the web root', !stored.some((f) => f.includes('p
 console.log('\n# Voice and video');
 await alice.click('.c-compose [aria-label="ضبط پیام صوتی"]');
 await alice.waitForTimeout(2200);
-await alice.click('.c-compose .c-icon.rec');
+await alice.click('.c-compose .c-mic.rec');
 await bob.waitForSelector('.c-msg.in button:has-text("پخش پیام صوتی")', { timeout: 60000 });
 await bob.locator('.c-msg.in button:has-text("پخش پیام صوتی")').last().click();
-await bob.waitForSelector('.c-msg.in audio', { timeout: T });
+await bob.waitForSelector('.c-msg.in audio', { timeout: T, state: 'attached' });
 const dur = await bob.$eval('.c-msg.in audio', (a) => new Promise((r) => { if (a.readyState > 0) r(a.duration); else a.onloadedmetadata = () => r(a.duration); }));
 check('voice message recorded, encrypted, decrypted and playable', dur > 0.5 || dur === Infinity, String(dur));
 const webm = Buffer.from(await alice.evaluate(async () => {
@@ -191,7 +192,7 @@ await bob.click('dialog >> text=بستن');
 console.log('\n# Forwarding and access control');
 await openWith(bob, 'کارول');
 await openWith(bob, 'آلیس');
-await menuOn(bob, 'report.bin', '↪ بازارسال');
+await menuOn(bob, 'report.bin', 'بازارسال');
 await bob.click('dialog .c-item:has-text("کارول")');
 await carol.waitForSelector('.c-item:has-text("باب")', { timeout: T });
 await openWith(carol, 'باب');

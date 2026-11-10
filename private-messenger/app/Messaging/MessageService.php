@@ -65,7 +65,7 @@ final class MessageService
 
     public function conversations(int $meId): array
     {
-        return $this->db->all("SELECT c.public_id AS id, c.type, c.last_activity_at, cm.archived, cm.muted_until, cm.role,
+        return $this->db->all("SELECT c.public_id AS id, c.type, c.is_channel, c.last_activity_at, cm.archived, cm.muted_until, cm.role,
                                       p.public_id AS peer_id, p.display_name AS peer_name, p.username AS peer_username, p.status AS peer_status,
                                       (SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id = c.id AND x.left_at IS NULL) AS member_count
                                  FROM conversation_members cm
@@ -104,7 +104,7 @@ final class MessageService
 
     private function membership(int $meId, string $convPublicId): ?array
     {
-        return $this->db->one('SELECT c.id, c.type FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
+        return $this->db->one('SELECT c.id, c.type, c.is_channel, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
                                 WHERE c.public_id = ? AND cm.user_id = ? AND cm.left_at IS NULL', [$convPublicId, $meId]);
     }
 
@@ -119,6 +119,9 @@ final class MessageService
         $conv = is_string($in['conversation_id'] ?? null) ? $this->membership($meId, $in['conversation_id']) : null;
         if ($conv === null) {
             throw new UserError('conversation_not_found');
+        }
+        if ((int)$conv['is_channel'] === 1 && $conv['role'] === 'member') {
+            throw new UserError('channel_read_only'); // in a channel only its admins post (clients enforce the same on the encrypted roster)
         }
         if ((int)($in['protocol_version'] ?? 0) !== self::PROTOCOL_VERSION) {
             throw new UserError('unsupported_protocol_version');
@@ -172,10 +175,11 @@ final class MessageService
         if ($attIds !== [] && $files === null) {
             throw new UserError('attachments_unsupported');
         }
-        return $this->db->transaction(function () use ($conv, $meId, $myDeviceId, $clientRaw, $clientId, $given, $expected, $attIds, $files): array {
+        $notify = ($in['notify'] ?? false) === true; // client hint: a visible message (not a receipt, reaction or edit)
+        $res = $this->db->transaction(function () use ($conv, $meId, $myDeviceId, $clientRaw, $clientId, $given, $expected, $attIds, $files, $notify): array {
             $now = Clock::db();
             $msgId = $this->db->insert('INSERT INTO messages (conversation_id, sender_user_id, sender_device_id, client_msg_id, envelope_count, notify, created_at)
-                                        VALUES (?, ?, ?, ?, ?, 1, ?)', [$conv['id'], $meId, $myDeviceId, $clientRaw, count($given), $now]);
+                                        VALUES (?, ?, ?, ?, ?, ?, ?)', [$conv['id'], $meId, $myDeviceId, $clientRaw, count($given), $notify ? 1 : 0, $now]);
             if ($attIds !== []) {
                 $files->grant($meId, (int)$conv['id'], $msgId, $attIds);
             }
@@ -188,6 +192,43 @@ final class MessageService
             $this->db->run('UPDATE conversations SET last_activity_at = ? WHERE id = ?', [Clock::now()->format('Y-m-d H:i:00'), $conv['id']]);
             return ['message_id' => $clientId, 'created_at' => $now, 'duplicate' => false];
         });
+        if ($notify) {
+            \PM\Push\PushService::queue('message', (int)$conv['id'], $meId, $myDeviceId);
+        }
+        return $res;
+    }
+
+    /** Per-member conversation preferences, synced across the user's devices. Mute also suppresses push. */
+    public function setPrefs(int $meId, string $convPublicId, array $in): array
+    {
+        $conv = $this->membership($meId, $convPublicId);
+        if ($conv === null) {
+            throw new UserError('conversation_not_found');
+        }
+        if (array_key_exists('muted_until', $in)) {
+            $m = $in['muted_until'];
+            $until = $m === null || $m === 0 ? null : ($m === -1 ? '2099-01-01 00:00:00' : (is_int($m) && $m > 0 && $m <= 366 * 86400 ? Clock::now()->modify("+$m seconds")->format('Y-m-d H:i:s') : false));
+            if ($until === false) {
+                throw new UserError('invalid_mute');
+            }
+            $this->db->run('UPDATE conversation_members SET muted_until = ? WHERE conversation_id = ? AND user_id = ?', [$until, $conv['id'], $meId]);
+        }
+        if (array_key_exists('archived', $in)) {
+            $this->db->run('UPDATE conversation_members SET archived = ? WHERE conversation_id = ? AND user_id = ?', [($in['archived'] === true) ? 1 : 0, $conv['id'], $meId]);
+        }
+        return $this->db->one('SELECT archived, muted_until FROM conversation_members WHERE conversation_id = ? AND user_id = ?', [$conv['id'], $meId]) ?? [];
+    }
+
+    /** Online status of the other person in a direct chat (minute precision; only to members of that chat). */
+    public function peerSeen(int $meId, string $convPublicId): ?string
+    {
+        $conv = $this->membership($meId, $convPublicId);
+        if ($conv === null || $conv['type'] !== 'direct') {
+            return null;
+        }
+        $v = $this->db->scalar("SELECT MAX(d.last_seen_at) FROM devices d JOIN conversation_members cm ON cm.user_id = d.user_id
+                                 WHERE cm.conversation_id = ? AND cm.user_id <> ? AND d.status = 'active'", [$conv['id'], $meId]);
+        return is_string($v) ? $v : null;
     }
 
     /**

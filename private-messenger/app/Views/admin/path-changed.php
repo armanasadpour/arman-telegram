@@ -1,6 +1,6 @@
 <?php use function PM\Support\e; ?>
 <!doctype html>
-<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer"><title>آدرس جدید</title></head>
 <body>
 <h1>آدرس پنل مدیریت تغییر کرد</h1>

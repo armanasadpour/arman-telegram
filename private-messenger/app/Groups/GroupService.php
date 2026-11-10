@@ -33,7 +33,7 @@ final class GroupService
     }
 
     /** @param list<string> $memberPublicIds */
-    public function create(int $meId, array $memberPublicIds): string
+    public function create(int $meId, array $memberPublicIds, bool $channel = false): string
     {
         $ids = [];
         foreach (array_unique(array_filter($memberPublicIds, 'is_string')) as $p) {
@@ -45,11 +45,11 @@ final class GroupService
         if ($ids === [] || count($ids) + 1 > self::MAX_MEMBERS) {
             throw new UserError('invalid_members');
         }
-        return $this->db->transaction(function () use ($meId, $ids): string {
+        return $this->db->transaction(function () use ($meId, $ids, $channel): string {
             $now = Clock::db();
             $pub = Ulid::generate();
-            $cid = $this->db->insert('INSERT INTO conversations (public_id, type, created_by, created_at, last_activity_at) VALUES (?, ?, ?, ?, ?)',
-                [$pub, 'group', $meId, $now, Clock::now()->format('Y-m-d H:i:00')]);
+            $cid = $this->db->insert('INSERT INTO conversations (public_id, type, is_channel, created_by, created_at, last_activity_at) VALUES (?, ?, ?, ?, ?, ?)',
+                [$pub, 'group', $channel ? 1 : 0, $meId, $now, Clock::now()->format('Y-m-d H:i:00')]);
             $this->db->run('INSERT INTO conversation_members (conversation_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)', [$cid, $meId, 'owner', $now]);
             foreach ($ids as $u) {
                 $this->db->run('INSERT INTO conversation_members (conversation_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)', [$cid, $u, 'member', $now]);

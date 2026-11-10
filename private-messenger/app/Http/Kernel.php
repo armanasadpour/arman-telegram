@@ -33,6 +33,7 @@ final class Kernel
         } elseif (function_exists('litespeed_finish_request')) {
             litespeed_finish_request();
         }
+        \PM\Push\PushService::flush($this->app, (string)($_SERVER['HTTP_HOST'] ?? ''));
         \PM\Maintenance::runIfDue($this->app);
     }
 

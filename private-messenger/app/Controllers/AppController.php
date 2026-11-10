@@ -33,7 +33,10 @@ final class AppController extends Controller
         $r->get('/', fn (Request $q) => $this->home($q));
         $r->get('/theme.css', fn () => $this->themeCss());
         $r->get('/b/{tok}/manifest.webmanifest', fn (Request $q) => hash_equals($this->brandToken(), $q->param('tok')) ? $this->manifest() : Response::notFound());
-        $r->get('/b/{tok}/icon', fn (Request $q) => hash_equals($this->brandToken(), $q->param('tok')) ? $this->icon() : Response::notFound());
+        $r->get('/b/{tok}/icon', fn (Request $q) => hash_equals($this->brandToken(), $q->param('tok')) ? $this->icon('512') : Response::notFound());
+        $r->get('/b/{tok}/icon/{variant}', fn (Request $q) => hash_equals($this->brandToken(), $q->param('tok')) && in_array($q->param('variant'), ['192', '512', 'maskable', 'apple', 'badge'], true)
+            ? $this->icon($q->param('variant')) : Response::notFound());
+        $r->get('/sw.js', fn () => $this->serviceWorker());
         $r->post('/login', fn (Request $q) => $this->guard($q) ?? $this->passwordLogin($q));
         $r->post('/otp/request', fn (Request $q) => $this->guard($q) ?? $this->otpRequest($q));
         $r->get('/otp', fn (Request $q) => $this->otpForm($q));
@@ -115,8 +118,9 @@ final class AppController extends Controller
         $b = $this->base . '/b/' . $this->brandToken();
         $accent = (string)$this->app->settings()->get('app.accent');
         return $this->page($req, 'app/home', ['user' => $u, 'name' => (string)$this->app->settings()->get('app.internal_name'),
-            'theme' => $this->themeHref(), 'manifest' => $b . '/manifest.webmanifest', 'icon' => $b . '/icon?v=' . $this->logoVersion(),
-            'themeColor' => isset(Settings::ACCENTS[$accent]) ? $accent : '#2563eb']);
+            'theme' => $this->themeHref(), 'manifest' => $b . '/manifest.webmanifest', 'icon' => $b . '/icon/192?v=' . $this->logoVersion(),
+            'appleIcon' => $b . '/icon/apple?v=' . $this->logoVersion(), 'brand' => $b, 'logoV' => $this->logoVersion(),
+            'themeColor' => isset(Settings::ACCENTS[$accent]) ? $accent : '#7c3aed']);
     }
 
     // ------------------------------------------------------------------ branding (revealed only after sign-in)
@@ -138,27 +142,39 @@ final class AppController extends Controller
         $accent = (string)$s->get('app.accent');
         $logo = $this->app->root . '/storage/branding/logo.png';
         $dim = is_file($logo) ? @getimagesize($logo) : false;
-        $icon = ['src' => 'icon?v=' . $this->logoVersion(), 'purpose' => 'any']
-            + ($dim ? ['type' => 'image/png', 'sizes' => $dim[0] . 'x' . $dim[1]] : ['type' => 'image/svg+xml', 'sizes' => 'any']);
-        $m = ['name' => $name, 'short_name' => mb_substr($name, 0, 12), 'lang' => 'fa', 'dir' => 'rtl',
-            'start_url' => $this->base . '/', 'scope' => $this->base . '/', 'display' => 'standalone',
-            'background_color' => '#f4f6f9', 'theme_color' => isset(Settings::ACCENTS[$accent]) ? $accent : '#2563eb', 'icons' => [$icon]];
+        $v = '?v=' . $this->logoVersion();
+        $icons = $dim
+            ? [['src' => 'icon' . $v, 'type' => 'image/png', 'sizes' => $dim[0] . 'x' . $dim[1], 'purpose' => 'any'],
+               ['src' => 'icon' . $v, 'type' => 'image/png', 'sizes' => $dim[0] . 'x' . $dim[1], 'purpose' => 'maskable']]
+            : [['src' => 'icon/192' . $v, 'type' => 'image/png', 'sizes' => '192x192', 'purpose' => 'any'],
+               ['src' => 'icon/512' . $v, 'type' => 'image/png', 'sizes' => '512x512', 'purpose' => 'any'],
+               ['src' => 'icon/maskable' . $v, 'type' => 'image/png', 'sizes' => '512x512', 'purpose' => 'maskable']];
+        $m = ['id' => $this->base . '/', 'name' => $name, 'short_name' => mb_substr($name, 0, 12), 'description' => $name, 'lang' => 'fa', 'dir' => 'rtl',
+            'start_url' => $this->base . '/', 'scope' => $this->base . '/', 'display' => 'standalone', 'display_override' => ['standalone', 'minimal-ui'],
+            'orientation' => 'any', 'background_color' => '#f5f3ff', 'theme_color' => isset(Settings::ACCENTS[$accent]) ? $accent : '#7c3aed',
+            'categories' => ['social', 'communication'], 'icons' => $icons,
+            'shortcuts' => [['name' => 'گفتگوها', 'url' => $this->base . '/#tab=chats', 'icons' => [['src' => 'icon/192' . $v, 'sizes' => '192x192']]],
+                            ['name' => 'تماس‌ها', 'url' => $this->base . '/#tab=calls', 'icons' => [['src' => 'icon/192' . $v, 'sizes' => '192x192']]]]];
         return new Response((string)json_encode($m, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 200,
             ['Content-Type' => 'application/manifest+json; charset=utf-8', 'Cache-Control' => 'private, no-cache']);
     }
 
-    private function icon(): Response
+    /** App icon: the admin's uploaded logo, or the built-in icon in the requested variant. */
+    private function icon(string $variant): Response
     {
         $logo = $this->app->root . '/storage/branding/logo.png';
-        if (is_file($logo)) {
-            return new Response((string)file_get_contents($logo), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, max-age=604800']);
-        }
-        $accent = (string)$this->app->settings()->get('app.accent');
-        $accent = isset(Settings::ACCENTS[$accent]) ? $accent : '#2563eb';
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="' . $accent . '"/>'
-            . '<path d="M136 160h240a40 40 0 0 1 40 40v120a40 40 0 0 1-40 40H236l-76 56v-56h-24a40 40 0 0 1-40-40V200a40 40 0 0 1 40-40z" fill="#fff"/>'
-            . '<rect x="220" y="236" width="72" height="60" rx="10" fill="' . $accent . '"/><path d="M234 236v-16a22 22 0 0 1 44 0v16" stroke="' . $accent . '" stroke-width="12" fill="none"/></svg>';
-        return new Response($svg, 200, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'private, max-age=604800']);
+        $file = is_file($logo) && $variant !== 'badge' ? $logo : $this->app->root . '/app/resources/assets/' . match ($variant) {
+            '192' => 'icon-192.png', 'maskable' => 'icon-maskable-512.png', 'apple' => 'apple-touch-icon.png', 'badge' => 'badge-96.png', default => 'icon-512.png',
+        };
+        return new Response((string)file_get_contents($file), 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, max-age=604800']);
+    }
+
+    /** The service worker must live at the root of the app's secret path to control it. */
+    private function serviceWorker(): Response
+    {
+        return new Response((string)file_get_contents($this->app->root . '/app/resources/assets/sw.js'), 200, [
+            'Content-Type' => 'text/javascript; charset=utf-8', 'Cache-Control' => 'no-cache', 'Service-Worker-Allowed' => $this->base . '/',
+            'Content-Security-Policy' => "default-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'"]);
     }
 
     private function passwordLogin(Request $req): Response

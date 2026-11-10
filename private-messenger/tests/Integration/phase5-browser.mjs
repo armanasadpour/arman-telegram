@@ -10,7 +10,7 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 const [BASE, ROOT, DBN, DBU, DBP] = process.argv.slice(2);
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 const browser = await chromium.launch({ ...(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {}),
-  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
+  args: ['--ignore-certificate-errors', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
 async function appReady(p, timeout = 30000) {
   await p.waitForSelector('.c-side-head h1, .c-rk', { timeout });
   if (await p.$('.c-rk')) { // first device: confirm the recovery key like a user would
@@ -36,6 +36,7 @@ await admin.click('summary'); await admin.check('input[name=db_mode][value=manua
 await admin.fill('input[name=db_name]', DBN); await admin.fill('input[name=db_user]', DBU); await admin.fill('input[name=db_pass]', DBP); await admin.fill('input[name=db_host]', '127.0.0.1');
 await admin.fill('input[name=admin_password]', 'Admin strong pass 123'); await admin.fill('input[name=admin_password2]', 'Admin strong pass 123');
 await admin.click('form button');
+await admin.waitForSelector('text=نصب کامل شد', { timeout: 60000 });
 const [ADM, APP] = [...new Set((await admin.content()).match(/https:\/\/[^/"<]+\/[A-Za-z0-9]{16}\//g))];
 await admin.goto(ADM);
 await admin.fill('input[name=username]', 'admin'); await admin.fill('input[name=password]', 'Admin strong pass 123'); await admin.click('button');
@@ -62,7 +63,7 @@ check('setup', true);
 
 // ---------------------------------------------------------------- search & follow
 console.log('\n# Finding users: search + follow (no list of all members)');
-await alice.click('text=گفتگوی جدید');
+await alice.click('[aria-label="گفتگوی جدید"]');
 await alice.waitForSelector('dialog .small.muted:has-text("هنوز کسی را دنبال نکرده‌اید")', { timeout: T });
 const SHOTS0 = process.env.SHOTS;
 check('new-chat dialog does not list members by default', (await alice.locator('dialog .c-user').count()) === 0);
@@ -127,7 +128,7 @@ check('mute toggles the microphone', !!(await alice.$('[aria-label="وصل می�
 await alice.click('[aria-label="خاموش کردن دوربین"]');
 check('camera can be turned off', !!(await alice.$('[aria-label="روشن کردن دوربین"]')));
 console.log('\n# Busy');
-await carol.click('text=گفتگوی جدید'); await carol.fill('dialog input[type=search]', 'باب');
+await carol.click('[aria-label="گفتگوی جدید"]'); await carol.fill('dialog input[type=search]', 'باب');
 await carol.click('dialog .c-user:has-text("باب") button:text-is("گفتگو")');
 await carol.waitForSelector('.c-compose textarea', { timeout: T });
 await carol.click('[aria-label="تماس صوتی"]');
@@ -152,10 +153,10 @@ await alice.click('.cl-overlay [aria-label="پایان تماس"]');
 await bob.waitForSelector('.c-toast:has-text("تماس ازدست‌رفته")', { timeout: T });
 check('caller hangs up before answer → «missed call» for Bob', !(await bob.$('.cl-overlay')));
 check('statuses: ended, rejected, cancelled (+ carol\'s busy attempt)', sql("SELECT GROUP_CONCAT(status ORDER BY id) FROM calls") === 'ended,cancelled,rejected,cancelled', sql("SELECT GROUP_CONCAT(status ORDER BY id) FROM calls"));
-await bob.click('text=تماس‌ها');
-await bob.waitForSelector('dialog .c-item', { timeout: T });
-check('call history lists the calls', (await bob.locator('dialog .c-item').count()) === 4);
-await bob.click('dialog >> text=بستن');
+await bob.click('.c-tab[data-tab=calls]');
+await bob.waitForSelector('.c-list .c-call', { timeout: T });
+check('call history lists the calls', (await bob.locator('.c-list .c-call').count()) === 4);
+await bob.click('.c-tab[data-tab=chats]');
 await admin.goto(ADM);
 check('admin dashboard shows call statistics (counts only)', (await admin.textContent('main')).includes('تماس‌ها — ۲۴ ساعت'));
 

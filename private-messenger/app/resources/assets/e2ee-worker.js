@@ -245,7 +245,9 @@ async function deliver(cid, peerId, mid, payload, attachmentIds = [], attempt = 
   }
   await write(sessionOps(Object.keys(targets)));
   try {
-    await api('/messages', { method: 'POST', body: { conversation_id: cid, client_msg_id: mid, protocol_version: 1, envelopes, attachment_ids: attachmentIds } });
+    // notify: a visible message → the server may wake recipients' closed apps (push carries no content).
+    const notify = ['text', 'file'].includes(JSON.parse(payload).t);
+    await api('/messages', { method: 'POST', body: { conversation_id: cid, client_msg_id: mid, protocol_version: 1, envelopes, attachment_ids: attachmentIds, notify } });
   } catch (e) {
     if (e.message === 'devices_mismatch' && attempt < 2) {
       for (const d of e.data.stale || []) sessions.delete(d);
@@ -401,7 +403,7 @@ function validPayload(p, env) {
     case 'read': return Array.isArray(b.mids) && b.mids.length <= 200 && b.mids.every((x) => validStr(x, 30));
     case 'group_state': return validStr(b.name, 100) && Number.isSafeInteger(b.version) && b.version > 0 && validStr(b.owner, 26)
       && Array.isArray(b.members) && b.members.length <= 64 && b.members.every((x) => validStr(x, 26))
-      && Array.isArray(b.admins) && b.admins.every((x) => b.members.includes(x));
+      && Array.isArray(b.admins) && b.admins.every((x) => b.members.includes(x)) && typeof (b.channel ?? false) === 'boolean';
     case 'call': return validStr(b.call_id, 26) && CALL_ACTIONS.includes(b.action) && (b.sdp == null || validStr(b.sdp, 30000)) && typeof (b.video ?? false) === 'boolean';
     default: return EVENT_TYPES.includes(p.t) && validStr(b.target, 30);
   }
@@ -455,7 +457,11 @@ async function receive(env) {
   if (p.t === 'text' || p.t === 'file') {
     const mine = p.su === me.id; // sent from another of my devices
     let rflag = flag;
-    if (!mine) { const g = await get('groups', p.cid); if (g && !g.members.includes(p.su)) rflag = 'not_in_roster'; }
+    if (!mine) {
+      const g = await get('groups', p.cid);
+      if (g && !g.members.includes(p.su)) rflag = 'not_in_roster';
+      else if (g?.channel && !g.admins.includes(p.su)) return fail('not_channel_admin', ops); // only admins post in a channel
+    }
     const m = { ...base, dir: mine ? 'out' : 'in', status: mine ? 'sent' : 'received', ts: mine ? p.ts : base.ts, text: p.body.text || '', reply_to: p.body.reply_to || null,
       flag: rflag, fwd: p.body.fwd === true, att: p.t === 'file' ? sanitizeAtt(p.body.att) : null };
     await putMessage(m, ops); emit('message', m);
@@ -519,14 +525,16 @@ async function sysMessage(cid, text) {
 async function applyGroupState(cid, from, st, ts) {
   const local = await get('groups', cid);
   if (local ? !(local.admins.includes(from) && st.version > local.version) : !st.admins.includes(from)) return false;
-  const next = { cid, name: st.name, version: st.version, members: [...new Set(st.members)], admins: [...new Set(st.admins)], owner: st.owner, updated: ts };
+  // "channel" is fixed when the group is created and can never be switched later.
+  const next = { cid, name: st.name, version: st.version, members: [...new Set(st.members)], admins: [...new Set(st.admins)], owner: st.owner, updated: ts,
+    channel: local ? !!local.channel : st.channel === true };
   await write([['groups', next]]);
   serverMembers.delete(cid);
-  const mine = from === me.id, fa = (n) => n.toLocaleString('fa-IR');
-  if (!local) await sysMessage(cid, mine ? `گروه «${st.name}» را ساختید.` : `شما به گروه «${st.name}» اضافه شدید.`);
+  const mine = from === me.id, fa = (n) => n.toLocaleString('fa-IR'), kind = next.channel ? 'کانال' : 'گروه';
+  if (!local) await sysMessage(cid, mine ? `${kind} «${st.name}» را ساختید.` : `شما به ${kind} «${st.name}» اضافه شدید.`);
   else {
     const added = next.members.filter((x) => !local.members.includes(x)).length, removed = local.members.filter((x) => !next.members.includes(x)).length;
-    if (local.name !== next.name) await sysMessage(cid, mine ? `نام گروه را به «${next.name}» تغییر دادید.` : `یک مدیر نام گروه را به «${next.name}» تغییر داد.`);
+    if (local.name !== next.name) await sysMessage(cid, mine ? `نام ${kind} را به «${next.name}» تغییر دادید.` : `یک مدیر نام ${kind} را به «${next.name}» تغییر داد.`);
     if (added) await sysMessage(cid, mine ? `${fa(added)} عضو جدید اضافه کردید.` : `یک مدیر ${fa(added)} عضو جدید اضافه کرد.`);
     if (removed) await sysMessage(cid, !next.members.includes(me.id) ? 'شما از گروه حذف شدید.' : mine ? `${fa(removed)} عضو را از گروه حذف کردید.` : `${fa(removed)} عضو از گروه حذف شد.`);
     if (next.admins.length !== local.admins.length) await sysMessage(cid, 'مدیران گروه تغییر کردند.');
@@ -540,7 +548,7 @@ async function publishGroupState(cid, mutate) {
   if (!g || !g.admins.includes(me.id)) throw new Error('not_group_admin');
   const next = mutate({ ...g, members: [...g.members], admins: [...g.admins] });
   next.version = g.version + 1;
-  const body = { name: next.name, version: next.version, members: next.members, admins: next.admins.filter((a) => next.members.includes(a)), owner: next.owner };
+  const body = { name: next.name, version: next.version, members: next.members, admins: next.admins.filter((a) => next.members.includes(a)), owner: next.owner, channel: !!g.channel };
   const mid = newId();
   await write([['events', { mid, applied: true }]]);
   await applyGroupState(cid, me.id, body, Date.now());
@@ -718,7 +726,7 @@ async function start() {
   if (!self.indexedDB || !self.crypto?.subtle || !self.WebAssembly || !navigator.locks) return { state: 'unsupported' };
   await init();
   const boot = await api('/bootstrap');
-  me = boot.me; notifyCfg = boot.notify || notifyCfg;
+  me = boot.me; notifyCfg = boot.notify || notifyCfg; bootInfo = { retention_days: boot.retention_days || 7, version: boot.version || '' };
   // One tab at a time: two tabs advancing the same ratchet would corrupt it.
   const got = await new Promise((resolve) => {
     navigator.locks.request(`pm-e2ee-${me.id}`, { ifAvailable: true }, (lock) => {
@@ -747,7 +755,7 @@ async function start() {
   }
   return ready(boot.name);
 }
-let notifyCfg = { enabled: true, preview: 'none' };
+let notifyCfg = { enabled: true, preview: 'none' }, bootInfo = { retention_days: 7, version: '' };
 async function ready(name) {
   const st = await api('/bootstrap');
   await replenish(st.device?.otk_count ?? OTK_TARGET);
@@ -759,7 +767,7 @@ async function ready(name) {
   syncOnce().then(schedule);
   let needsRecovery = false;
   try { await api('/me/key-backup'); } catch (e) { needsRecovery = e.status === 404; }
-  return { state: 'ready', me, device_id: deviceId, name, needs_recovery: needsRecovery, notify: notifyCfg };
+  return { state: 'ready', me, device_id: deviceId, name, needs_recovery: needsRecovery, notify: notifyCfg, info: bootInfo };
 }
 
 async function conversations() {
@@ -769,7 +777,7 @@ async function conversations() {
     const last = rows.length ? await readMessage(rows[0]) : null;
     c.last = last ? { text: last.deleted ? '' : last.text, att: last.att ? last.att.kind : null, deleted: !!last.deleted, flag: last.flag, ts: last.ts, dir: last.dir } : null;
     c.unread = rows.filter((r) => r.dir === 'in' && r.status === 'received').length;
-    if (c.type === 'group') { const g = await get('groups', c.id); c.name = g?.name || 'گروه'; c.is_admin = !!g?.admins.includes(me.id); c.has_state = !!g; }
+    if (c.type === 'group') { const g = await get('groups', c.id); c.name = g?.name || (c.channel ? 'کانال' : 'گروه'); c.is_admin = !!g?.admins.includes(me.id); c.has_state = !!g; if (g) c.channel = !!g.channel; }
   }
   return list;
 }
@@ -792,9 +800,14 @@ const commands = {
   async link_reject({ id }) { await api(`/device-links/${id}/reject`, { method: 'POST', body: {} }); },
   async my_devices() { return (await api('/me/devices')).devices; },
   async revoke_device({ id }) { await api(`/devices/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: {} }); await contact(me.id, true); },
-  async create_group({ name, members }) {
-    const { id } = await api('/groups', { method: 'POST', body: { members } });
-    const body = { name: String(name).trim().slice(0, 100) || 'گروه', version: 1, members: [me.id, ...members], admins: [me.id], owner: me.id };
+  conv_prefs: ({ cid, prefs }) => api(`/conversations/${encodeURIComponent(cid)}/prefs`, { method: 'POST', body: prefs }),
+  async presence({ cid }) { const r = await api(`/conversations/${encodeURIComponent(cid)}/presence`); return { online: r.devices.length > 0, seen: r.peer_seen }; },
+  push_config: () => api('/push'),
+  push_subscribe: ({ sub }) => api('/push', { method: 'POST', body: sub }),
+  push_remove: () => api('/push/remove', { method: 'POST', body: {} }),
+  async create_group({ name, members, channel = false }) {
+    const { id } = await api('/groups', { method: 'POST', body: { members, channel: !!channel } });
+    const body = { name: String(name).trim().slice(0, 100) || (channel ? 'کانال' : 'گروه'), version: 1, members: [me.id, ...members], admins: [me.id], owner: me.id, channel: !!channel };
     const mid = newId();
     await write([['events', { mid, applied: true }]]);
     await applyGroupState(id, me.id, body, Date.now());
@@ -808,7 +821,7 @@ const commands = {
       m.in_roster = !!g?.members.includes(m.id);
       try { const c = m.id === me.id ? null : await contact(m.id); m.key_changed = !!c?.pending_msk; } catch { m.key_changed = false; }
     }
-    return { name: g?.name || 'گروه', admins: g?.admins || [], owner: g?.owner, members, me: me.id, is_admin: !!g?.admins.includes(me.id) };
+    return { name: g?.name || 'گروه', admins: g?.admins || [], owner: g?.owner, members, me: me.id, is_admin: !!g?.admins.includes(me.id), channel: !!g?.channel };
   },
   async group_add({ cid, user_id }) {
     await api(`/groups/${cid}/members`, { method: 'POST', body: { user_id } });
@@ -912,16 +925,35 @@ const commands = {
     return blob;
   },
   async media({ cid }) { return (await messages(cid, 2000)).filter((m) => m.att && !m.deleted); },
-  async search({ q }) {
+  /** Local search (nothing leaves the device). kind: '' | image | video | audio | file | link; cid limits to one chat. */
+  async search({ q = '', kind = '', cid = null }) {
     const needle = norm(q).trim();
-    if (needle.length < 2) return [];
+    if (needle.length < 2 && !kind) return [];
     const out = [];
-    for (const row of await getAll('messages')) {
+    const rows = cid ? await convRows(cid) : await getAll('messages');
+    for (const row of rows) {
       const m = await readMessage(row);
-      if (!m.deleted && (norm(m.text || '').includes(needle) || norm(m.att?.name || '').includes(needle))) out.push({ mid: m.mid, cid: m.cid, ts: m.ts, dir: m.dir, text: m.text || m.att?.name || '' });
+      if (m.deleted || m.dir === 'sys') continue;
+      if (kind === 'link' ? !/https?:\/\/\S+/i.test(m.text || '') : kind && m.att?.kind !== kind) continue;
+      if (needle.length >= 2 && !(norm(m.text || '').includes(needle) || norm(m.att?.name || '').includes(needle))) continue;
+      out.push({ mid: m.mid, cid: m.cid, ts: m.ts, dir: m.dir, from: m.from, text: m.text || m.att?.name || '', kind: m.att?.kind || (kind === 'link' ? 'link' : 'text'), thumb: m.att?.thumb || null, size: m.att?.size || 0 });
     }
-    return out.sort((a, b) => b.ts - a.ts).slice(0, 50);
+    return out.sort((a, b) => b.ts - a.ts).slice(0, kind ? 300 : 80);
   },
+  /** Deletes this chat's history from THIS device only (other devices and members are not affected). */
+  async clear_chat({ cid }) {
+    const rows = await convRows(cid);
+    if (rows.length) await write(rows.map((r) => ['messages', undefined, r.mid]));
+    for (const r of rows) fileCache.delete(r.mid);
+    emit('conversations_changed', {});
+    return rows.length;
+  },
+  async storage_info() {
+    const est = await navigator.storage?.estimate?.().catch(() => null);
+    const persisted = await navigator.storage?.persisted?.().catch(() => false);
+    return { messages: (await getAll('messages')).length, usage: est?.usage ?? null, quota: est?.quota ?? null, persisted: !!persisted, cached_files: fileCache.size };
+  },
+  clear_file_cache() { const n = fileCache.size; fileCache.clear(); return n; },
   async contact_state({ user_id }) { const c = await contact(user_id); return { verified: !!c.verified, pending: !!c.pending_msk }; },
   safety: ({ user_id }) => safety(user_id),
   async verify({ user_id }) { const c = await get('contacts', user_id); if (c && !c.pending_msk) await write([['contacts', { ...c, verified: true }, user_id]]); },

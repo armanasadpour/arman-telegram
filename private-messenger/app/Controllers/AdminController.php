@@ -430,8 +430,9 @@ final class AdminController extends Controller
                 'limits.send_per_hour' => $int($req->input('limit_send', (string)$s->get('limits.send_per_hour')), 100, 100000, 'سقف ارسال'),
                 'limits.search_per_hour' => $int($req->input('limit_search', (string)$s->get('limits.search_per_hour')), 10, 10000, 'سقف جست‌وجو'),
                 'limits.claim_per_hour' => $int($req->input('limit_claim', (string)$s->get('limits.claim_per_hour')), 50, 100000, 'سقف دریافت کلید'),
-                'notify.enabled' => $req->input('notify_enabled') === '1',
+                'notify.enabled' => $req->input('_notify_section') === '1' ? $req->input('notify_enabled') === '1' : (bool)$s->get('notify.enabled'),
                 'notify.preview' => $req->input('notify_preview') === 'sender' ? 'sender' : 'none',
+                'push.enabled' => $req->input('_notify_section') === '1' ? $req->input('push_enabled') === '1' : (bool)$s->get('push.enabled'),
             ];
             if ($new['sms.generic_url'] !== '' && !str_starts_with($new['sms.generic_url'], 'https://')) {
                 throw new UserError('آدرس وب‌هوک پیامک باید با https:// شروع شود.');

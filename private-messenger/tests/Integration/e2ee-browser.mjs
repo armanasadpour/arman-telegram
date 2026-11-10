@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 
 const [BASE, ROOT, DBN, DBU, DBP] = process.argv.slice(2);
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
-const browser = await chromium.launch(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {});
+const browser = await chromium.launch({ ...(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {}), args: ['--ignore-certificate-errors'] });
 async function appReady(p, timeout = 30000) {
   await p.waitForSelector('.c-side-head h1, .c-rk', { timeout });
   if (await p.$('.c-rk')) { // first device: confirm the recovery key like a user would
@@ -37,6 +37,7 @@ await admin.fill('input[name=db_name]', DBN); await admin.fill('input[name=db_us
 await admin.fill('input[name=db_host]', '127.0.0.1');
 await admin.fill('input[name=admin_password]', 'Admin strong pass 123'); await admin.fill('input[name=admin_password2]', 'Admin strong pass 123');
 await admin.click('form button');
+await admin.waitForSelector('text=نصب کامل شد', { timeout: 60000 });
 const urls = [...new Set((await admin.content()).match(/https:\/\/[^/"<]+\/[A-Za-z0-9]{16}\//g))];
 const [ADM, APP] = urls;
 check('installed', !!ADM && !!APP);
@@ -82,7 +83,7 @@ check('server stores only 32-byte public keys', keyBytes === '32/32', keyBytes);
 // ---------------------------------------------------------------- messaging
 console.log('\n# Messaging');
 const CANARY1 = 'سلام باب CANARY-ALICE-7f3a', CANARY2 = 'سلام آلیس CANARY-BOB-91c2';
-await alice.click('text=گفتگوی جدید');
+await alice.click('[aria-label="گفتگوی جدید"]');
 await alice.fill('dialog input[type=search]', 'باب'); await alice.click('dialog .c-user:has-text("باب") button:text-is("گفتگو")');
 await alice.fill('.c-compose textarea', CANARY1);
 await alice.press('.c-compose textarea', 'Enter');
@@ -136,7 +137,7 @@ check('history survives reload (decrypted locally from encrypted IndexedDB)', !!
 const tab2 = await page(aCtx); await tab2.goto(APP);
 check('second tab is refused (one ratchet writer at a time)', !!(await tab2.waitForSelector('text=در یک تب یا پنجره دیگر باز است', { timeout: 15000 })));
 await tab2.close();
-await alice.click('text=خروج');
+alice.once('dialog', (d) => d.accept()); await alice.click('.c-tab[data-tab=settings]'); await alice.click('text=خروج از حساب');
 await alice.fill('input[name=username]', 'alice'); await alice.fill('input[name=password]', 'Alice strong pass 1'); await alice.click('button');
 await ready(alice);
 check('after logout/login the browser re-binds to its device with a signed challenge', sql("SELECT COUNT(*) FROM devices WHERE status='active'") === '2');

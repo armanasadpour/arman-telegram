@@ -9,7 +9,7 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 const [BASE, ROOT, DBN, DBU, DBP] = process.argv.slice(2);
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 const browser = await chromium.launch({ ...(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {}),
-  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
+  args: ['--ignore-certificate-errors', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => { if (cond) { pass++; console.log('  \x1b[32m✔\x1b[0m', name); } else { fail++; console.log('  \x1b[31m✘', name, '\x1b[0m', extra); } };
 const sql = (q) => execFileSync('mysql', ['-N', '-u', DBU, `-p${DBP}`, '-h', '127.0.0.1', DBN, '-e', q]).toString().trim();
@@ -17,6 +17,9 @@ const errors = [];
 const newPage = async () => { const c = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1200, height: 820 }, permissions: ['microphone', 'camera'] });
   const p = await c.newPage(); p.on('pageerror', (e) => errors.push(e.message)); p.on('dialog', (d) => d.accept()); return p; };
 const T = 30000;
+// Devices now live under Settings; the list returns to «chats» underneath the (modal) dialog.
+const openDevices = async (p) => { await p.click('.c-tab[data-tab=settings]'); await p.click('.c-devbtn'); await p.waitForSelector('dialog', { timeout: T });
+  await p.evaluate(() => document.querySelector('.c-tab[data-tab=chats]').click()); };
 const pages = {};
 process.on('uncaughtException', async (e) => { console.log('FAIL:', e.message.split('\n')[0]);
   for (const [n, p] of Object.entries(pages)) { try { console.log(`--- ${n}:`, (await p.evaluate(() => document.body.innerText)).slice(-700)); } catch {} }
@@ -33,6 +36,7 @@ await admin.click('summary'); await admin.check('input[name=db_mode][value=manua
 await admin.fill('input[name=db_name]', DBN); await admin.fill('input[name=db_user]', DBU); await admin.fill('input[name=db_pass]', DBP); await admin.fill('input[name=db_host]', '127.0.0.1');
 await admin.fill('input[name=admin_password]', 'Admin strong pass 123'); await admin.fill('input[name=admin_password2]', 'Admin strong pass 123');
 await admin.click('form button');
+await admin.waitForSelector('text=نصب کامل شد', { timeout: 60000 });
 const [ADM, APP] = [...new Set((await admin.content()).match(/https:\/\/[^/"<]+\/[A-Za-z0-9]{16}\//g))];
 await admin.goto(ADM);
 await admin.fill('input[name=username]', 'admin'); await admin.fill('input[name=password]', 'Admin strong pass 123'); await admin.click('button');
@@ -82,7 +86,7 @@ pages.a1 = a1;
 const bob = await firstLogin('bob'); pages.bob = bob; await confirmRecovery(bob);
 const carol = await firstLogin('carol'); await confirmRecovery(carol);
 const dave = await firstLogin('dave'); await confirmRecovery(dave);
-await bob.click('text=گفتگوی جدید'); await bob.fill('dialog input[type=search]', 'آلیس'); await bob.click('dialog .c-user:has-text("آلیس") button:text-is("گفتگو")');
+await bob.click('[aria-label="گفتگوی جدید"]'); await bob.fill('dialog input[type=search]', 'آلیس'); await bob.click('dialog .c-user:has-text("آلیس") button:text-is("گفتگو")');
 await send(bob, 'سلام آلیس از باب');
 await a1.waitForSelector('.c-item:has-text("باب")', { timeout: T });
 
@@ -95,7 +99,7 @@ await a2.waitForSelector('.c-code', { timeout: T });
 const code2 = (await a2.textContent('.c-code')).trim();
 check('new device shows an 8-digit verification code', /^\d{4} \d{4}$/.test(code2), code2);
 await a1.waitForSelector('.c-toast:has-text("درخواست اتصال دستگاه جدید")', { timeout: T });
-await a1.click('.c-devbtn');
+await openDevices(a1);
 await a1.waitForSelector('dialog .c-code', { timeout: T });
 const code1 = (await a1.textContent('dialog .c-code')).trim();
 check('the existing device shows the SAME code (derived from the new device\'s keys)', code1 === code2, `${code1} / ${code2}`);
@@ -131,7 +135,7 @@ await send(bob, 'سلام به هر سه');
 await a3.waitForSelector('.c-item:has-text("باب")', { timeout: T }); await openChat(a3, 'باب');
 await a3.waitForSelector('.c-msg.in:has-text("سلام به هر سه")', { timeout: T });
 check('the restored device receives new messages', true);
-await a1.click('.c-devbtn'); await a1.waitForSelector('dialog .c-item', { timeout: T });
+await openDevices(a1); await a1.waitForSelector('dialog .c-item', { timeout: T });
 check('devices dialog lists 3 devices', (await a1.locator('dialog .c-item').count()) === 3);
 await a1.locator('dialog .c-item').last().locator('text=خروج').click();
 await a1.waitForSelector('.c-toast:has-text("دستگاه جدا شد")', { timeout: T });
@@ -154,7 +158,7 @@ await a1.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { t
 // ---------------------------------------------------------------- groups
 console.log('\n# End-to-end encrypted groups');
 const GNAME = 'تیم GROUP-CANARY';
-await a1.click('text=گروه جدید');
+await a1.click('[aria-label="گفتگوی جدید"]'); await a1.click('dialog >> text=گروه جدید');
 await a1.fill('dialog input[placeholder="نام گروه"]', GNAME);
 for (const n of ['باب', 'کارول']) { await a1.fill('dialog input[type=search]', n); await a1.click(`dialog .c-user:has-text("${n}") >> text=افزودن`); }
 await a1.click('dialog >> text=ساخت گروه');

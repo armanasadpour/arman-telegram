@@ -19,6 +19,7 @@ echo "== phase 4 (browser)"; fresh; node tests/Integration/phase4-browser.mjs ht
 echo "== phase 5 (browser)"; fresh; node tests/Integration/phase5-browser.mjs https://pm.test $H/private-messenger pm_e2e pme2e E2e-db-pass | tail -1 || R=1
 echo "== phase 6 (browser)"; fresh; node tests/Integration/phase6-browser.mjs https://pm.test $H/private-messenger pm_e2e pme2e E2e-db-pass | tail -1 || R=1
 echo "== phase 7 (browser)"; fresh; node tests/Integration/phase7-browser.mjs https://pm.test $H/private-messenger pm_e2e pme2e E2e-db-pass | tail -1 || R=1
+echo "== phase 8 (browser)"; fresh; node tests/Integration/phase8-browser.mjs https://pm.test $H/private-messenger pm_e2e pme2e E2e-db-pass | tail -1 || R=1
 echo "== installer failure path"; fresh
 mysql -e "DROP DATABASE IF EXISTS pm_fail; CREATE DATABASE pm_fail CHARACTER SET latin1; DROP USER IF EXISTS 'pmlimited'@'127.0.0.1'; CREATE USER 'pmlimited'@'127.0.0.1' IDENTIFIED BY 'Limited-pass1'; GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ON pm_fail.* TO 'pmlimited'@'127.0.0.1';"
 php tests/Integration/install-failure.php | tail -1 || R=1

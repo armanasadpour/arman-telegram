@@ -37,6 +37,7 @@ final class CallService
         $id = $this->db->insert('INSERT INTO calls (public_id, conversation_id, caller_user_id, callee_user_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
             [$pub, $c['id'], $meId, $c['peer'], 'ringing', $now]);
         $this->db->run('INSERT INTO call_participants (call_id, user_id, joined_at) VALUES (?, ?, ?)', [$id, $meId, $now]);
+        \PM\Push\PushService::queue('call', (int)$c['id'], $meId, 0); // wakes the callee's closed apps ("incoming call", nothing else)
         return $pub;
     }
 

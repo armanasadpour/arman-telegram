@@ -27,7 +27,8 @@ abstract class Controller
     {
         $vars['csrf'] = Csrf::token($req);
         $vars['base'] = $this->base;
-        $vars['asset'] = fn (string $f): string => $this->base . '/assets/' . $f . '?v=' . $this->assetVersion($f);
+        $assetBase = $vars['assetBase'] ?? $this->base; // e.g. the installer's last page: /install is already closed
+        $vars['asset'] = fn (string $f): string => $assetBase . '/assets/' . $f . '?v=' . $this->assetVersion($f);
         return Csrf::attach($req, Response::html($this->view->render($template, $vars), $status));
     }
 
@@ -71,7 +72,7 @@ abstract class Controller
     {
         $accent = (string)$this->app->settings()->get('app.accent');
         if (!isset(\PM\Settings\Settings::ACCENTS[$accent])) {
-            $accent = '#2563eb';
+            $accent = '#7c3aed';
         }
         [$r, $g, $b] = sscanf($accent, '#%02x%02x%02x');
         return new Response(":root { --accent: $accent; --accent-soft: rgba($r, $g, $b, .08); }\n", 200,

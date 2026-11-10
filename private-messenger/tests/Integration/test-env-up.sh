@@ -2,6 +2,7 @@
 # Brings up the local integration-test environment (development machine only):
 # MariaDB, Apache+HTTPS vhost "pm.test" (see docs in tests), mock cPanel API on :2099.
 grep -q " pm.test" /etc/hosts || echo "127.0.0.1 pm.test" >> /etc/hosts
+grep -q " push.test" /etc/hosts || echo "127.0.0.1 push.test" >> /etc/hosts
 if ! mysqladmin ping >/dev/null 2>&1; then
   mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
   (mysqld_safe --user=mysql >/dev/null 2>&1 &)

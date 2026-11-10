@@ -31,6 +31,9 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
       <option value="none" <?= $v('notify.preview') === 'none' ? 'selected' : '' ?>>فقط «پیام جدید» — بدون نام فرستنده (امن‌ترین)</option>
       <option value="sender" <?= $v('notify.preview') === 'sender' ? 'selected' : '' ?>>نام فرستنده یا گروه</option>
     </select></label>
+    <input type="hidden" name="_notify_section" value="1">
+    <label class="check"><input type="checkbox" name="push_enabled" value="1" <?= $v('push.enabled') ? 'checked' : '' ?> <?= $dis ?>> اعلان وقتی برنامه بسته است (Web Push از طریق سرویس اعلان گوگل/اپل/موزیلا/مایکروسافت)</label>
+    <p class="small muted">در Web Push فقط «نوع رویداد + شناسه گفتگو» به‌صورت رمزنگاری‌شده برای دستگاه فرستاده می‌شود؛ سرویس اعلان نه متن را می‌بیند و نه نام را. اما می‌فهمد که یک دستگاه در چه زمانی اعلان گرفته است. اگر سرور شما به این سرویس‌ها دسترسی نداشته باشد (مثلاً فیلتر)، اعلان فقط وقتی برنامه باز است کار می‌کند.</p>
     <p class="small muted">متن پیام هرگز در اعلان نمایش داده نمی‌شود (اعلان روی صفحه قفل گوشی دیده می‌شود). اعلان فقط وقتی برنامه باز است (حتی در پس‌زمینه) کار می‌کند؛ اعلان در حالت بسته (Web Push) در این نسخه وجود ندارد.</p>
   </div>
   <div class="panel">

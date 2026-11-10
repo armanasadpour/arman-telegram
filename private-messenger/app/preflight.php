@@ -40,7 +40,7 @@ function pm_preflight_page($title, $items)
         $li .= '<li>' . htmlspecialchars($i, ENT_QUOTES, 'UTF-8') . '</li>';
     }
     echo '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="robots" content="noindex">'
-        . '<meta name="viewport" content="width=device-width, initial-scale=1"><title>نصب</title></head>'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"><title>نصب</title></head>'
         . '<body style="font-family:Tahoma,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.9">'
         . '<h1 style="font-size:20px">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1><ul>' . $li . '</ul></body></html>';
 }

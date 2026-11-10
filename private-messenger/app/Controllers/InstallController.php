@@ -76,7 +76,7 @@ final class InstallController extends Controller
         }
         @unlink($tokenFile);
         $this->removeSingleFileInstaller($req);
-        $res = $this->page($req, 'install/done', $result + ['checks' => $checks, 'host' => $req->host(), 'root' => $this->app->root]);
+        $res = $this->page($req, 'install/done', $result + ['checks' => $checks, 'host' => $req->host(), 'root' => $this->app->root, 'assetBase' => '/' . $result['admin_path']]);
         return $res->forgetCookie(self::COOKIE);
     }
 

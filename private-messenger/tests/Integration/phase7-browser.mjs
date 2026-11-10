@@ -11,7 +11,7 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 
 const [BASE, ROOT, DBN, DBU, DBP] = process.argv.slice(2);
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
-const browser = await chromium.launch({ ...(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {}) });
+const browser = await chromium.launch({ ...(proxy ? { proxy: { server: proxy, bypass: new URL(BASE).hostname } } : {}), args: ['--ignore-certificate-errors'] });
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => { if (cond) { pass++; console.log('  \x1b[32m✔\x1b[0m', name); } else { fail++; console.log('  \x1b[31m✘', name, '\x1b[0m', extra); } };
 const sql = (q) => execFileSync('mysql', ['-N', '-u', DBU, `-p${DBP}`, '-h', '127.0.0.1', DBN, '-e', q]).toString().trim();
@@ -41,6 +41,7 @@ await admin.click('summary'); await admin.check('input[name=db_mode][value=manua
 await admin.fill('input[name=db_name]', DBN); await admin.fill('input[name=db_user]', DBU); await admin.fill('input[name=db_pass]', DBP); await admin.fill('input[name=db_host]', '127.0.0.1');
 await admin.fill('input[name=admin_password]', 'Admin strong pass 123'); await admin.fill('input[name=admin_password2]', 'Admin strong pass 123');
 await admin.click('form button');
+await admin.waitForSelector('text=نصب کامل شد', { timeout: 60000 });
 let [ADM, APP] = [...new Set((await admin.content()).match(/https:\/\/[^/"<]+\/[A-Za-z0-9]{16}\//g))];
 const adminLogin = async (p, u, pw) => { await p.goto(ADM); await p.fill('input[name=username]', u); await p.fill('input[name=password]', pw); await p.click('button'); };
 await adminLogin(admin, 'admin', 'Admin strong pass 123');

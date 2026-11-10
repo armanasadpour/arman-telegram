@@ -23,7 +23,7 @@ function pm_page($title, $html, $status)
         header('Content-Type: text/html; charset=utf-8', true, $status);
     }
     echo '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="robots" content="noindex">'
-        . '<meta name="viewport" content="width=device-width, initial-scale=1"><title>نصب</title><style>'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"><title>نصب</title><style>'
         . 'body{font-family:IRANSans,Tahoma,sans-serif;background:#f4f6f9;color:#111827;margin:0;line-height:1.9}'
         . '.c{max-width:640px;margin:32px auto;padding:0 16px}.p{background:#fff;border-radius:14px;padding:20px;margin:12px 0}'
         . 'h1{font-size:21px}.ok{color:#0f7b45}.bad{color:#b42318}.warn{background:#fff6db;color:#7a5200;padding:10px;border-radius:10px}'
