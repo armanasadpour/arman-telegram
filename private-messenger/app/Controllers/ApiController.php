@@ -76,6 +76,7 @@ final class ApiController extends Controller
         $r->post('/api/v1/attachments/{id}/chunks/{index}', fn (Request $q) => $this->auth($q, fn () => $this->chunk($q), true));
         $r->get('/api/v1/attachments/{id}/status', fn (Request $q) => $this->auth($q, fn () => Response::json(['received' => $this->files()->received((int)$this->s['id'], $q->param('id'))]), true));
         $r->post('/api/v1/attachments/{id}/complete', fn (Request $q) => $this->auth($q, fn () => Response::json($this->files()->complete((int)$this->s['id'], $q->param('id'))), true));
+        $r->post('/api/v1/attachments/{id}/abort', fn (Request $q) => $this->auth($q, fn () => Response::json(['ok' => $this->files()->abort((int)$this->s['id'], $q->param('id'))]), true));
         $r->get('/api/v1/attachments/{id}/blob', fn (Request $q) => $this->auth($q, fn () => $this->download($q), true));
         $r->get('/api/v1/conversations/{id}/presence', fn (Request $q) => $this->auth($q, fn () => Response::json(['devices' => $this->msgs()->presentDevices((int)$this->s['id'], $q->param('id')),
             'peer_seen' => $this->msgs()->peerSeen((int)$this->s['id'], $q->param('id'))]), true));

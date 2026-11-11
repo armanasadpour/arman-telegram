@@ -1362,17 +1362,29 @@ function upPaint(mid) {
     if (sz && total) sz.textContent = size(total * f) + ' از ' + size(total);
   }
 }
+function xIcon() {
+  const svg = svgEl('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+  svg.append(svgEl('path', { d: 'M6 6l12 12M18 6L6 18', fill: 'none', stroke: 'currentColor', 'stroke-width': 2.6, 'stroke-linecap': 'round' }));
+  return svg;
+}
 function svgEl(tag, attrs) { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; }
 function uploadView(m, a, media) {
   if (!upProg.has(m.mid)) upProg.set(m.mid, { target: 0, shown: 0 });
+  const cancel = el('button', { type: 'button', class: 'up-x', 'aria-label': 'لغو ارسال', title: 'لغو ارسال', onclick: async (e) => {
+    e.stopPropagation(); e.preventDefault();
+    e.currentTarget.disabled = true;
+    upProg.delete(m.mid);
+    try { await call('cancel_upload', { mid: m.mid }); toast('ارسال لغو شد'); } catch (err) { toast(errText(err)); }
+  } }, xIcon());
   let node;
   if (media) {
     const svg = svgEl('svg', { viewBox: '0 0 48 48', class: 'up-svg', 'aria-hidden': 'true' });
     svg.append(svgEl('circle', { cx: 24, cy: 24, r: 21, class: 'up-bg' }), svgEl('circle', { cx: 24, cy: 24, r: 21, class: 'up-arc', 'stroke-dasharray': RING, 'stroke-dashoffset': RING }));
-    node = el('div', { class: 'up-ring', role: 'status', 'aria-label': 'در حال ارسال' }, el('div', { class: 'up-dial' }, svg, el('span', { class: 'up-pct' })), el('span', { class: 'up-size' }));
+    node = el('div', { class: 'up-ring', role: 'status', 'aria-label': 'در حال ارسال' }, el('div', { class: 'up-dial' }, svg, cancel), el('span', { class: 'up-cap' }, el('b', { class: 'up-pct' }), el('span', { class: 'up-size' })));
   } else {
     node = el('div', { class: 'up-bar', role: 'status', 'aria-label': 'در حال ارسال' },
-      el('div', { class: 'up-track' }, el('i', { class: 'up-fill' })), el('div', { class: 'up-txt' }, el('span', { class: 'up-size' }), el('span', { class: 'up-pct' })));
+      el('div', { class: 'up-row' }, el('div', { class: 'up-track' }, el('i', { class: 'up-fill' })), cancel),
+      el('div', { class: 'up-txt' }, el('span', { class: 'up-size' }), el('span', { class: 'up-pct' })));
   }
   node.dataset.up = m.mid; node.dataset.size = String(a.size || 0);
   queueMicrotask(() => upPaint(m.mid));
@@ -1400,6 +1412,7 @@ function attachmentView(m) {
   if (a.kind === 'image' || a.kind === 'video') {
     const thumb = a.thumb ? el('img', { src: a.thumb, alt: a.name, class: 'c-thumb' }) : el('div', { class: 'c-thumb c-ph', text: KIND[a.kind] });
     box.append(el('button', { class: 'c-media', 'aria-label': a.kind === 'video' ? 'پخش ویدیو' : 'نمایش تصویر', onclick: async () => {
+      if (uploading) return;
       const url = await open(); if (!url) return;
       const dlg = dialog(a.name, a.kind === 'video' ? el('video', { src: url, controls: true, autoplay: true, playsinline: true, class: 'c-view' }) : el('img', { src: url, alt: a.name, class: 'c-view' }),
         el('a', { class: 'btn block mt', href: url, download: a.name, text: 'ذخیره روی دستگاه' }));

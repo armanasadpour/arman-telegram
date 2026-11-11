@@ -200,7 +200,30 @@ final class AttachmentService
         $this->db->run('INSERT INTO upload_chunks (attachment_id, chunk_index, size_bytes, sha256, received_at) VALUES (?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE size_bytes = VALUES(size_bytes), sha256 = VALUES(sha256), received_at = VALUES(received_at)',
             [$a['id'], $index, $n, hex2bin($sha256Hex), Clock::db()]);
-        $this->db->run("UPDATE attachments SET upload_status = 'uploading', last_chunk_at = ? WHERE id = ?", [Clock::db(), $a['id']]);
+        $this->db->run("UPDATE attachments SET upload_status = 'uploading', last_chunk_at = ? WHERE id = ? AND upload_status IN ('initiated','uploading')", [Clock::db(), $a['id']]);
+        if ($this->db->scalar('SELECT upload_status FROM attachments WHERE id = ?', [$a['id']]) !== 'uploading') { // cancelled while this chunk was arriving: leave nothing behind
+            @unlink($part);
+            $this->db->run('DELETE FROM upload_chunks WHERE attachment_id = ?', [$a['id']]);
+            throw new UserError('upload_cancelled');
+        }
+    }
+
+    /**
+     * The sender cancelled: the partial (or finished but never sent) ciphertext is deleted at once.
+     * A file that was already sent in a message cannot be withdrawn this way.
+     */
+    public function abort(int $userId, string $publicId): bool
+    {
+        $a = $this->db->one("SELECT id, storage_key, upload_status FROM attachments WHERE public_id = ? AND uploader_user_id = ?
+                               AND upload_status IN ('initiated','uploading','complete')", [$publicId, $userId]);
+        if ($a === null || ($a['upload_status'] === 'complete' && $this->db->scalar('SELECT 1 FROM attachment_grants WHERE attachment_id = ? LIMIT 1', [$a['id']]) !== null)) {
+            return false;
+        }
+        $this->db->run("UPDATE attachments SET upload_status = 'deleted', deleted_at = ?, delete_reason = 'user' WHERE id = ?", [Clock::db(), $a['id']]);
+        @unlink($this->path($a['storage_key'], true));
+        @unlink($this->path($a['storage_key']));
+        $this->db->run('DELETE FROM upload_chunks WHERE attachment_id = ?', [$a['id']]);
+        return true;
     }
 
     /** @return list<int> received chunk indexes (for resuming) */
@@ -223,8 +246,13 @@ final class AttachmentService
         $permanent = (int)$this->db->scalar('SELECT permanent_file_retention FROM users WHERE id = ?', [$userId]) === 1;
         $now = Clock::db();
         $expires = $permanent ? null : Clock::dbIn('+' . max(1, $this->settings->int('files.retention_days')) . ' days');
-        $this->db->run("UPDATE attachments SET upload_status = 'complete', uploaded_at = ?, expires_at = ?, retention_permanent = ?,
-                        ciphertext_sha256 = ? WHERE id = ?", [$now, $expires, $permanent ? 1 : 0, hash_file('sha256', $this->path($a['storage_key']), true), $a['id']]);
+        $done = $this->db->run("UPDATE attachments SET upload_status = 'complete', uploaded_at = ?, expires_at = ?, retention_permanent = ?,
+                        ciphertext_sha256 = ? WHERE id = ? AND upload_status IN ('initiated','uploading')",
+            [$now, $expires, $permanent ? 1 : 0, hash_file('sha256', $this->path($a['storage_key']), true), $a['id']])->rowCount();
+        if ($done === 0) { // cancelled meanwhile
+            @unlink($this->path($a['storage_key']));
+            throw new UserError('upload_cancelled');
+        }
         $this->db->run('DELETE FROM upload_chunks WHERE attachment_id = ?', [$a['id']]);
         return ['expires_at' => $expires];
     }

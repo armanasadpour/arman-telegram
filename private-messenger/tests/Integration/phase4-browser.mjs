@@ -178,6 +178,47 @@ check('server stores ciphertext only (no plaintext in any stored file)', stored.
 check('stored size = plaintext + 16 bytes per 256 KiB segment', stored.some((f) => statSync(f).size === big.length + 16 * Math.ceil(big.length / 262144)));
 check('files are stored outside the web root', !stored.some((f) => f.includes('public_html')));
 
+// ---------------------------------------------------------------- cancelling an upload
+console.log('\n# Cancelling an upload (really stops it)');
+let afterCancel = 0, cancelled = false;
+const chunkRe = /\/attachments\/[0-9a-f]+\/chunks\/\d+$/;
+await aCtx.route(chunkRe, async (route) => { if (cancelled) afterCancel++; await new Promise((r) => setTimeout(r, 1200)); await route.continue().catch(() => {}); });
+const before = Number(sql("SELECT COUNT(*) FROM attachments"));
+await sendFiles(alice, [{ name: 'cancel-me.bin', mimeType: 'application/octet-stream', buffer: big }]);
+await alice.waitForSelector('.c-msg.out:has-text("cancel-me.bin") .up-bar .up-x', { timeout: T });
+await alice.waitForTimeout(1500);
+cancelled = true;
+await alice.click('.c-msg.out:has-text("cancel-me.bin") .up-x');
+await alice.waitForFunction(() => ![...document.querySelectorAll('.c-msg.out')].some((m) => m.textContent.includes('cancel-me.bin')), null, { timeout: T });
+check('file: the ✕ next to the bar removes the message', true);
+await alice.waitForTimeout(4000);
+check('file: no chunk is sent after cancelling', afterCancel === 0, `chunks after cancel: ${afterCancel}`);
+const row = sql("SELECT CONCAT(upload_status, '/', COALESCE(delete_reason, '')) FROM attachments ORDER BY id DESC LIMIT 1");
+check('file: the server marks the upload deleted (by the user)', Number(sql("SELECT COUNT(*) FROM attachments")) === before + 1 && row === 'deleted/user', row);
+const ckey = sql("SELECT storage_key FROM attachments ORDER BY id DESC LIMIT 1");
+const left = readdirSync(`${ROOT}/storage/attachments`, { recursive: true }).filter((f) => String(f).includes(ckey));
+check('file: nothing of it is left on the server disk', left.length === 0, left.join(','));
+check('file: no leftover chunk records', Number(sql("SELECT COUNT(*) FROM upload_chunks c JOIN attachments a ON a.id = c.attachment_id WHERE a.storage_key = '" + ckey + "'")) === 0);
+await alice.reload(); await alice.waitForSelector('.c-list .c-item', { timeout: T }); await openWith(alice, 'باب'); await alice.waitForSelector('.c-msg', { timeout: T });
+check('file: the message does not come back after a reload', !(await alice.$('.c-msg.out:has-text("cancel-me.bin")')));
+
+cancelled = false; afterCancel = 0;
+await sendFiles(alice, [{ name: 'cancel.png', mimeType: 'image/png', buffer: png }], 'original');
+await alice.waitForSelector('.c-msg.out .c-media .up-dial .up-x', { timeout: T });
+await alice.waitForTimeout(600);
+cancelled = true;
+const n0 = await alice.$$eval('.c-msg.out', (x) => x.length);
+await alice.click('.c-msg.out .c-media .up-x');
+await alice.waitForFunction((n) => document.querySelectorAll('.c-msg.out').length === n - 1, n0, { timeout: T });
+check('photo: the ✕ in the middle of the ring cancels it (and does not open the viewer)', !(await alice.$('dialog[open].viewer')));
+await alice.waitForTimeout(2500);
+check('photo: no chunk is sent after cancelling', afterCancel === 0, String(afterCancel));
+const row2 = sql("SELECT CONCAT(upload_status, '/', COALESCE(delete_reason, '')) FROM attachments ORDER BY id DESC LIMIT 1");
+check('photo: the server deleted it', row2 === 'deleted/user', row2);
+await aCtx.unroute(chunkRe);
+await bob.waitForTimeout(500);
+check('Bob never received either cancelled file', !(await bob.$('.c-msg.in:has-text("cancel-me.bin")')) && (await bob.$$('.c-msg.in img.c-thumb')).length === 2);
+
 // ---------------------------------------------------------------- voice and video
 console.log('\n# Voice and video');
 await alice.click('.c-compose [aria-label="ضبط پیام صوتی"]');

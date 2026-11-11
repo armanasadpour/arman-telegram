@@ -325,15 +325,24 @@ input[type=range] { accent-color: var(--accent); }
 .c-att { margin: 2px 0; }
 .c-att.busy { opacity: .6; cursor: progress; }
 /* upload progress: a ring over photos/videos, a bar under files and voice; both eased frame by frame in chat.js */
-.c-att.uploading .c-media { cursor: default; pointer-events: none; }
+.c-att.uploading .c-media { cursor: default; }
+.up-x { position: relative; display: grid; place-items: center; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; border-radius: 50%; -webkit-tap-highlight-color: transparent; }
+.up-x svg { width: 20px; height: 20px; }
+.up-dial .up-x { width: 100%; height: 100%; }
+.up-x:active { transform: scale(.9); }
+.up-x:disabled { opacity: .5; }
+.up-row { display: flex; align-items: center; gap: 8px; }
+.up-row .up-track { flex: 1; }
+.up-row .up-x { flex: none; width: 28px; height: 28px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.up-row .up-x svg { width: 14px; height: 14px; }
 .up-ring { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(0, 0, 0, .38); color: #fff; }
 .up-dial { position: relative; width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; background: rgba(0, 0, 0, .35); }
 .up-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
 .up-svg circle { fill: none; stroke-width: 3.5; }
 .up-bg { stroke: rgba(255, 255, 255, .25); }
 .up-arc { stroke: #fff; stroke-linecap: round; }
-.up-ring .up-pct { position: relative; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.up-ring .up-size { font-size: 11px; background: rgba(0, 0, 0, .45); border-radius: 999px; padding: 1px 8px; }
+.up-cap { display: flex; gap: 6px; align-items: baseline; font-size: 11px; background: rgba(0, 0, 0, .5); border-radius: 999px; padding: 2px 10px; font-variant-numeric: tabular-nums; }
+.up-cap .up-pct { font-size: 12px; }
 .up-bar { margin-top: 6px; }
 .up-track { height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); overflow: hidden; }
 .up-fill { display: block; height: 100%; background: var(--accent); border-radius: inherit; transform: scaleX(0); transform-origin: right; will-change: transform; }

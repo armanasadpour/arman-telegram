@@ -402,9 +402,12 @@ function nonce(prefix, i, last) {
   return n;
 }
 /** POST with upload progress (fetch has none): resolves {status, ok, json} like a small Response. */
-function xhrPost(url, body, headers, onProgress) {
+function xhrPost(url, body, headers, onProgress, ctl) {
   return new Promise((resolve, reject) => {
+    if (ctl?.cancelled) { reject(cancelledError()); return; }
     const x = new XMLHttpRequest();
+    if (ctl) ctl.xhr = x;
+    x.onabort = () => reject(cancelledError());
     x.open('POST', url); x.withCredentials = true;
     for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v);
     if (onProgress) x.upload.onprogress = (e) => onProgress(e.loaded);
@@ -413,32 +416,38 @@ function xhrPost(url, body, headers, onProgress) {
     x.send(body);
   });
 }
-async function putChunk(id, index, body, onProgress) {
+const cancelledError = () => Object.assign(new Error('cancelled'), { fatal: true, cancelled: true });
+const uploads = new Map(); // mid -> { cancelled, xhr, id }: lets the user stop an upload for real
+async function putChunk(id, index, body, onProgress, ctl) {
   const sha = hex(await crypto.subtle.digest('SHA-256', body));
   for (let attempt = 0; ; attempt++) {
     let status = 0;
     try {
       const r = await xhrPost(`${API}/attachments/${id}/chunks/${index}`, body,
-        { 'Content-Type': 'application/octet-stream', 'X-PM-Request': '1', 'X-Chunk-SHA256': sha }, onProgress);
+        { 'Content-Type': 'application/octet-stream', 'X-PM-Request': '1', 'X-Chunk-SHA256': sha }, onProgress, ctl);
       status = r.status;
       if (r.ok) return;
       onProgress?.(0);
       const j = await r.json().catch(() => ({}));
       if (status >= 400 && status < 500 && status !== 408 && status !== 429) throw Object.assign(new Error(j?.error?.code || `http_${status}`), { fatal: true });
       if (status === 507) throw Object.assign(new Error('insufficient_storage'), { fatal: true });
-    } catch (e) { if (e.fatal || attempt >= 7) throw e; }
+    } catch (e) { if (e.fatal || attempt >= 7 || ctl?.cancelled) throw ctl?.cancelled ? cancelledError() : e; }
     // Connection lost or server busy: wait, then ask the server what it already has (the response may have been lost).
     await sleep(Math.min(30000, 1000 * 2 ** attempt));
+    if (ctl?.cancelled) throw cancelledError();
     try { if ((await api(`/attachments/${id}/status`)).received.includes(index)) return; } catch { /* still offline */ }
   }
 }
-async function uploadFile(file, cid, mid) {
+async function uploadFile(file, cid, mid, ctl = { cancelled: false }) {
   const size = file.size, nseg = Math.max(1, Math.ceil(size / SEG)), csize = size + 16 * nseg;
   const keyRaw = crypto.getRandomValues(new Uint8Array(32)), prefix = crypto.getRandomValues(new Uint8Array(7));
   const key = await crypto.subtle.importKey('raw', keyRaw, 'AES-GCM', false, ['encrypt']);
   const up = await api('/attachments', { method: 'POST', body: { conversation_id: cid, size: csize } });
+  ctl.id = up.id;
+  if (ctl.cancelled) throw cancelledError();
   const per = up.chunk_size / SEGC;
   for (let c = 0; c < up.chunk_count; c++) {
+    if (ctl.cancelled) throw cancelledError();
     const parts = [];
     for (let s = c * per; s < Math.min(nseg, (c + 1) * per); s++) {
       const plain = new Uint8Array(await file.slice(s * SEG, Math.min(size, (s + 1) * SEG)).arrayBuffer());
@@ -450,9 +459,10 @@ async function uploadFile(file, cid, mid) {
       const now = Date.now();
       if (now - last < 120) return; // at most ~8 updates a second; the page animates between them
       last = now; emit('progress', { mid, done: Math.min(csize, base + sent), total: csize });
-    });
+    }, ctl);
     emit('progress', { mid, done: Math.min(csize, (c + 1) * up.chunk_size), total: csize });
   }
+  if (ctl.cancelled) throw cancelledError();
   const done = await api(`/attachments/${up.id}/complete`, { method: 'POST', body: {} });
   return { id: up.id, key: b64(keyRaw), prefix: b64(prefix), size, csize, exp: done.expires_at };
 }
@@ -487,12 +497,16 @@ async function sendFile(cid, peerId, file, meta, caption, replyTo, mid = newId()
   unsentFiles.set(mid, file);
   fileCache.set(mid, file);
   await putMessage(m); emit('message', m);
+  const ctl = { cancelled: false, xhr: null, id: null };
+  uploads.set(mid, ctl);
   try {
-    Object.assign(att, await uploadFile(file, cid, mid));
+    Object.assign(att, await uploadFile(file, cid, mid, ctl));
+    if (ctl.cancelled) throw cancelledError();
   } catch (e) {
+    if (ctl.cancelled) return mid; // cancel_upload already removed everything
     m.status = 'failed'; m.flag = e.message; await putMessage(m); emit('message', m);
     return mid;
-  }
+  } finally { uploads.delete(mid); }
   await write([['messages', undefined, mid]]);
   return sendMessage(cid, peerId, 'file', { att, text: caption || '', reply_to: replyTo || null }, {}, mid);
 }
@@ -995,6 +1009,16 @@ const commands = {
   },
   edit: ({ cid, peer, mid, text }) => sendEvent(cid, peer, 'edit', { target: mid, text: String(text).slice(0, MAX_TEXT) }),
   delete_all: ({ cid, peer, mid }) => sendEvent(cid, peer, 'delete', { target: mid }),
+  /** Stops the transfer at once (the request in flight is aborted), deletes what reached the server and removes the message. */
+  async cancel_upload({ mid }) {
+    const ctl = uploads.get(mid);
+    if (ctl) { ctl.cancelled = true; try { ctl.xhr?.abort(); } catch { /* finished */ } }
+    unsentFiles.delete(mid); fileCache.delete(mid);
+    await write([['messages', undefined, mid]]); emit('removed', { mid });
+    for (let i = 0; ctl && !ctl.id && i < 50; i++) await sleep(100); // the upload was still being opened
+    if (ctl?.id) await api(`/attachments/${ctl.id}/abort`, { method: 'POST', body: {} }).catch(() => { /* the server deletes unfinished uploads after 48 h */ });
+    return true;
+  },
   async delete_local({ mid }) { await write([['messages', undefined, mid]]); fileCache.delete(mid); emit('removed', { mid }); },
   react: ({ cid, peer, mid, emoji }) => sendEvent(cid, peer, 'reaction', { target: mid, emoji: emoji || '' }),
   pin: ({ cid, peer, mid, pinned }) => sendEvent(cid, peer, 'pin', { target: mid, pinned: !!pinned }),
