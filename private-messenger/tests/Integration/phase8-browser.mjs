@@ -335,18 +335,16 @@ check('microphone still live after the route switch', await iph.evaluate(() => [
 await iph.click('.cl-overlay [aria-label="پایان تماس"]');
 await a2.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
 
-// iPhone: Safari's Audio Session API decides earpiece vs loudspeaker. Emulate it and check what the app asks for.
-await a2.context().addInitScript(() => { if (!('audioSession' in navigator)) Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto', log: [] } }); });
+// iPhone: changing Safari's Audio Session during a call silenced the remote audio on real devices — the app must leave it alone.
+await a2.context().addInitScript(() => { if (!('audioSession' in navigator)) Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto' }, writable: false }); });
 await a2.reload(); await a2.waitForSelector('.c-side-head h1', { timeout: T });
 await openChat(a2, 'کارول');
 await a2.click('[aria-label="تماس صوتی"]');
-await a2.waitForSelector('.cl-overlay [aria-label="پخش از بلندگو"]', { timeout: T });
-check('iPhone: a voice call switches the audio session to «play-and-record» (earpiece) before the microphone starts',
-  await a2.evaluate(() => navigator.audioSession.type) === 'play-and-record');
-await a2.click('.cl-overlay [aria-label="پخش از بلندگو"]');
-check('iPhone: the loudspeaker button switches the session back (speaker)', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
+await a2.waitForSelector('.cl-overlay [aria-label="پایان تماس"]', { timeout: T });
+await a2.waitForTimeout(800);
+check('iPhone: a voice call leaves Safari\'s audio session untouched', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
 await a2.click('.cl-overlay [aria-label="پایان تماس"]');
-check('iPhone: session restored after the call', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
+check('iPhone: still untouched after the call', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
 await iph.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
 
 console.log('\n# Delivery ticks');

@@ -1623,20 +1623,17 @@ async function audioRoutes() {
   const r = { inEar: pick('audioinput', EARPIECE), inSpk: pick('audioinput', SPEAKER), outEar: pick('audiooutput', EARPIECE), outSpk: pick('audiooutput', SPEAKER) };
   r.sink = !!(r.outEar && r.outSpk && HTMLMediaElement.prototype.setSinkId);
   r.input = !!(r.inEar && r.inSpk);
-  // iPhone / iPad (Safari 16.4+): the Audio Session API. «play-and-record» is the voice-call session
-  // (earpiece); «auto» lets Safari use its default for capturing pages (loudspeaker).
-  r.ios = !r.input && !r.sink && 'audioSession' in navigator;
-  r.can = r.sink || r.input || r.ios;
+  // iPhone / iPad: Safari offers web pages no earpiece/loudspeaker choice. Changing navigator.audioSession
+  // during a call silenced the remote audio on real iPhones, so it is left alone there.
+  r.can = r.sink || r.input;
   return r;
 }
-function setAudioSession(type) { try { if ('audioSession' in navigator) navigator.audioSession.type = type; } catch { /* unsupported */ } }
 async function setRoute(speaker) {
   const c = cur;
   if (!c?.stream) return false;
   c.routes ||= await audioRoutes();
   const r = c.routes;
   let ok = false;
-  if (r.ios) { setAudioSession(speaker ? 'auto' : 'play-and-record'); c.speaker = speaker; return true; }
   if (r.sink) { try { await c.ui.audio.setSinkId((speaker ? r.outSpk : r.outEar).deviceId); ok = true; } catch { /* not allowed */ } }
   if (r.input) {
     try {
@@ -1741,7 +1738,6 @@ async function startCall(video) {
   call('call_mode', { active: true });
   try {
     const cfg = await iceConfig();
-    setAudioSession(video ? 'auto' : 'play-and-record'); // iPhone: voice calls on the earpiece
     cur.stream = await media(video);
     cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
     await initRoute();
@@ -1811,7 +1807,6 @@ async function acceptCall() {
   cur.state = 'connecting'; renderCall();
   try {
     const cfg = await iceConfig();
-    setAudioSession(cur.video ? 'auto' : 'play-and-record'); // iPhone: voice calls on the earpiece
     cur.stream = await media(cur.video);
     cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
     await initRoute();
@@ -1859,7 +1854,6 @@ function endCall(status, reason, message) {
   if (!cur) return;
   const c = cur; cur = null;
   c.ring?.close?.(); c.back?.close?.(); clearInterval(c.ringLoop);
-  setAudioSession('auto');
   clearTimeout(c.ringTimer); clearInterval(c.tick);
   if (status && c.id) call('call_status', { id: c.id, status, reason });
   c.stream?.getTracks().forEach((t) => t.stop());
