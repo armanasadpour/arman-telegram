@@ -948,6 +948,7 @@ const commands = {
   async follow({ user_id, on }) { await api(on ? '/contacts' : '/contacts/remove', { method: 'POST', body: { user_id } }); },
   async call_ice() { return api('/calls/ice'); },
   async call_start({ cid, video = false }) { return (await api('/calls', { method: 'POST', body: { conversation_id: cid, video: !!video } })).id; },
+  async call_ring({ id }) { return (await api(`/calls/${encodeURIComponent(id)}/ring`, { method: 'POST', body: {} })).status; },
   async call_status({ id, status, reason }) { try { return (await api(`/calls/${encodeURIComponent(id)}/status`, { method: 'POST', body: { status, reason } })).status; } catch { return null; } },
   async call_history() { return (await api('/calls')).calls; },
   /** Sends an end-to-end encrypted call signal (offer / answer / hangup …). Not stored as a chat message. */

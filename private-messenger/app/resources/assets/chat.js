@@ -935,7 +935,11 @@ async function registerSw() {
   if (!('serviceWorker' in navigator)) return;
   try {
     swReg = await navigator.serviceWorker.register(BASE + 'sw.js', { scope: BASE });
-    navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'open' && e.data.c) openById(e.data.c); });
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data?.type !== 'open' || !e.data.c) return;
+      if (e.data.answer) { if (cur?.id === e.data.answer && cur.state === 'incoming') acceptCall(); else pendingAnswer = e.data.answer; }
+      openById(e.data.c);
+    });
     navigator.serviceWorker.addEventListener('controllerchange', syncSwMeta);
     await navigator.serviceWorker.ready; syncSwMeta();
     // Keep an existing push subscription bound to this device (e.g. after re-login).
@@ -994,6 +998,7 @@ async function openById(cid) {
 }
 function handleHash() {
   const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('answer')) pendingAnswer = h.get('answer');
   if (h.get('c')) openById(h.get('c'));
   else if (h.get('tab') && TABS.some(([k]) => k === h.get('tab'))) setTab(h.get('tab'));
   if (location.hash) history.replaceState(null, '', location.pathname);
@@ -1604,15 +1609,41 @@ async function initRoute() {
   if (c.routes.can) await setRoute(c.speaker);
   if (cur === c) renderCall();
 }
+// Tones (Web Audio, nothing to download): a melodic ringtone for incoming calls, the familiar 425 Hz
+// «tuuut… tuuut» ringback for the caller while the other phone is ringing.
+function tone(pattern) {
+  try {
+    const ctx = new AudioContext(), master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+    let stopped = false;
+    const play = () => {
+      if (stopped) return;
+      const t0 = ctx.currentTime + 0.05;
+      for (const [f, at, len, vol] of pattern.notes) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = pattern.wave || 'sine'; o.frequency.value = f; o.connect(g); g.connect(master);
+        g.gain.setValueAtTime(0.0001, t0 + at); g.gain.exponentialRampToValueAtTime(vol, t0 + at + 0.03);
+        g.gain.setValueAtTime(vol, t0 + at + len - 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len);
+        o.start(t0 + at); o.stop(t0 + at + len + 0.02);
+      }
+      pattern.onCycle?.();
+    };
+    play();
+    const iv = setInterval(play, pattern.every);
+    return { close: () => { stopped = true; clearInterval(iv); ctx.close().catch(() => {}); } };
+  } catch { return null; } // autoplay blocked: the visual ring still shows
+}
+const RINGTONE = { every: 2600, wave: 'triangle', onCycle: () => buzz([500, 250, 500]),
+  notes: [[659, 0, 0.18, 0.22], [784, 0.2, 0.18, 0.22], [988, 0.4, 0.3, 0.22], [784, 0.85, 0.18, 0.2], [988, 1.05, 0.35, 0.22]] };
+const RINGBACK = { every: 5000, notes: [[425, 0, 1.0, 0.12]] };
 function ring(on) {
   if (!on) { cur?.ring?.close?.(); if (cur) cur.ring = null; return; }
-  try {
-    const ctx = new AudioContext(); const g = ctx.createGain(); g.gain.value = 0; g.connect(ctx.destination);
-    const o = ctx.createOscillator(); o.frequency.value = 440; o.connect(g); o.start();
-    let i = 0; const iv = setInterval(() => { g.gain.value = (i++ % 4 < 2) ? 0.08 : 0; if (i % 8 === 1) buzz([300, 200, 300]); }, 400);
-    cur.ring = { close: () => { clearInterval(iv); ctx.close(); } };
-  } catch { /* autoplay blocked: the visual ring still shows */ }
+  cur.ring = tone(RINGTONE);
 }
+function ringback(on) {
+  if (!on) { cur?.back?.close?.(); if (cur) cur.back = null; return; }
+  if (!cur.back) cur.back = tone(RINGBACK);
+}
+let pendingAnswer = null; // call id chosen with «Answer» on the notification
 function callUi() {
   const remote = el('video', { class: 'cl-remote', autoplay: true, playsinline: true, muted: true });
   const audio = el('audio', { class: 'cl-audio', autoplay: true, playsinline: true });
@@ -1668,7 +1699,17 @@ async function startCall(video) {
     await gathered(cur.pc);
     if (!cur) return;
     await call('call_signal', { cid: cur.cid, peer: cur.peer, body: { call_id: cur.id, action: 'offer', sdp: cur.pc.localDescription.sdp, video } });
-    cur.state = 'ringing'; renderCall();
+    cur.state = 'ringing'; renderCall(); ringback(true);
+    // Keep the other phone ringing even if its app is closed (re-sends the call push) and learn about a
+    // rejection made straight from their notification.
+    const me2 = cur;
+    me2.ringLoop = setInterval(async () => {
+      if (cur !== me2 || me2.state !== 'ringing') return clearInterval(me2.ringLoop);
+      const st = await call('call_ring', { id: me2.id }).catch(() => null);
+      if (cur !== me2 || me2.state !== 'ringing') return;
+      if (st === 'rejected') endCall(null, null, me2.name + ' تماس را رد کرد.');
+      else if (st && !['ringing', 'active'].includes(st)) endCall(null, null, 'تماس پایان یافت.');
+    }, 4000);
     cur.ringTimer = setTimeout(() => { if (cur?.state === 'ringing') { signal('cancel'); endCall('missed', 'timeout', 'پاسخی داده نشد.'); } }, ((await iceConfig()).ring_seconds || 45) * 1000);
   } catch (e) {
     endCall('failed', 'error', e?.name === 'NotAllowedError' ? 'اجازه دسترسی به میکروفون/دوربین داده نشد.' : 'تماس برقرار نشد: ' + errText(e));
@@ -1689,15 +1730,17 @@ async function onCallSignal(d) {
     }
     const c = convs.find((x) => x.id === d.cid) || (await call('conversations').then((l) => (convs = l).find((x) => x.id === d.cid)));
     cur = { id: d.call_id, cid: d.cid, peer: d.from, name: c?.peer?.display_name || 'تماس', video: !!d.video, outgoing: false, state: 'incoming', offer: d.sdp };
-    callUi(); ring(true);
+    callUi();
     call('call_mode', { active: true });
+    if (pendingAnswer && pendingAnswer === d.call_id) { pendingAnswer = null; acceptCall(); return; }
+    ring(true);
     cur.ringTimer = setTimeout(() => { if (cur?.state === 'incoming') endCall(null, null, 'تماس ازدست‌رفته از ' + cur.name); }, 50000);
     if (document.visibilityState !== 'visible') systemNotify('📞 تماس ورودی', { body: previewLevel() === 'sender' ? cur.name : 'برای پاسخ، برنامه را باز کنید', tag: 'call', requireInteraction: true, silent: false, vibrate: [400, 200, 400] });
     return;
   }
   if (!cur || d.call_id !== cur.id || d.from !== cur.peer) return; // signals of another call are ignored
   if (d.action === 'answer' && cur.outgoing && cur.state === 'ringing') {
-    clearTimeout(cur.ringTimer);
+    clearTimeout(cur.ringTimer); ringback(false); clearInterval(cur.ringLoop);
     cur.state = 'connecting'; renderCall();
     try { await cur.pc.setRemoteDescription({ type: 'answer', sdp: d.sdp }); } catch { endCall('failed', 'error', 'پاسخ تماس نامعتبر بود.'); }
   } else if (d.action === 'reject') endCall(null, null, cur.name + ' تماس را رد کرد.');
@@ -1756,7 +1799,7 @@ async function switchCamera() {
 function endCall(status, reason, message) {
   if (!cur) return;
   const c = cur; cur = null;
-  c.ring?.close?.();
+  c.ring?.close?.(); c.back?.close?.(); clearInterval(c.ringLoop);
   clearTimeout(c.ringTimer); clearInterval(c.tick);
   if (status && c.id) call('call_status', { id: c.id, status, reason });
   c.stream?.getTracks().forEach((t) => t.stop());

@@ -42,6 +42,7 @@ final class ApiController extends Controller
         $r->get('/api/v1/calls', fn (Request $q) => $this->auth($q, fn () => Response::json(['calls' => $this->calls()->history((int)$this->s['id'])])));
         $r->get('/api/v1/calls/ice', fn (Request $q) => $this->auth($q, fn () => Response::json($this->calls()->iceConfig((string)$this->s['public_id']))));
         $r->post('/api/v1/calls', fn (Request $q) => $this->auth($q, fn () => Response::json(['id' => $this->calls()->start((int)$this->s['id'], (string)($this->json($q)['conversation_id'] ?? ''), ($this->json($q)['video'] ?? false) === true)], 201), true));
+        $r->post('/api/v1/calls/{id}/ring', fn (Request $q) => $this->auth($q, fn () => Response::json(['status' => $this->calls()->ring((int)$this->s['id'], $q->param('id'))]), true));
         $r->post('/api/v1/calls/{id}/status', fn (Request $q) => $this->auth($q, fn () => Response::json(['status' => $this->calls()->update((int)$this->s['id'], $q->param('id'),
             (string)($this->json($q)['status'] ?? ''), isset($this->json($q)['reason']) ? (string)$this->json($q)['reason'] : null)]), true));
         $r->get('/api/v1/conversations', fn (Request $q) => $this->auth($q, fn () => $this->conversations()));

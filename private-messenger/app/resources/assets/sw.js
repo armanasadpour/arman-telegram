@@ -80,12 +80,19 @@ self.addEventListener('push', (e) => e.waitUntil((async () => {
     }
     return;
   }
+  if (p.t === 'z') { for (const n of await self.registration.getNotifications({ tag: 'call-' + cid })) n.close(); return; }
   if (p.t === 'c') {
     if (visible) return; // the open app is ringing already
+    const k = typeof p.k === 'string' ? p.k : '';
+    if (p.r && k && rejected.has(k)) return; // declined here a moment ago: ignore the remaining «keep ringing» pushes
+    // The caller's app re-sends this push every few seconds while it waits: each one replaces the notification
+    // (same tag, renotify) and plays the notification sound + vibration again — the web's version of a ringtone.
     await self.registration.showNotification(p.v ? '🎥 تماس تصویری ورودی' : '📞 تماس ورودی', {
-      body: (m.preview === 'sender' && m.names[cid] ? m.names[cid] + ' — ' : '') + 'برای پاسخ، برنامه را باز کنید',
-      tag: 'call-' + cid, renotify: true, requireInteraction: true, vibrate: [400, 200, 400, 200, 400],
-      icon: m.icon || undefined, badge: m.badge || undefined, data: { c: cid, call: true }, actions: [{ action: 'open', title: 'باز کردن' }],
+      body: (m.preview === 'sender' && m.names[cid] ? m.names[cid] : 'یک مخاطب') + ' در حال تماس با شماست…',
+      tag: 'call-' + cid, renotify: true, requireInteraction: true, silent: false,
+      vibrate: [800, 400, 800, 400, 800, 400, 800], timestamp: Date.now(),
+      icon: m.icon || undefined, badge: m.badge || undefined, data: { c: cid, call: true, k, v: !!p.v },
+      actions: [{ action: 'answer', title: p.v ? '🎥 پاسخ' : '📞 پاسخ' }, { action: 'reject', title: '✕ رد تماس' }],
     });
     return;
   }
@@ -107,10 +114,26 @@ self.addEventListener('push', (e) => e.waitUntil((async () => {
   });
 })()));
 
+const rejected = new Set(); // call ids declined from a notification (this worker's lifetime)
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const cid = e.notification.data?.c || '';
+  const k = e.notification.data?.k || '';
+  if (e.action === 'reject' && k) { // decline without opening the app; the caller's app learns it on its next ring check
+    rejected.add(k);
+    e.waitUntil(fetch(SCOPE + 'api/v1/calls/' + encodeURIComponent(k) + '/status', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-PM-Request': '1' }, body: JSON.stringify({ status: 'rejected', reason: 'hangup' }) }).catch(() => {}));
+    return;
+  }
+  const hash = cid ? '#c=' + encodeURIComponent(cid) + (k ? (e.action === 'answer' ? '&answer=' : '&call=') + encodeURIComponent(k) : '') : '';
   e.waitUntil((async () => {
+    if (k) {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const w = wins.find((x) => new URL(x.url).pathname.startsWith(SCOPE));
+      if (w) { await w.focus(); w.postMessage({ type: 'open', c: cid, answer: e.action === 'answer' ? k : null }); return; }
+      await self.clients.openWindow(SCOPE + hash);
+      return;
+    }
     const m = await meta(); delete m.unread[cid]; await saveMeta(m);
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const w = wins.find((x) => new URL(x.url).pathname.startsWith(SCOPE));

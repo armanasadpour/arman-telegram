@@ -41,8 +41,27 @@ final class CallService
         $id = $this->db->insert('INSERT INTO calls (public_id, conversation_id, caller_user_id, callee_user_id, is_video, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [$pub, $c['id'], $meId, $c['peer'], $video ? 1 : 0, 'ringing', $now]);
         $this->db->run('INSERT INTO call_participants (call_id, user_id, joined_at) VALUES (?, ?, ?)', [$id, $meId, $now]);
-        \PM\Push\PushService::queue($video ? 'call_video' : 'call', (int)$c['id'], $meId, 0); // wakes the callee's closed apps ("incoming call", nothing else)
+        \PM\Push\PushService::queue($video ? 'call_video' : 'call', (int)$c['id'], $meId, 0, ['k' => $pub]); // wakes the callee's closed apps ("incoming call", nothing else)
         return $pub;
+    }
+
+    /**
+     * «Keep ringing»: while the caller waits, their app calls this every few seconds; each call re-sends the
+     * incoming-call push so the callee's phone plays its notification sound and vibrates again — the closest a
+     * web app can get to a ringtone when it is closed. Returns the call status, so the caller also learns
+     * about a rejection made from the notification itself.
+     */
+    public function ring(int $meId, string $callPublicId): string
+    {
+        $c = $this->db->one('SELECT * FROM calls WHERE public_id = ? AND caller_user_id = ?', [$callPublicId, $meId]);
+        if ($c === null) {
+            throw new UserError('call_not_found');
+        }
+        $age = Clock::now()->getTimestamp() - strtotime($c['created_at'] . ' UTC');
+        if ($c['status'] === 'ringing' && $age < 60 && (new \PM\Auth\RateLimiter($this->db))->hit('ring:' . $c['id'], 15, 120)) {
+            \PM\Push\PushService::queue((int)$c['is_video'] === 1 ? 'call_video' : 'call', (int)$c['conversation_id'], $meId, 0, ['k' => $c['public_id'], 'r' => 1]);
+        }
+        return $c['status'];
     }
 
     public function update(int $meId, string $callPublicId, string $status, ?string $reason): string
@@ -77,6 +96,9 @@ final class CallService
             $dur = $c['answered_at'] !== null ? max(0, Clock::now()->getTimestamp() - strtotime($c['answered_at'] . ' UTC')) : null;
             $this->db->run('UPDATE calls SET status = ?, end_reason = ?, ended_at = ?, duration_seconds = ? WHERE id = ?', [$status, $reason, $now, $dur, $c['id']]);
             $this->db->run('UPDATE call_participants SET left_at = ? WHERE call_id = ? AND left_at IS NULL', [$now, $c['id']]);
+            if ($status === 'rejected') { // rejected on one device (possibly from the notification): silence the others
+                \PM\Push\PushService::queue('call_closed', (int)$c['conversation_id'], $meId, 0);
+            }
             if ($c['answered_at'] === null && in_array($status, ['cancelled', 'missed'], true)) {
                 // the caller gave up: turn the ringing notification on closed apps into «missed call»
                 \PM\Push\PushService::queue('call_missed', (int)$c['conversation_id'], (int)$c['caller_user_id'], 0);

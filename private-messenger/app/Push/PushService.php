@@ -105,9 +105,9 @@ final class PushService
     }
 
     /** Queues a notification for all members' devices (except the sender's device). Sent after the response. */
-    public static function queue(string $type, int $conversationId, int $senderUserId, int $senderDeviceId): void
+    public static function queue(string $type, int $conversationId, int $senderUserId, int $senderDeviceId, array $extra = []): void
     {
-        self::$queue[] = [$type, $conversationId, $senderUserId, $senderDeviceId];
+        self::$queue[] = [$type, $conversationId, $senderUserId, $senderDeviceId, $extra];
     }
 
     /** Called by the kernel after the HTTP response is complete. */
@@ -134,13 +134,15 @@ final class PushService
         $jobs = [];
         $now = Clock::db();
         $online = Clock::now()->modify('-20 seconds')->format('Y-m-d H:i:s');
-        foreach ($events as [$type, $convId, $senderUser, $senderDevice]) {
+        foreach ($events as $ev) {
+            [$type, $convId, $senderUser, $senderDevice] = $ev;
+            $extra = $ev[4] ?? [];
             $conv = $this->db->one('SELECT public_id, type FROM conversations WHERE id = ?', [$convId]);
             if ($conv === null) {
                 continue;
             }
             $isCall = in_array($type, ['call', 'call_video', 'call_missed'], true);
-            if ($type === 'call_answered') {
+            if ($type === 'call_answered' || $type === 'call_closed') {
                 // the callee's OTHER devices: stop their ringing notification
                 $rows = $this->db->all("SELECT ps.id, ps.endpoint, ps.p256dh, ps.auth_secret, ps.device_id FROM devices d JOIN push_subscriptions ps ON ps.device_id = d.id
                                          WHERE d.user_id = ? AND d.status = 'active' AND d.id <> ?", [$senderUser, $senderDevice]);
@@ -156,11 +158,11 @@ final class PushService
                                            AND (? OR d.last_seen_at IS NULL OR d.last_seen_at < ?)",
                     [$convId, $senderDevice, $senderUser, $isCall ? 1 : 0, $now, $isCall ? 1 : 0, $online]);
             }
-            $t = ['call' => 'c', 'call_video' => 'c', 'call_missed' => 'x', 'call_answered' => 'a'][$type] ?? 'm';
-            $payload = json_encode(['t' => $t, 'c' => $conv['public_id'], 'g' => $conv['type'] === 'direct' ? 0 : 1] + ($type === 'call_video' ? ['v' => 1] : []));
+            $t = ['call' => 'c', 'call_video' => 'c', 'call_missed' => 'x', 'call_answered' => 'a', 'call_closed' => 'z'][$type] ?? 'm';
+            $payload = json_encode(['t' => $t, 'c' => $conv['public_id'], 'g' => $conv['type'] === 'direct' ? 0 : 1] + ($type === 'call_video' ? ['v' => 1] : []) + $extra);
             foreach ($rows as $r) {
                 $jobs[(int)$r['id']] = ['id' => (int)$r['id'], 'endpoint' => $r['endpoint'], 'p256dh' => $r['p256dh'], 'auth' => $r['auth_secret'],
-                    'payload' => $payload, 'ttl' => in_array($type, ['call', 'call_video'], true) ? 60 : ($type === 'call_answered' ? 120 : 86400), 'urgency' => $type === 'message' ? 'normal' : 'high'];
+                    'payload' => $payload, 'ttl' => in_array($type, ['call', 'call_video'], true) ? 30 : ($type === 'call_answered' ? 120 : 86400), 'urgency' => $type === 'message' ? 'normal' : 'high'];
             }
         }
         if ($jobs === []) {

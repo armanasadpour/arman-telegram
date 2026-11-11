@@ -173,7 +173,7 @@ await bob.click('[aria-label="تماس صوتی"]');
 for (let i = 0; i < 20 && pushes.length === n0; i++) await bob.waitForTimeout(500);
 const cp = pushes[pushes.length - 1];
 check('incoming call wakes the closed app even when muted (urgency high, short TTL)', pushes.length === n0 + 1 && JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), cp.body)).t === 'c'
-  && cp.headers.urgency === 'high' && cp.headers.ttl === '60');
+  && cp.headers.urgency === 'high' && cp.headers.ttl === '30');
 await bob.click('.cl-overlay [aria-label="پایان تماس"]').catch(() => {});
 check('server never stored the message text', !execFileSync('mysqldump', ['-u', DBU, `-p${DBP}`, '-h', '127.0.0.1', DBN], { maxBuffer: 1 << 28 }).toString('latin1').includes('PUSH-CANARY'));
 sql(`UPDATE conversation_members cm JOIN users u ON u.id = cm.user_id SET cm.muted_until = NULL WHERE u.username = 'alice'`);

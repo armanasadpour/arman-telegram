@@ -213,10 +213,26 @@ for (let i = 0; i < 20 && pushes.length === p0; i++) await alice.waitForTimeout(
 const cp = pushes.length > p0 ? JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), pushes[pushes.length - 1].body)) : {};
 check('incoming VIDEO call → push even though bob\'s app counts as online (a frozen background tab cannot ring)', cp.t === 'c' && cp.v === 1, JSON.stringify(cp));
 await bob.waitForSelector('.cl-overlay', { timeout: T });
+check('the call push carries the call id (for Answer / Decline buttons on the notification)', typeof cp.k === 'string' && cp.k.length === 26);
+await alice.waitForTimeout(9500);
+const rerings = pushes.slice(p0).map((x) => JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), x.body))).filter((x) => x.t === 'c' && x.r === 1);
+check('while the caller waits, the push is repeated every few seconds (the notification rings again)', rerings.length >= 1, String(rerings.length));
 await alice.click('.cl-overlay [aria-label="پایان تماس"]');
 for (let i = 0; i < 20 && !pushes.slice(p0).some((x) => JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), x.body)).t === 'x'); i++) await alice.waitForTimeout(500);
 check('caller hangs up before an answer → «missed call» push replaces the ringing notification',
   pushes.slice(p0).some((x) => JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), x.body)).t === 'x'));
+
+await bob.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
+// «Decline» on the notification: the service worker calls the API directly, the app stays closed.
+const p1 = pushes.length;
+await alice.click('[aria-label="تماس تصویری"]'); // (bob's voice calls are switched off earlier in this suite)
+await bob.waitForSelector('.cl-overlay', { timeout: T });
+const callId = sql("SELECT public_id FROM calls ORDER BY id DESC LIMIT 1");
+await bob.evaluate(async (k) => fetch(location.pathname + 'api/v1/calls/' + k + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-PM-Request': '1' }, body: JSON.stringify({ status: 'rejected', reason: 'hangup' }) }), callId);
+await alice.waitForSelector('.c-toast:has-text("تماس را رد کرد")', { timeout: T });
+check('declining from the notification ends the call on the caller\'s side', !(await alice.$('.cl-overlay')));
+for (let i = 0; i < 10 && !pushes.slice(p1).some((x) => JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), x.body)).t === 'z'); i++) await alice.waitForTimeout(500);
+check('…and silences the ringing notification on the callee\'s other devices', pushes.slice(p1).some((x) => JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), x.body)).t === 'z'));
 
 // ---------------------------------------------------------------- per-user storage quota
 console.log('\n# Per-user storage quota');
