@@ -484,3 +484,8 @@ body.offline .c-side-head h1::after { content: ' · بدون اتصال'; font-s
 .meter .fill.w0 { width: 1%; } .meter .fill.w1 { width: 10%; } .meter .fill.w2 { width: 20%; } .meter .fill.w3 { width: 30%; } .meter .fill.w4 { width: 40%; } .meter .fill.w5 { width: 50%; }
 .meter .fill.w6 { width: 60%; } .meter .fill.w7 { width: 70%; } .meter .fill.w8 { width: 80%; } .meter .fill.w9 { width: 90%; } .meter .fill.w10 { width: 100%; }
 .meter.full .fill { background: var(--danger); }
+
+/* support inbox (agents) */
+.c-target { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--surface); border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+.c-target select { width: auto; flex: 1; padding: 6px 10px; font-size: 14px; }
+.c-inbox-label { border: 0; background: none; padding: 0; cursor: pointer; text-align: start; display: block; }

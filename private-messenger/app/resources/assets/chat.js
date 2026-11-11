@@ -182,7 +182,7 @@ const titleOf = (c) => c.peer ? c.peer.display_name : c.name;
 worker.onmessage = ({ data }) => {
   if (data.id) { const p = pending.get(data.id); pending.delete(data.id); data.ok ? p.resolve(data.result) : p.reject(new Error(data.error)); return; }
   const { event, data: d } = data;
-  if (event === 'message') { if (current && d.cid === current.id) { upsertMessage(d); if (d.dir === 'in') scheduleRead(); } scheduleRefresh(); if (d.status === 'received') notifyIncoming(d); }
+  if (event === 'message') { if (current && (d.cid === current.id || current.inbox && current.cids.includes(d.cid))) { upsertMessage(d); if (d.dir === 'in') scheduleRead(); } scheduleRefresh(); if (d.status === 'received') notifyIncoming(d); }
   if (event === 'status') { const m = byMid.get(d.mid); if (m) { m.status = d.status; upsertMessage(m, false); } }
   if (event === 'removed') { byMid.delete(d.mid); document.querySelector(`[data-mid="${CSS.escape(d.mid)}"]`)?.remove(); }
   if (event === 'progress') { const b = document.querySelector(`[data-mid="${CSS.escape(d.mid)}"] progress`); if (b) { b.max = d.total; b.value = d.done; } }
@@ -234,7 +234,7 @@ async function notifyIncoming(d) {
   if (!c) { await refreshList().catch(() => {}); c = convs.find((x) => x.id === d.cid); } // a brand-new chat
   if (isMuted(c)) return;
   if (document.visibilityState === 'visible') {
-    if (current?.id === d.cid) return;
+    if (current?.id === d.cid || (current?.inbox && current.cids.includes(d.cid))) return;
     chime(); buzz();
     if (prefs.inapp) inAppBanner(c, d);
     return;
@@ -544,6 +544,7 @@ function preview(c) {
   return (l.dir === 'out' ? 'شما: ' : '') + (l.att ? KIND[l.att] + (l.text ? ' — ' : '') : '') + (l.text || '').replace(/\s+/g, ' ').slice(0, 60);
 }
 function matchFilter(c) {
+  if (c.inbox) return filter === 'all' || filter === 'support';
   if (filter === 'support') return isSupport(c);
   if (filter === 'archive') return c.archived;
   if (c.archived) return false;
@@ -557,12 +558,15 @@ async function refreshList() {
   if (!sideEl) return;
   const fresh = await call('conversations');
   convs = fresh.filter((c) => c.peer || c.type === 'group' || c.type === 'support');
-  for (const c of convs) if (c.peer) names.set(c.peer.id, c.peer.display_name);
+  for (const c of convs) { if (c.peer) names.set(c.peer.id, c.peer.display_name); if (c.support_user) names.set(c.support_user.id, c.support_user.display_name); }
   updateBadges(); syncSwMeta();
   if (current) { const c = convs.find((x) => x.id === current.id); if (c) { current.muted_until = c.muted_until; current.archived = c.archived; } }
   if (tab !== 'chats' || !listEl || (searchEl && searchEl.value.trim().length >= 2)) return;
   const pinned = new Set(prefs.pinned);
-  const shown = convs.filter(matchFilter).sort((a, b) => (supportUserView(b) - supportUserView(a)) || (pinned.has(b.id) - pinned.has(a.id)) || ((b.last?.ts || 0) - (a.last?.ts || 0)));
+  const inbox = inboxConv();
+  if (current?.inbox && inbox) Object.assign(current, { cids: inbox.cids, owners: inbox.owners });
+  const listed = inbox ? [...convs.filter((c) => !(isSupport(c) && !c.verified)), inbox] : convs;
+  const shown = listed.filter(matchFilter).sort((a, b) => (supportUserView(b) - supportUserView(a)) || (pinned.has(b.id) - pinned.has(a.id)) || ((b.last?.ts || 0) - (a.last?.ts || 0)));
   if (info.support?.agent && !document.querySelector('.chip[data-f=support]')) {
     document.querySelector('.c-filters')?.append(el('button', { class: 'chip' + (filter === 'support' ? ' on' : ''), 'data-f': 'support', onclick: (e) => { filter = 'support'; e.currentTarget.parentNode.querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); refreshList(); } }, el('span', { text: 'پشتیبانی' })));
   }
@@ -576,7 +580,7 @@ async function refreshList() {
 function convItem(c, isPinned) {
   const unread = c.unread && current?.id !== c.id;
   const item = el('button', { class: 'c-item' + (current?.id === c.id ? ' on' : '') + (unread ? ' unread' : ''), role: 'listitem', 'data-cid': c.id, onclick: () => openConversation(c),
-    oncontextmenu: (e) => { e.preventDefault(); quickActions(c); } },
+    oncontextmenu: (e) => { e.preventDefault(); if (!c.inbox) quickActions(c); } },
     avatar(titleOf(c), c.peer?.id || c.id, kindOf(c)),
     el('span', { class: 'c-body' },
       el('span', { class: 'c-name' }, el('span', { class: 'c-title', text: titleOf(c) }), c.verified ? verified() : null, c.banned ? el('span', { class: 'tag fail', text: 'مسدود' }) : null, isMuted(c) ? ico('bellOff', 'mini') : null),
@@ -584,7 +588,7 @@ function convItem(c, isPinned) {
     el('span', { class: 'c-side-meta' }, el('span', { class: 'c-time', text: c.last ? when(c.last.ts) : '' }),
       unread ? el('span', { class: 'badge' + (isMuted(c) ? ' muted' : ''), text: faNum.format(c.unread) })
         : isPinned || supportUserView(c) ? ico('pin', 'mini pinned') : c.last?.dir === 'out' ? ico('checks', 'mini tick') : null));
-  longPress(item, () => quickActions(c));
+  if (!c.inbox) longPress(item, () => quickActions(c));
   return item;
 }
 function longPress(node, fn) {
@@ -994,7 +998,31 @@ async function installApp() {
 async function openById(cid) {
   let c = convs.find((x) => x.id === cid);
   if (!c) { await refreshList(); c = convs.find((x) => x.id === cid); }
+  if (c && isSupport(c) && !c.verified) { inboxTarget = c.id; c = inboxConv(); } // agents: the shared support inbox
   if (c) { if (tab !== 'chats') setTab('chats'); openConversation(c); }
+}
+
+// ---- support inbox (agents only): every user's support chat merged into ONE conversation. Underneath, each user
+// keeps a private end-to-end encrypted chat with the support team; a reply goes to the chat of the chosen user.
+const INBOX = '__support_inbox__';
+let inboxTarget = null;
+function inboxConv() {
+  const list = convs.filter((c) => isSupport(c) && !c.verified);
+  if (!list.length) return null;
+  const latest = list.filter((c) => c.last).sort((a, b) => b.last.ts - a.last.ts)[0];
+  const who = latest?.support_user?.display_name || '';
+  return { id: INBOX, type: 'support', inbox: true, name: info.support?.name || 'پشتیبانی', member_count: list.length,
+    cids: list.map((c) => c.id), owners: Object.fromEntries(list.map((c) => [c.id, c.support_user])),
+    unread: list.reduce((n, c) => n + (c.unread || 0), 0), blocked_services: [],
+    last: latest ? { ...latest.last, dir: 'in', text: (latest.last.dir === 'out' ? 'پاسخ به ' + who : who) + ': ' + (latest.last.att ? KIND[latest.last.att] : latest.last.text || '') , att: null } : null };
+}
+const ownerOf = (cid) => current?.owners?.[cid] || null;
+const sendCid = () => current?.inbox ? inboxTarget : current?.id;
+function setInboxTarget(cid) {
+  if (!current?.inbox || !current.cids.includes(cid)) return;
+  inboxTarget = cid;
+  const sel = document.querySelector('.c-target select'); if (sel) sel.value = cid;
+  composer.placeholder = 'پاسخ به ' + (ownerOf(cid)?.display_name || '') + '…';
 }
 function handleHash() {
   const h = new URLSearchParams(location.hash.slice(1));
@@ -1027,7 +1055,7 @@ async function openConversation(c, focusMid = null) {
   typingEl = el('span', { class: 'c-typing' }); statusEl = el('span', { class: 'c-status' });
   composer = el('textarea', { rows: '1', placeholder: 'پیام خود را بنویسید…', 'aria-label': 'متن پیام', maxlength: '10000', enterkeyhint: prefs.enter ? 'send' : 'enter',
     onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey && prefs.enter && !e.isComposing) { e.preventDefault(); doSend(); } else if (e.key === 'Escape') clearReply(); },
-    oninput: () => { autosize(); toggleSend(); if (composer.value.trim()) call('typing', { cid: c.id }).catch(() => {}); } });
+    oninput: () => { autosize(); toggleSend(); if (composer.value.trim() && sendCid()) call('typing', { cid: sendCid() }).catch(() => {}); } });
   fileInput = el('input', { type: 'file', multiple: true, hidden: true, onchange: () => { const fs = [...fileInput.files]; fileInput.value = ''; if (fs.length) sendDialog(fs); } });
   camInput = el('input', { type: 'file', accept: 'image/*,video/*', capture: 'environment', hidden: true, onchange: () => { const fs = [...camInput.files]; camInput.value = ''; if (fs.length) sendDialog(fs); } });
   sendBtn = el('button', { class: 'c-send', onclick: doSend }, ico('send'), sr('ارسال'));
@@ -1040,9 +1068,12 @@ async function openConversation(c, focusMid = null) {
     : c.type === 'group' && svcOff('group_message', c) ? 'ارسال پیام در گروه‌ها و کانال‌ها توسط مدیر سامانه غیرفعال شده است.'
     : ['text', 'image', 'video', 'audio', 'file'].every((k) => svcOff(k, c)) ? 'ارسال پیام برای شما توسط مدیر سامانه غیرفعال شده است.' : null;
   if (svcOff('text', c)) { composer.disabled = true; composer.placeholder = 'ارسال پیام متنی غیرفعال است'; }
+  const targetBar = c.inbox ? el('div', { class: 'c-target' }, el('span', { text: 'پاسخ به:' }),
+    el('select', { 'aria-label': 'پاسخ به کدام کاربر', onchange: (e) => setInboxTarget(e.target.value) },
+      ...c.cids.map((cid) => el('option', { value: cid, text: c.owners[cid]?.display_name + ' (@' + c.owners[cid]?.username + ')' })))) : null;
   mainEl.replaceChildren(chatHead, bannerEl, pinEl, findBar,
     el('div', { class: 'c-msgs-wrap' }, msgsEl),
-    replyBar, emojiPanel,
+    replyBar, emojiPanel, targetBar,
     readOnly ? el('div', { class: 'c-compose ro' + (ban ? ' banned' : '') }, ico(ban ? 'lock' : 'channel'), el('span', { text: readOnly }), el('textarea', { hidden: true }))
       : el('div', { class: 'c-compose' },
         el('button', { class: 'ib c-attach', 'aria-label': 'پیوست فایل یا تصویر', title: 'پیوست', onclick: attachSheet }, ico('plus')),
@@ -1051,9 +1082,14 @@ async function openConversation(c, focusMid = null) {
         micBtn, sendBtn));
   renderHead();
   toggleSend();
-  msgsEl.append(el('div', { class: 'c-e2ee' }, ico('lock'), el('span', { text: isSupport(c) ? (supportUserView(c) ? 'سؤال، مشکل یا پیشنهادتان را اینجا بنویسید. پیام‌ها رمزنگاری سرتاسری دارند و فقط تیم پشتیبانی آن‌ها را می‌خواند.' : 'گفتگوی پشتیبانی — پاسخ شما با نام «' + (info.support?.name || 'پشتیبانی') + '» به کاربر نمایش داده می‌شود.') : c.type === 'group' ? 'پیام‌های این ' + (c.channel ? 'کانال' : 'گروه') + ' رمزنگاری سرتاسری دارند.' : 'گفتگوی رمزنگاری‌شده (E2EE) — فقط شما و ' + cname() + ' می‌توانید این پیام‌ها را بخوانید.' })));
-  if (c.type !== 'direct') { try { for (const m of (await call('group_info', { cid: c.id })).members) names.set(m.id, m.display_name); } catch { /* names fall back */ } }
-  const list = await call('messages', { cid: c.id });
+  msgsEl.append(el('div', { class: 'c-e2ee' }, ico('lock'), el('span', { text: c.inbox ? 'صندوق مشترک پشتیبانی: پیام همه کاربران اینجاست. پاسخ شما فقط برای کاربری که در «پاسخ به» انتخاب شده می‌رود (با زدن روی پیام هر کاربر هم انتخاب می‌شود) و با نام «' + (info.support?.name || 'پشتیبانی') + '» نمایش داده می‌شود.' : isSupport(c) ? (supportUserView(c) ? 'سؤال، مشکل یا پیشنهادتان را اینجا بنویسید. پیام‌ها رمزنگاری سرتاسری دارند و فقط تیم پشتیبانی آن‌ها را می‌خواند.' : 'گفتگوی پشتیبانی — پاسخ شما با نام «' + (info.support?.name || 'پشتیبانی') + '» به کاربر نمایش داده می‌شود.') : c.type === 'group' ? 'پیام‌های این ' + (c.channel ? 'کانال' : 'گروه') + ' رمزنگاری سرتاسری دارند.' : 'گفتگوی رمزنگاری‌شده (E2EE) — فقط شما و ' + cname() + ' می‌توانید این پیام‌ها را بخوانید.' })));
+  if (c.type !== 'direct') { try { for (const m of (await call('group_info', { cid: c.inbox ? c.cids[0] : c.id })).members) names.set(m.id, m.display_name); } catch { /* names fall back */ } }
+  const list = c.inbox ? (await Promise.all(c.cids.map((cid) => call('messages', { cid })))).flat().sort((a, b) => a.ts - b.ts) : await call('messages', { cid: c.id });
+  if (c.inbox) {
+    const latestIn = [...list].reverse().find((m) => m.dir === 'in');
+    if (!c.cids.includes(inboxTarget)) inboxTarget = latestIn?.cid || c.cids[0];
+    setInboxTarget(inboxTarget);
+  }
   if (current !== c) return;
   let lastDay = '';
   for (const m of list) {
@@ -1078,7 +1114,8 @@ function renderHead() {
     iconBtn('back', 'بازگشت', () => closeConversation(), 'c-back'),
     el('button', { class: 'c-head-who', onclick: isSupport(c) ? supportInfo : c.type === 'group' ? groupInfo : showSafety, 'aria-label': 'اطلاعات گفتگو' }, avatar(titleOf(c), c.peer?.id || c.id, kindOf(c))),
     el('div', { class: 'c-head-name' }, el('b', {}, el('span', { text: titleOf(c) }), c.verified ? verified() : null),
-      isSupport(c) ? el('button', { class: 'c-lock', onclick: supportInfo }, ico('lock', 'mini'), el('span', { text: supportUserView(c) ? ' تیم پشتیبانی — رمزنگاری سرتاسری' : ' @' + (c.support_user?.username || '') }))
+      c.inbox ? el('span', { class: 'c-lock' }, ico('lock', 'mini'), el('span', { text: ` صندوق مشترک — ${faNum.format(c.cids.length)} کاربر` }))
+      : isSupport(c) ? el('button', { class: 'c-lock', onclick: supportInfo }, ico('lock', 'mini'), el('span', { text: supportUserView(c) ? ' تیم پشتیبانی — رمزنگاری سرتاسری' : ' @' + (c.support_user?.username || '') }))
         : c.type === 'group' ? el('button', { class: 'c-lock', onclick: groupInfo }, ico('lock', 'mini'), el('span', { text: ` ${faNum.format(c.member_count)} ${word} — اطلاعات ${c.channel ? 'کانال' : 'گروه'}` }))
         : el('button', { class: 'c-lock', onclick: showSafety }, statusEl, typingEl)),
     isMuted(c) ? ico('bellOff', 'mini muted-ic') : null,
@@ -1097,6 +1134,7 @@ async function updatePresence() {
 }
 function chatMenu() {
   const c = current;
+  if (c.inbox) return sheet(titleOf(c), sheetItem('search', 'جست‌وجو در پیام‌ها', openFind));
   sheet(titleOf(c),
     isSupport(c) ? sheetItem('info', 'درباره پشتیبانی', supportInfo) : sheetItem('info', c.type === 'group' ? 'اطلاعات ' + (c.channel ? 'کانال' : 'گروه') : 'اطلاعات و شماره امنیتی', c.type === 'group' ? groupInfo : showSafety),
     isSupport(c) ? null : sheetItem('shield', 'گزارش تخلف', () => reportDialog(c.type === 'group' ? 'conversation' : 'user', c.type === 'group' ? c.id : c.peer.id, titleOf(c))),
@@ -1142,7 +1180,7 @@ function openFind() {
   let hits = [], i = 0;
   const go = (d) => { if (!hits.length) return; i = (i + d + hits.length) % hits.length; count.textContent = `${faNum.format(i + 1)} از ${faNum.format(hits.length)}`; const n = msgsEl.querySelector(`[data-mid="${CSS.escape(hits[i].mid)}"]`); n?.scrollIntoView({ block: 'center' }); n?.classList.remove('flash'); void n?.offsetWidth; n?.classList.add('flash'); };
   let t;
-  q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(async () => { hits = q.value.trim().length >= 2 ? await call('search', { q: q.value, cid: current.id }) : []; i = -1; count.textContent = hits.length ? '' : (q.value.trim().length >= 2 ? 'یافت نشد' : ''); go(1); }, 250); });
+  q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(async () => { hits = q.value.trim().length >= 2 ? (await call('search', { q: q.value, cid: current.inbox ? null : current.id })).filter((h) => !current.inbox || current.cids.includes(h.cid)) : []; i = -1; count.textContent = hits.length ? '' : (q.value.trim().length >= 2 ? 'یافت نشد' : ''); go(1); }, 250); });
   findBar.replaceChildren(el('div', { class: 'c-find' }, ico('search'), q, count, iconBtn('chevron', 'قبلی', () => go(1)), iconBtn('back', 'بعدی', () => go(-1)), iconBtn('x', 'بستن جست‌وجو', () => findBar.replaceChildren())));
   q.focus();
 }
@@ -1168,7 +1206,10 @@ function attachSheet() {
 }
 function scheduleRead() {
   clearTimeout(readTimer);
-  readTimer = setTimeout(() => { if (current && document.visibilityState === 'visible') call('mark_read', { cid: current.id, peer: pid() }).then((n) => n && scheduleRefresh()).catch(() => {}); }, 800);
+  readTimer = setTimeout(() => {
+    if (!current || document.visibilityState !== 'visible') return;
+    for (const cid of current.inbox ? current.cids : [current.id]) call('mark_read', { cid, peer: pid() }).then((n) => n && scheduleRefresh()).catch(() => {});
+  }, 800);
 }
 function showTyping() {
   typingEl.textContent = 'در حال نوشتن…'; statusEl.hidden = true;
@@ -1245,7 +1286,8 @@ function upsertMessage(m, scroll = true) {
     const media = !m.deleted && m.att && (m.att.kind === 'image' || m.att.kind === 'video') && m.att.thumb;
     node = el('div', { class: 'c-msg ' + (m.dir === 'out' ? 'out' : 'in') + (m.deleted ? ' deleted' : '') + (media && !m.text ? ' media' : ''), 'data-mid': m.mid,
       oncontextmenu: (e) => { if (m.deleted || m.status === 'uploading' || m.status === 'sending') return; e.preventDefault(); menu(m, e.currentTarget); }, ondblclick: () => !m.deleted && setReply(m) },
-      (isGroup() || (isSupport() && !supportUserView())) && m.dir === 'in' ? el('div', { class: 'c-sender g' + (hash(m.from) % 8), text: nameOf(m.from) }) : null,
+      current?.inbox ? inboxLabel(m)
+        : (isGroup() || (isSupport() && !supportUserView())) && m.dir === 'in' ? el('div', { class: 'c-sender g' + (hash(m.from) % 8), text: nameOf(m.from) }) : null,
       m.flag === 'not_in_roster' ? el('div', { class: 'c-flag', text: '⚠ فرستنده در فهرست رمزنگاری‌شده اعضای گروه نیست' }) : null,
       m.fwd ? el('div', { class: 'c-fwd', text: '↪ بازارسال‌شده' }) : null,
       target ? el('button', { class: 'c-quote', onclick: () => msgsEl.querySelector(`[data-mid="${CSS.escape(target.mid)}"]`)?.scrollIntoView({ block: 'center' }) },
@@ -1270,6 +1312,12 @@ function upsertMessage(m, scroll = true) {
   for (const x of byMid.values()) if (x.reply_to === m.mid && x.mid !== m.mid) { const n = msgsEl.querySelector(`[data-mid="${CSS.escape(x.mid)}"] .c-quote span`); if (n) n.textContent = summary(m); }
   if (scroll && !old && (atBottom || m.dir === 'out')) msgsEl.scrollTop = msgsEl.scrollHeight;
   if (old && pinEl) renderPinned();
+}
+function inboxLabel(m) {
+  const owner = ownerOf(m.cid);
+  const ownerName = owner?.display_name || 'کاربر';
+  const text = m.from === owner?.id ? ownerName : (m.dir === 'out' ? 'شما' : nameOf(m.from)) + ' ← ' + ownerName;
+  return el('button', { class: 'c-sender c-inbox-label g' + (hash(m.cid) % 8), text, title: 'پاسخ به ' + ownerName, onclick: () => setInboxTarget(m.cid) });
 }
 function groupReacts(reacts) {
   const by = new Map();
@@ -1343,20 +1391,20 @@ function menu(m) {
   const own = m.from === me.id;
   const reactRow = el('div', { class: 'c-emoji' }, ...EMOJI.map((e) => el('button', { text: e, class: m.reactions?.[me.id] === e ? 'on' : '', 'aria-label': 'واکنش ' + e, onclick: async () => {
     document.querySelector('.c-sheet-wrap')?.remove(); const mine = m.reactions?.[me.id] === e;
-    try { await call('react', { cid: current.id, peer: pid(), mid: m.mid, emoji: mine ? '' : e }); } catch (x) { toast(errText(x)); }
+    try { await call('react', { cid: m.cid, peer: pid(), mid: m.mid, emoji: mine ? '' : e }); } catch (x) { toast(errText(x)); }
   } })));
   const w = sheet(null, reactRow,
     sheetItem('reply', 'پاسخ', () => setReply(m)),
     m.text ? sheetItem('copy', 'کپی متن', () => navigator.clipboard.writeText(m.text).then(() => toast('کپی شد'))) : null,
     own && !m.att && m.text ? sheetItem('edit', 'ویرایش', () => setEdit(m)) : null,
-    sheetItem('pin', m.pinned ? 'برداشتن سنجاق' : 'سنجاق', () => call('pin', { cid: current.id, peer: pid(), mid: m.mid, pinned: !m.pinned })),
+    sheetItem('pin', m.pinned ? 'برداشتن سنجاق' : 'سنجاق', () => call('pin', { cid: m.cid, peer: pid(), mid: m.mid, pinned: !m.pinned })),
     sheetItem('forward', 'بازارسال', () => forwardDialog(m)),
     sheetItem('trash', 'حذف برای من', () => call('delete_local', { mid: m.mid }), 'danger'),
-    own ? sheetItem('trash', 'حذف برای همه', () => confirm('این پیام برای همه حذف شود؟') && call('delete_all', { cid: current.id, peer: pid(), mid: m.mid }), 'danger') : null);
+    own ? sheetItem('trash', 'حذف برای همه', () => confirm('این پیام برای همه حذف شود؟') && call('delete_all', { cid: m.cid, peer: pid(), mid: m.mid }), 'danger') : null);
   w.classList.add('c-menu-wrap');
   w.querySelector('.c-sheet').classList.add('c-menu');
 }
-function setReply(m) { editing = null; reply = m; replyBar.replaceChildren(ico('reply'), el('span', { class: 'c-body' }, el('b', { text: 'پاسخ به ' + nameOf(m.from) }), el('span', { text: summary(m) })), iconBtn('x', 'لغو', clearReply)); composer.focus(); }
+function setReply(m) { editing = null; reply = m; if (current?.inbox) setInboxTarget(m.cid); replyBar.replaceChildren(ico('reply'), el('span', { class: 'c-body' }, el('b', { text: 'پاسخ به ' + nameOf(m.from) }), el('span', { text: summary(m) })), iconBtn('x', 'لغو', clearReply)); composer.focus(); }
 function setEdit(m) { reply = null; editing = m; composer.value = m.text; toggleSend(); autosize(); replyBar.replaceChildren(ico('edit'), el('span', { class: 'c-body' }, el('b', { text: 'ویرایش پیام' }), el('span', { text: summary(m) })), iconBtn('x', 'لغو', () => { clearReply(); composer.value = ''; toggleSend(); })); composer.focus(); }
 function clearReply() { reply = null; editing = null; replyBar.replaceChildren(); }
 async function forwardDialog(m) {
@@ -1371,8 +1419,8 @@ async function doSend() {
   if (!text.trim() || !current) return;
   composer.value = ''; toggleSend(); autosize(); emojiPanel.hidden = true;
   try {
-    if (editing) await call('edit', { cid: current.id, peer: pid(), mid: editing.mid, text });
-    else await call('send', { cid: current.id, peer: pid(), text, reply_to: reply?.mid || null });
+    if (editing) await call('edit', { cid: editing.cid, peer: pid(), mid: editing.mid, text });
+    else await call('send', { cid: sendCid(), peer: pid(), text, reply_to: reply && reply.cid === sendCid() ? reply.mid : null });
   } catch (e) { toast(errText(e)); }
   clearReply();
 }
@@ -1445,7 +1493,7 @@ async function sendDialog(files) {
     el('p', { class: 'small muted', text: `فایل‌ها پیش از خروج از این دستگاه رمزنگاری می‌شوند و ${faNum.format(info.retention_days)} روز روی سرور می‌مانند.` }),
     el('button', { class: 'btn block', text: 'ارسال', onclick: async () => {
       close(dlg);
-      const cid = current.id, peer = pid();
+      const cid = sendCid(), peer = pid();
       for (const [n, i] of items.entries()) {
         let file = i.f, meta = { ...i.meta, name: i.f.name, mime: i.f.type };
         if (meta.kind === 'image') {
@@ -1479,7 +1527,7 @@ function recorderButton() {
       if (cancelled || secs < 0.7 || !current) return;
       const mime = (chunks[0]?.type || type || 'audio/webm').split(';')[0];
       const file = new File(chunks, 'voice.' + (mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'webm'), { type: mime });
-      call('send_file', { cid: current.id, peer: pid(), file, meta: { kind: 'audio', dur: secs, name: file.name, mime } }).catch((e) => toast(errText(e)));
+      call('send_file', { cid: sendCid(), peer: pid(), file, meta: { kind: 'audio', dur: secs, name: file.name, mime } }).catch((e) => toast(errText(e)));
     };
     rec.start();
     btn.classList.add('rec'); buzz([20]);
@@ -1575,15 +1623,20 @@ async function audioRoutes() {
   const r = { inEar: pick('audioinput', EARPIECE), inSpk: pick('audioinput', SPEAKER), outEar: pick('audiooutput', EARPIECE), outSpk: pick('audiooutput', SPEAKER) };
   r.sink = !!(r.outEar && r.outSpk && HTMLMediaElement.prototype.setSinkId);
   r.input = !!(r.inEar && r.inSpk);
-  r.can = r.sink || r.input;
+  // iPhone / iPad (Safari 16.4+): the Audio Session API. «play-and-record» is the voice-call session
+  // (earpiece); «auto» lets Safari use its default for capturing pages (loudspeaker).
+  r.ios = !r.input && !r.sink && 'audioSession' in navigator;
+  r.can = r.sink || r.input || r.ios;
   return r;
 }
+function setAudioSession(type) { try { if ('audioSession' in navigator) navigator.audioSession.type = type; } catch { /* unsupported */ } }
 async function setRoute(speaker) {
   const c = cur;
   if (!c?.stream) return false;
   c.routes ||= await audioRoutes();
   const r = c.routes;
   let ok = false;
+  if (r.ios) { setAudioSession(speaker ? 'auto' : 'play-and-record'); c.speaker = speaker; return true; }
   if (r.sink) { try { await c.ui.audio.setSinkId((speaker ? r.outSpk : r.outEar).deviceId); ok = true; } catch { /* not allowed */ } }
   if (r.input) {
     try {
@@ -1688,6 +1741,7 @@ async function startCall(video) {
   call('call_mode', { active: true });
   try {
     const cfg = await iceConfig();
+    setAudioSession(video ? 'auto' : 'play-and-record'); // iPhone: voice calls on the earpiece
     cur.stream = await media(video);
     cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
     await initRoute();
@@ -1716,7 +1770,9 @@ async function startCall(video) {
   }
 }
 const signal = (action, extra = {}) => cur && call('call_signal', { cid: cur.cid, peer: cur.peer, body: { call_id: cur.id, action, video: !!cur.video, ...extra } }).catch(() => {});
+const endedCalls = new Set(); // hang-up/cancel seen before (or together with) the offer: never ring for those
 async function onCallSignal(d) {
+  if (['hangup', 'cancel', 'reject', 'busy'].includes(d.action)) endedCalls.add(d.call_id);
   if (d.from === me.id) { // a signal from another of MY devices
     if (cur && cur.id === d.call_id && cur.state === 'incoming' && (d.action === 'answer' || d.action === 'reject')) {
       endCall(null, null, d.action === 'answer' ? 'تماس روی دستگاه دیگرتان پاسخ داده شد.' : 'تماس روی دستگاه دیگرتان رد شد.');
@@ -1724,11 +1780,13 @@ async function onCallSignal(d) {
     return;
   }
   if (d.action === 'offer') {
+    if (endedCalls.has(d.call_id)) return;
     if (cur) { // already in a call: tell the caller we are busy
       call('call_signal', { cid: d.cid, peer: d.from, body: { call_id: d.call_id, action: 'busy', video: false } }).catch(() => {});
       return;
     }
     const c = convs.find((x) => x.id === d.cid) || (await call('conversations').then((l) => (convs = l).find((x) => x.id === d.cid)));
+    if (endedCalls.has(d.call_id) || cur) return; // ended (or another call started) while we were looking it up
     cur = { id: d.call_id, cid: d.cid, peer: d.from, name: c?.peer?.display_name || 'تماس', video: !!d.video, outgoing: false, state: 'incoming', offer: d.sdp };
     callUi();
     call('call_mode', { active: true });
@@ -1753,6 +1811,7 @@ async function acceptCall() {
   cur.state = 'connecting'; renderCall();
   try {
     const cfg = await iceConfig();
+    setAudioSession(cur.video ? 'auto' : 'play-and-record'); // iPhone: voice calls on the earpiece
     cur.stream = await media(cur.video);
     cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
     await initRoute();
@@ -1800,6 +1859,7 @@ function endCall(status, reason, message) {
   if (!cur) return;
   const c = cur; cur = null;
   c.ring?.close?.(); c.back?.close?.(); clearInterval(c.ringLoop);
+  setAudioSession('auto');
   clearTimeout(c.ringTimer); clearInterval(c.tick);
   if (status && c.id) call('call_status', { id: c.id, status, reason });
   c.stream?.getTracks().forEach((t) => t.stop());

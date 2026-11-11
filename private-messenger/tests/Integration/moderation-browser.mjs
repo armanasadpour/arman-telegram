@@ -191,13 +191,23 @@ check('every user has the support chat pinned first, with a verified badge', fir
 await openChat(alice, 'پشتیبانی پیام‌رسان');
 check('support chat: verified name in the header, no call buttons', await alice.isVisible('.c-head-name .verified') && !(await alice.$('[aria-label="تماس صوتی"]')));
 await send(alice, 'سلام پشتیبانی SUP-CANARY کمک لازم دارم');
+await bob.reload(); await bob.waitForSelector('.c-side-head h1', { timeout: T });
+await openChat(bob, 'پشتیبانی پیام‌رسان'); await send(bob, 'سؤال باب BOB-SUP');
 await carol.reload(); await carol.waitForSelector('.c-side-head h1', { timeout: T });
-await carol.waitForSelector('.c-list .c-item:has-text("پشتیبانی: آلیس")', { timeout: T });
-await openChat(carol, 'پشتیبانی: آلیس');
-await carol.waitForSelector('.c-msg.in:has-text("SUP-CANARY")', { timeout: T });
-check('the agent receives it as «پشتیبانی: آلیس» (decrypted on the agent\'s device)', true);
+const carolList = await carol.textContent('.c-list');
+check('the agent has ONE shared support chat (no chat per user)', (carolList.match(/پشتیبانی پیام‌رسان/g) || []).length === 1 && !carolList.includes('پشتیبانی: آلیس'));
+await openChat(carol, 'پشتیبانی پیام‌رسان');
+await carol.waitForSelector('.c-msg.in:has-text("SUP-CANARY")', { timeout: T }); await carol.waitForSelector('.c-msg.in:has-text("BOB-SUP")', { timeout: T });
+check('messages of all users in one place, each labelled with the user\'s name',
+  (await carol.textContent('.c-msg.in:has-text("SUP-CANARY") .c-sender')) === 'آلیس' && (await carol.textContent('.c-msg.in:has-text("BOB-SUP") .c-sender')) === 'باب');
+await carol.click('.c-msg.in:has-text("SUP-CANARY") .c-sender');
+check('tapping a user\'s name chooses who the reply goes to', (await carol.$eval('.c-target select', (x) => x.selectedOptions[0].textContent)).includes('آلیس'));
 await send(carol, 'سلام، در خدمتیم SUP-REPLY');
 await alice.waitForSelector('.c-msg.in:has-text("SUP-REPLY")', { timeout: T });
+await carol.waitForSelector('.c-msg.out:has-text("SUP-REPLY") .c-sender:text("شما ← آلیس")', { timeout: T });
+check('the reply reaches only that user; the agent sees «شما ← آلیس»', true);
+await bob.waitForTimeout(3000);
+check('…the other user does not receive it', !(await bob.textContent('.c-msgs')).includes('SUP-REPLY'));
 check('the user sees the reply without the agent\'s name', !(await alice.textContent('.c-msgs')).includes('کارول') && !(await alice.$('.c-msg.in .c-sender')));
 check('agents see a «پشتیبانی» filter', await carol.isVisible('.chip[data-f=support]'));
 check('server holds no support text', !execFileSync('mysqldump', ['-u', DBU, `-p${DBP}`, '-h', '127.0.0.1', DBN], { maxBuffer: 1 << 28 }).toString('latin1').includes('SUP-CANARY'));

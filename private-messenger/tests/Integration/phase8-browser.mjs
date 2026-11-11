@@ -335,6 +335,20 @@ check('microphone still live after the route switch', await iph.evaluate(() => [
 await iph.click('.cl-overlay [aria-label="پایان تماس"]');
 await a2.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
 
+// iPhone: Safari's Audio Session API decides earpiece vs loudspeaker. Emulate it and check what the app asks for.
+await a2.context().addInitScript(() => { if (!('audioSession' in navigator)) Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto', log: [] } }); });
+await a2.reload(); await a2.waitForSelector('.c-side-head h1', { timeout: T });
+await openChat(a2, 'کارول');
+await a2.click('[aria-label="تماس صوتی"]');
+await a2.waitForSelector('.cl-overlay [aria-label="پخش از بلندگو"]', { timeout: T });
+check('iPhone: a voice call switches the audio session to «play-and-record» (earpiece) before the microphone starts',
+  await a2.evaluate(() => navigator.audioSession.type) === 'play-and-record');
+await a2.click('.cl-overlay [aria-label="پخش از بلندگو"]');
+check('iPhone: the loudspeaker button switches the session back (speaker)', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
+await a2.click('.cl-overlay [aria-label="پایان تماس"]');
+check('iPhone: session restored after the call', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
+await iph.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
+
 console.log('\n# Delivery ticks');
 await openChat(a2, 'باب'); await a2.waitForSelector('.c-msg.out .st', { timeout: T });
 const ticks = await a2.evaluate(() => [...document.querySelectorAll('.c-msg.out .st')].map((t) => t.className + '|' + !!t.querySelector('svg')));
