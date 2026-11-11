@@ -1801,7 +1801,7 @@ let pendingAnswer = null; // call id chosen with «Answer» on the notification
 function callUi() {
   const remote = el('video', { class: 'cl-remote', autoplay: true, playsinline: true });
   const audio = el('audio', { class: 'cl-audio', autoplay: true, playsinline: true });
-  const local = el('video', { class: 'cl-local', autoplay: true, playsinline: true, muted: true });
+  const local = el('video', { class: 'cl-local', autoplay: true, playsinline: true, muted: true, title: 'آینه‌ای / واقعی', onclick: () => toggleMirror() });
   remote.muted = !IOS; // elsewhere the sound goes through the routable <audio>; the attribute alone does not mute a script-created element
   local.muted = true;  // never play your own microphone back
   const status = el('div', { class: 'cl-status' });
@@ -1843,7 +1843,7 @@ async function startCall(video) {
   try {
     const cfg = await iceConfig();
     cur.stream = await media(video);
-    cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
+    cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local'); applyMirror();
     await initRoute();
     cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length;
     cur.id = await call('call_start', { cid: cur.cid, video });
@@ -1912,7 +1912,7 @@ async function acceptCall() {
   try {
     const cfg = await iceConfig();
     cur.stream = await media(cur.video);
-    cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
+    cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local'); applyMirror();
     await initRoute();
     cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput').length;
     cur.pc = makePc(cfg);
@@ -1943,6 +1943,23 @@ async function onConnected() {
     cur.ui.info.textContent = '🔒 رمزنگاری DTLS-SRTP · ' + (relay ? 'از طریق سرور رله (TURN)' : 'ارتباط مستقیم');
   } catch { /* stats unavailable */ }
 }
+// Your own picture from the FRONT camera is shown like a mirror (as in WhatsApp/FaceTime), the back camera as it is.
+// This changes only your small preview: the other side always gets the real, un-mirrored picture.
+// A tap on the preview switches between mirror view and real view (remembered on this device).
+const mirrorPref = () => { try { return localStorage.getItem('pm.mirror') !== '0'; } catch { return true; } };
+function applyMirror() {
+  const v = cur?.stream?.getVideoTracks()[0];
+  if (!v || !cur.ui) return;
+  const back = v.getSettings?.().facingMode === 'environment';
+  cur.ui.local.classList.toggle('mirror', !back && mirrorPref());
+}
+function toggleMirror() {
+  if (!cur?.stream?.getVideoTracks()[0]) return;
+  const on = !mirrorPref();
+  try { localStorage.setItem('pm.mirror', on ? '1' : '0'); } catch { /* private mode */ }
+  applyMirror();
+  toast(on ? 'پیش‌نمایش شما آینه‌ای شد (طرف مقابل تصویر واقعی را می‌بیند)' : 'پیش‌نمایش شما بدون آینه (همان تصویری که طرف مقابل می‌بیند)');
+}
 async function switchCamera() {
   const v = cur.stream.getVideoTracks()[0];
   const facing = (v.getSettings().facingMode === 'environment') ? 'user' : 'environment';
@@ -1950,7 +1967,7 @@ async function switchCamera() {
     const ns = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } });
     const nt = ns.getVideoTracks()[0];
     await cur.pc.getSenders().find((x) => x.track?.kind === 'video')?.replaceTrack(nt);
-    v.stop(); cur.stream.removeTrack(v); cur.stream.addTrack(nt); cur.ui.local.srcObject = cur.stream;
+    v.stop(); cur.stream.removeTrack(v); cur.stream.addTrack(nt); cur.ui.local.srcObject = cur.stream; applyMirror();
     renderCall();
   } catch { toast('تعویض دوربین ممکن نشد.'); }
 }

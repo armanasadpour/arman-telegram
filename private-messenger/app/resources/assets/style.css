@@ -437,6 +437,8 @@ body.offline .c-side-head h1::after { content: ' · بدون اتصال'; font-s
 .cl-local { position: absolute; width: 112px; height: 160px; object-fit: cover; border-radius: 18px; inset-block-start: calc(24px + env(safe-area-inset-top, 0px)); inset-inline-end: 16px;
   background: #111; display: none; z-index: 2; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); border: 2px solid rgba(255, 255, 255, .25); }
 .cl-overlay.video .cl-remote, .cl-overlay.video.has-local .cl-local { display: block; }
+.cl-local { cursor: pointer; transition: transform .25s ease; }
+.cl-local.mirror { transform: scaleX(-1); }
 .cl-top { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; text-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
 .cl-rings { border-radius: 50%; padding: 10px; margin-bottom: 8px; }
 .cl-overlay.ringing .cl-rings { animation: rings 1.8s infinite; }
