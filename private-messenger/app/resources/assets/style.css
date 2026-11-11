@@ -479,3 +479,8 @@ body.offline .c-side-head h1::after { content: ' · بدون اتصال'; font-s
 .c-reasons { display: grid; gap: 0; margin-bottom: 8px; }
 .c-reasons .check { margin: 6px 0; }
 .c-name .tag { font-size: 10.5px; padding: 0 7px; }
+/* storage quota */
+.quota-n { max-width: 9em; }
+.meter .fill.w0 { width: 1%; } .meter .fill.w1 { width: 10%; } .meter .fill.w2 { width: 20%; } .meter .fill.w3 { width: 30%; } .meter .fill.w4 { width: 40%; } .meter .fill.w5 { width: 50%; }
+.meter .fill.w6 { width: 60%; } .meter .fill.w7 { width: 70%; } .meter .fill.w8 { width: 80%; } .meter .fill.w9 { width: 90%; } .meter .fill.w10 { width: 100%; }
+.meter.full .fill { background: var(--danger); }

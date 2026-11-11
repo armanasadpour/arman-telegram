@@ -95,6 +95,28 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
 <?php endif; ?>
 
 <div class="panel">
+  <h2>فضای ذخیره‌سازی فایل</h2>
+  <?php $q = $ustorage['quota']; $pct = $q ? min(100, (int)round(100 * $ustorage['used'] / $q)) : 0; ?>
+  <p>مصرف فعلی: <b><?= e(Fa::bytes($ustorage['used'])) ?></b> از <b><?= $q ? e(Fa::bytes($q)) : 'نامحدود' ?></b>
+    <?= $ustorage['personal'] ? '<span class="tag">سهمیه اختصاصی</span>' : '<span class="tag">پیش‌فرض</span>' ?><?= $q ? ' — ' . e(Fa::digits($pct)) . '٪' : '' ?></p>
+  <?php if ($q): ?><div class="meter"><span class="fill w<?= (int)round($pct / 10) ?>"></span></div><?php endif; ?>
+  <p class="small muted">فقط فایل‌هایی که الان روی سرور هستند حساب می‌شوند (فایل‌های منقضی‌شده نه). اگر سهمیه پر شود، کاربر تا حذف خودکار فایل‌های قدیمی یا افزایش سهمیه نمی‌تواند فایل جدید بفرستد؛ پیام متنی آزاد است.</p>
+  <?php if (A::can($admin, 'users.edit')): ?>
+  <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/quota" class="row">
+    <?php include __DIR__ . '/../_csrf.php'; ?>
+    <select name="mode" aria-label="نوع سهمیه">
+      <option value="default" <?= !$ustorage['personal'] ? 'selected' : '' ?>>پیش‌فرض سامانه (<?= $default_quota ? e(Fa::bytes($default_quota)) : 'نامحدود' ?>)</option>
+      <option value="unlimited" <?= $ustorage['personal'] && !$q ? 'selected' : '' ?>>نامحدود</option>
+      <option value="custom" <?= $ustorage['personal'] && $q ? 'selected' : '' ?>>مقدار مشخص</option>
+    </select>
+    <input type="number" name="amount" min="1" step="any" class="ltr quota-n" value="<?= $ustorage['personal'] && $q ? e((string)($q % 1073741824 === 0 ? $q / 1073741824 : round($q / 1048576))) : '' ?>" aria-label="مقدار">
+    <select name="unit" aria-label="واحد"><option value="mb" <?= $q && $q % 1073741824 !== 0 ? 'selected' : '' ?>>مگابایت</option><option value="gb" <?= !$q || $q % 1073741824 === 0 ? 'selected' : '' ?>>گیگابایت</option></select>
+    <button class="btn secondary sm">ذخیره سهمیه</button>
+  </form>
+  <?php endif; ?>
+</div>
+
+<div class="panel">
   <h2>نگهداری فایل‌ها</h2>
   <p>نگهداری دائمی فایل‌های این حساب: <b><?= $u['permanent_file_retention'] ? 'فعال' : 'غیرفعال' ?></b></p>
   <p class="small muted"><?= $u['permanent_file_retention']

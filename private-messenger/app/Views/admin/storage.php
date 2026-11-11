@@ -20,4 +20,14 @@ $fmt = fn (?int $b) => $b === null ? 'نامعلوم' : ($b >= 1073741824 ? Fa::
   <form method="post" action="<?= e($base) ?>/storage/cleanup"><?php include __DIR__ . '/../_csrf.php'; ?><button class="btn secondary">اجرای پاک‌سازی همین حالا</button></form>
   <?php endif; ?>
 </div>
+<div class="panel table-wrap">
+  <h2>بیشترین مصرف فضا (فایل‌های فعلی روی سرور)</h2>
+  <p class="small muted">سهمیه پیش‌فرض هر کاربر: <b><?= $default_quota ? e($fmt($default_quota)) : 'نامحدود' ?></b> (تنظیمات ← فایل‌ها و فضا). سهمیه اختصاصی را در صفحه هر کاربر تعیین کنید.</p>
+  <table><tr><th>کاربر</th><th>فایل</th><th>مصرف</th><th>سهمیه</th></tr>
+  <?php foreach ($top as $t): $tq = $t['storage_quota_bytes'] !== null ? (int)$t['storage_quota_bytes'] : $default_quota; ?>
+    <tr><td><a href="<?= e($base) ?>/users/<?= (int)$t['id'] ?>"><?= e($t['display_name']) ?></a> <span class="ltr small muted">@<?= e($t['username']) ?></span></td>
+      <td><?= e(Fa::digits((int)$t['files'])) ?></td><td><?= e($fmt((int)$t['used'])) ?></td>
+      <td><?= $tq ? e($fmt($tq)) . ' (' . e(Fa::digits(min(999, (int)round(100 * $t['used'] / $tq)))) . '٪)' : 'نامحدود' ?><?= $t['storage_quota_bytes'] !== null ? ' <span class="tag">اختصاصی</span>' : '' ?></td></tr>
+  <?php endforeach; if (!$top): ?><tr><td colspan="4" class="muted">هنوز فایلی روی سرور نیست.</td></tr><?php endif; ?></table>
+</div>
 <?php include __DIR__ . '/_bottom.php'; ?>

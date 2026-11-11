@@ -61,6 +61,7 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
     <h2>فایل‌ها و فضا</h2>
     <div class="grid2">
       <label class="field"><span>سقف حجم هر فایل به مگابایت (۰ = بدون محدودیت نرم‌افزاری)</span><input type="number" name="files_max_mb" value="<?= e(intdiv((int)$v('files.max_bytes'), 1048576)) ?>" <?= $dis ?>></label>
+      <label class="field"><span>سهمیه پیش‌فرض فضای فایل برای هر کاربر به مگابایت (۰ = نامحدود؛ برای هر کاربر جداگانه هم در صفحه همان کاربر قابل تغییر است)</span><input type="number" name="user_quota_mb" min="0" value="<?= e(intdiv((int)$v('storage.user_quota_bytes'), 1048576)) ?>" <?= $dis ?>></label>
       <label class="field"><span>سهمیه فضای هاست به گیگابایت (از cPanel؛ فقط برای نمایش، ۰ = نامعلوم)</span><input type="number" name="quota_gb" value="<?= e(intdiv((int)$v('storage.quota_bytes'), 1073741824)) ?>" <?= $dis ?>></label>
     </div>
     <label class="field"><span>مدت نگهداری فایل روی سرور (روز؛ پیش‌فرض ۷)</span><input type="number" name="retention_days" min="1" max="3650" value="<?= e($v('files.retention_days')) ?>" <?= $is_super ? $dis : 'disabled' ?>></label>

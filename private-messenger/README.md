@@ -1,6 +1,6 @@
 # Private Messenger — پیام‌رسان خصوصی با رمزنگاری سرتاسری
 
-> وضعیت: **نسخه ۰٫۹** — همه ۸ فاز + مدیریت محتوا، کنترل سرویس‌ها، چت پشتیبانی، عکس پروفایل رمزنگاری‌شده (۴۵۴ تست).
+> وضعیت: **نسخه ۰٫۹** — همه ۸ فاز + مدیریت محتوا، کنترل سرویس‌ها، چت پشتیبانی، عکس پروفایل رمزنگاری‌شده، سهمیه فضای هر کاربر (۴۶۳ تست).
 > نصب: فقط فایل `install.php` را در public_html آپلود و باز کنید — [docs/12-installation-guide.md](docs/12-installation-guide.md)
 > گزارش‌ها: [فاز ۲](docs/13-phase-2-report.md) · [فاز ۳](docs/14-phase-3-report.md) · [فاز ۴](docs/15-phase-4-report.md) · [فاز ۵](docs/16-phase-5-report.md) · [فاز ۶](docs/17-phase-6-report.md) · [فاز ۷](docs/18-phase-7-report.md) · [فاز ۸](docs/19-phase-8-report.md)
 

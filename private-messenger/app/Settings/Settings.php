@@ -46,6 +46,7 @@ final class Settings
         'calls.relay_only' => false,
         'files.max_bytes' => 0,          // 0 = no software limit (real limit: disk/quota)
         'storage.quota_bytes' => 0,      // hosting quota entered by the admin (PHP cannot read cPanel quotas); 0 = unknown
+        'storage.user_quota_bytes' => 0, // default per-user file quota (0 = no limit); a user's own value overrides it
         'files.retention_days' => 7,     // days an attachment stays on the server (accounts with permanent retention excepted)
         'app.accent' => '#7c3aed',       // accent colour inside the app and the admin panel (never on the anonymous login page)
         'app.logo' => '',                // version tag of storage/branding/logo.png ('' = default icon)

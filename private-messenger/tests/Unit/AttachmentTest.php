@@ -95,3 +95,24 @@ test('Files: stale unfinished uploads are removed; optional admin size cap', fun
     $settings->set('files.max_bytes', 0);
     ok(is_array($f->init((int)$a['id'], $aDev, $cid, 50 * 1048576)), 'no software cap by default');
 });
+
+test('Quota: per-user file quota — default, personal override, unlimited; expired files do not count', function () {
+    [$db, $files, $a, , , $aDev, , $cid, $settings] = attEnv();
+    $uid = (int)$a['id'];
+    eq(null, $files->userQuota($uid), 'no limit by default');
+    $settings->set('storage.user_quota_bytes', 1000);
+    eq(1000, $files->userQuota($uid), 'system default applies');
+    $up = $files->init($uid, $aDev, $cid, 600);
+    eq(600, $files->userUsage($uid), 'unfinished uploads count');
+    throws(fn () => $files->init($uid, $aDev, $cid, 500), \PM\Support\UserError::class);
+    try { $files->init($uid, $aDev, $cid, 500); } catch (\PM\Support\UserError $e) { eq('user_quota_exceeded', $e->getMessage()); }
+    $db->run('UPDATE users SET storage_quota_bytes = 5000 WHERE id = ?', [$uid]);
+    eq(5000, $files->userQuota($uid), 'personal quota overrides the default');
+    $files->init($uid, $aDev, $cid, 500);
+    $db->run('UPDATE users SET storage_quota_bytes = 0 WHERE id = ?', [$uid]);
+    eq(null, $files->userQuota($uid), 'personal 0 = unlimited even with a default');
+    $db->run("UPDATE attachments SET upload_status = 'complete', expires_at = ? WHERE public_id = ?", [gmdate('Y-m-d H:i:s', time() - 60), $up['id']]);
+    eq(500, $files->userUsage($uid), 'an expired file stops counting at once');
+    $st = $files->userStorage($uid);
+    ok($st['personal'] && $st['quota'] === null && $st['used'] === 500);
+});

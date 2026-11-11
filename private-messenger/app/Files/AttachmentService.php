@@ -82,6 +82,10 @@ final class AttachmentService
         if ($max > 0 && $size > $max) {
             throw new UserError('file_too_large');
         }
+        $quota = $this->userQuota($userId);
+        if ($quota !== null && $this->userUsage($userId) + $size > $quota) {
+            throw new UserError('user_quota_exceeded');
+        }
         $free = $this->freeBytes();
         if ($free !== null && $free < $size + self::FREE_SPACE_MARGIN) {
             throw new UserError('insufficient_storage');
@@ -98,6 +102,33 @@ final class AttachmentService
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [$public, $key, 'message', $conv['id'], $userId, $deviceId, $size, $chunk, (int)ceil($size / $chunk), 'initiated', Clock::db()]);
         return ['id' => $public, 'chunk_size' => $chunk, 'chunk_count' => (int)ceil($size / $chunk)];
+    }
+
+    /**
+     * Bytes this user currently occupies on the server: finished files that have not expired (permanent ones
+     * included) plus unfinished uploads. Expired files stop counting immediately, even before the cleanup runs.
+     */
+    public function userUsage(int $userId): int
+    {
+        return (int)$this->db->scalar("SELECT COALESCE(SUM(size_bytes), 0) FROM attachments WHERE uploader_user_id = ?
+                                        AND (upload_status IN ('initiated','uploading') OR (upload_status = 'complete' AND (expires_at IS NULL OR expires_at > ?)))",
+            [$userId, Clock::db()]);
+    }
+
+    /** The user's limit in bytes, or null for «no limit». Personal value first, then the default from settings. */
+    public function userQuota(int $userId): ?int
+    {
+        $own = $this->db->scalar('SELECT storage_quota_bytes FROM users WHERE id = ?', [$userId]);
+        $q = $own !== null ? (int)$own : (int)$this->settings->get('storage.user_quota_bytes');
+        return $q > 0 ? $q : null;
+    }
+
+    /** @return array{used:int, quota:?int, personal:bool, retention_days:int} */
+    public function userStorage(int $userId): array
+    {
+        return ['used' => $this->userUsage($userId), 'quota' => $this->userQuota($userId),
+            'personal' => $this->db->scalar('SELECT storage_quota_bytes FROM users WHERE id = ?', [$userId]) !== null,
+            'retention_days' => $this->settings->int('files.retention_days')];
     }
 
     private function ownUpload(int $userId, string $publicId): array

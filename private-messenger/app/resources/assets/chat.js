@@ -125,7 +125,8 @@ const ERR = {
   not_group_admin: 'فقط مدیران این کار را می‌توانند انجام دهند', group_state_missing: 'اطلاعات رمزنگاری‌شده گروه هنوز دریافت نشده است', link_not_found: 'درخواست منقضی شده است', query_too_short: 'حداقل ۳ حرف وارد کنید',
   channel_read_only: 'در کانال فقط مدیران می‌توانند پیام بفرستند', push_service_not_allowed: 'سرویس اعلان این مرورگر پشتیبانی نمی‌شود', push_disabled: 'اعلان پس‌زمینه توسط مدیر غیرفعال است',
   'Failed to fetch': 'اتصال به سرور برقرار نیست',
-  service_disabled: 'این امکان توسط مدیر سامانه غیرفعال شده است', conversation_banned: 'این گروه/کانال توسط مدیر سامانه مسدود شده است',
+  service_disabled: 'این امکان توسط مدیر سامانه غیرفعال شده است',
+  user_quota_exceeded: 'فضای ذخیره‌سازی شما روی سرور پر است؛ تا حذف خودکار فایل‌های قدیمی صبر کنید یا از مدیر سهمیه بیشتر بخواهید', conversation_banned: 'این گروه/کانال توسط مدیر سامانه مسدود شده است',
   support_closed: 'چت پشتیبانی در حال حاضر غیرفعال است', invalid_report: 'گزارش نامعتبر است',
 };
 const errText = (e) => ERR[e] || ERR[e?.message] || 'خطا: ' + (e?.message || e);
@@ -894,7 +895,14 @@ function appearancePage() {
 }
 async function storagePage() {
   const s = await call('storage_info');
+  let srv = null; try { srv = await call('my_storage'); } catch { /* offline */ }
+  const pct = srv?.quota ? Math.min(100, Math.round(100 * srv.used / srv.quota)) : 0;
   subPage('داده و ذخیره‌سازی',
+    srv ? el('div', { class: 'c-group c-pad' },
+      el('p', { class: 'c-name', text: 'فضای فایل‌های شما روی سرور' }),
+      srv.quota ? el('div', { class: 'meter' + (pct >= 90 ? ' full' : '') }, el('span', { class: 'fill w' + Math.round(pct / 10) })) : null,
+      el('p', { class: 'small' + (pct >= 90 ? ' alert warn' : ''), text: srv.quota ? `${size(srv.used)} از ${size(srv.quota)} (${faNum.format(pct)}٪)` : `${size(srv.used)} — بدون محدودیت سهمیه` }),
+      el('p', { class: 'small muted', text: `فقط فایل‌های فعلی روی سرور حساب می‌شوند؛ هر فایل ${faNum.format(srv.retention_days)} روز پس از ارسال حذف و فضایش آزاد می‌شود. پیام متنی جزو سهمیه نیست.` })) : null,
     el('div', { class: 'c-group c-pad' },
       el('p', { class: 'c-name', text: 'فضای اشغال‌شده روی این دستگاه' }),
       el('div', { class: 'meter' }, el('span', { class: 'fill', 'data-w': s.usage && s.quota ? Math.min(100, Math.max(1, Math.round(100 * s.usage / s.quota))) : 1 })),
@@ -1403,6 +1411,15 @@ async function sendDialog(files) {
   if (dropped.length) toast(`${faNum.format(dropped.length)} فایل حذف شد: ارسال این نوع فایل توسط مدیر غیرفعال است.`);
   files = files.filter((f) => !svcOff(kindOfFile(f)));
   if (!files.length) return;
+  try { // the server enforces the quota too; this only avoids encrypting files that cannot be sent
+    const st = await call('my_storage');
+    const need = files.reduce((n, f) => n + f.size, 0);
+    if (st.quota && st.used + need > st.quota) {
+      return dialog('فضای شما کافی نیست',
+        el('p', { text: `این ${files.length > 1 ? 'فایل‌ها' : 'فایل'} ${size(need)} است ولی از سهمیه ${size(st.quota)} شما فقط ${size(Math.max(0, st.quota - st.used))} باقی مانده است.` }),
+        el('p', { class: 'small muted', text: `فایل‌ها ${faNum.format(st.retention_days)} روز پس از ارسال از سرور حذف می‌شوند و فضایشان آزاد می‌شود؛ برای سهمیه بیشتر با مدیر سامانه تماس بگیرید. ارسال پیام متنی محدودیتی ندارد.` })).showModal();
+    }
+  } catch { /* offline: the server decides */ }
   const items = [];
   for (const f of files) {
     const kind = f.type.startsWith('image/') && f.type !== 'image/svg+xml' ? 'image' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'file';

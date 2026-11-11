@@ -81,6 +81,7 @@ final class ApiController extends Controller
         $r->post('/api/v1/conversations/{id}/prefs', fn (Request $q) => $this->auth($q, fn () => Response::json($this->msgs()->setPrefs((int)$this->s['id'], $q->param('id'), $this->json($q))), true));
         $r->get('/api/v1/push', fn (Request $q) => $this->auth($q, fn () => $this->pushConfig($q), true));
         $r->post('/api/v1/push', fn (Request $q) => $this->auth($q, fn () => $this->pushSubscribe($q), true));
+        $r->get('/api/v1/me/storage', fn (Request $q) => $this->auth($q, fn () => Response::json($this->files()->userStorage((int)$this->s['id']))));
         $r->post('/api/v1/reports', fn (Request $q) => $this->auth($q, fn () => $this->ok((new \PM\Moderation\ReportService($this->app->db()))->create((int)$this->s['id'],
             (string)($this->json($q)['target_type'] ?? ''), (string)($this->json($q)['target_id'] ?? ''), (string)($this->json($q)['reason'] ?? ''), (string)($this->json($q)['details'] ?? ''))), true));
         $r->post('/api/v1/push/test', fn (Request $q) => $this->auth($q, fn () => $this->pushTest($q), true));
@@ -209,7 +210,7 @@ final class ApiController extends Controller
                 return self::err('service_disabled', 403, ['service' => $m[1]]);
             }
             $status = match ($code) {
-                'identity_exists' => 409, 'insufficient_storage' => 507, 'file_too_large' => 413,
+                'identity_exists' => 409, 'insufficient_storage' => 507, 'file_too_large' => 413, 'user_quota_exceeded' => 413,
                 'upload_not_found', 'attachment_not_found', 'call_not_found', 'user_not_found', 'link_not_found', 'group_not_found', 'device_not_found', 'avatar_not_found' => 404,
                 'too_many_devices', 'group_full', 'push_disabled' => 409, 'channel_read_only', 'conversation_banned', 'support_closed' => 403, 'not_group_admin', 'not_group_owner' => 403, default => 400,
             };

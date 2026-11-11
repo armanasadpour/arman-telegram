@@ -218,6 +218,33 @@ for (let i = 0; i < 20 && !pushes.slice(p0).some((x) => JSON.parse(decrypt(sub.j
 check('caller hangs up before an answer → «missed call» push replaces the ringing notification',
   pushes.slice(p0).some((x) => JSON.parse(decrypt(sub.jwk, Buffer.from(sub.auth, 'base64url'), x.body)).t === 'x'));
 
+// ---------------------------------------------------------------- per-user storage quota
+console.log('\n# Per-user storage quota');
+await admin.goto(ADM + 'users/' + uid.bob);
+await admin.selectOption('form[action$="/quota"] select[name=mode]', 'custom'); await admin.fill('form[action$="/quota"] input[name=amount]', '1');
+await admin.selectOption('form[action$="/quota"] select[name=unit]', 'mb'); await admin.click('form[action$="/quota"] button');
+check('admin gives bob a personal quota of 1 MB', sql(`SELECT storage_quota_bytes FROM users WHERE id = ${uid.bob}`) === '1048576');
+check('user page shows usage against the quota', (await admin.textContent('main')).includes('سهمیه اختصاصی'));
+await bob.waitForTimeout(1000);
+if (await bob.$('.cl-overlay')) await bob.click('.cl-overlay [aria-label="رد تماس"]').catch(() => {});
+await openChat(bob, 'آلیس');
+await bob.setInputFiles('.c-compose input[type=file]', { name: 'big.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(2 * 1048576, 7) });
+await bob.waitForSelector('dialog:has-text("فضای شما کافی نیست")', { timeout: T });
+check('the app stops a 2 MB file before encrypting it and explains the quota', (await bob.textContent('dialog')).includes('باقی مانده'));
+await bob.click('dialog >> text=بستن');
+const q413 = await api(bob, 'POST', 'attachments', { conversation_id: conv, size: 2 * 1048576 });
+check('the server refuses the upload too (413 user_quota_exceeded)', q413[0] === 413 && q413[1].error.code === 'user_quota_exceeded', JSON.stringify(q413));
+check('a small file still fits', (await api(bob, 'POST', 'attachments', { conversation_id: conv, size: 100000 }))[0] === 201);
+await bob.click('.c-tab[data-tab=settings]').catch(() => {}); if (await bob.isVisible('[aria-label="بازگشت"]')) await bob.goBack();
+await bob.click('.c-tab[data-tab=settings]'); await bob.click('text=داده و ذخیره‌سازی');
+await bob.waitForSelector('text=فضای فایل‌های شما روی سرور', { timeout: T });
+check('the user sees «X of 1 MB» in Settings → Data and storage', /از .*مگابایت/.test(await bob.textContent('.c-settings')));
+await bob.click('[aria-label="بازگشت"]'); await bob.click('.c-tab[data-tab=chats]');
+await admin.goto(ADM + 'storage');
+check('admin storage page lists the top users with their quotas', (await admin.textContent('main')).includes('@bob') && (await admin.textContent('main')).includes('اختصاصی'));
+await admin.goto(ADM + 'settings'); await admin.fill('input[name=user_quota_mb]', '500'); await admin.click('text=ذخیره تنظیمات');
+check('a default quota for everyone (500 MB) in Settings', sql("SELECT setting_value FROM system_settings WHERE setting_key = 'storage.user_quota_bytes'") === String(500 * 1048576));
+
 // ---------------------------------------------------------------- web cron
 console.log('\n# Cron');
 await admin.goto(ADM + 'system');

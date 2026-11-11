@@ -75,6 +75,7 @@ final class AdminController extends Controller
         $r->post('/users/{id}/sessions/revoke-all', $this->need('users.sessions.revoke', fn (Request $q) => $this->userSessionRevokeAll($q), true));
         $r->post('/users/{id}/devices/revoke', $this->need('users.devices.revoke', fn (Request $q) => $this->userDeviceRevoke($q), true));
         $r->post('/users/{id}/identity-reset', $this->need('users.identity.reset', fn (Request $q) => $this->userIdentityReset($q), true));
+        $r->post('/users/{id}/quota', $this->need('users.edit', fn (Request $q) => $this->userQuota($q), true));
         $r->post('/users/{id}/retention', $this->need('users.retention.manage', fn (Request $q) => $this->userRetention($q), true));
 
         $r->get('/settings', $this->need('settings.view', fn (Request $q) => $this->settingsPage($q)));
@@ -314,7 +315,9 @@ final class AdminController extends Controller
             $this->audit()->record('admin', (int)$this->admin['id'], 'user.view', 'user', $id, [], $req->ip());
         }
         return $this->page($req, 'admin/user', $this->vars(['u' => $u, 'sessions' => $sessions, 'audit' => $audit, 'temp' => $tempPassword, 'devices' => $devices,
-            'ustats' => (new \PM\Admin\Stats($db))->forUser($id), 'upolicies' => $this->policy()->list('user', $id),
+            'ustats' => (new \PM\Admin\Stats($db))->forUser($id),
+            'ustorage' => (new \PM\Files\AttachmentService($db, $this->app->settings(), $this->app->root . '/storage/attachments'))->userStorage($id),
+            'default_quota' => (int)$this->app->settings()->get('storage.user_quota_bytes'), 'upolicies' => $this->policy()->list('user', $id),
             'appeals' => $db->all('SELECT * FROM user_appeals WHERE user_id = ? ORDER BY id DESC LIMIT 5', [$id]),
             'ureports' => (new \PM\Moderation\ReportService($db))->list('all', 'user', $id), 'retention_days' => $this->app->settings()->int('files.retention_days'),
             'retention_by' => $retBy, 'method' => (string)$this->app->settings()->get('auth.method'),
@@ -408,6 +411,26 @@ final class AdminController extends Controller
         });
     }
 
+    /** Per-user file quota: default (from settings), unlimited, or a custom size. */
+    private function userQuota(Request $req): Response
+    {
+        $id = $this->userId($req);
+        $mode = $req->input('mode');
+        $n = (float)\PM\Support\Fa::toLatinDigits($req->input('amount', '0'));
+        $bytes = match ($mode) {
+            'default' => null,
+            'unlimited' => 0,
+            'custom' => $n > 0 && $n <= 1000000 ? (int)round($n * ($req->input('unit') === 'gb' ? 1073741824 : 1048576)) : -1,
+            default => -1,
+        };
+        if ($bytes === -1) {
+            return $this->page($req, 'admin/error', $this->vars(['error' => 'مقدار سهمیه نامعتبر است.', 'back' => '/users/' . $id]), 422);
+        }
+        $this->app->db()->run('UPDATE users SET storage_quota_bytes = ?, updated_at = ? WHERE id = ?', [$bytes, Clock::db(), $id]);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'user.quota', 'user', $id, ['bytes' => $bytes], $req->ip());
+        return $this->back('/users/' . $id, 'saved');
+    }
+
     private function userRetention(Request $req): Response
     {
         return $this->withUserError($req, function () use ($req): Response {
@@ -459,6 +482,7 @@ final class AdminController extends Controller
                 'calls.turn_username' => mb_substr(trim($req->input('calls_turn_username')), 0, 100),
                 'calls.relay_only' => $req->input('calls_relay_only') === '1',
                 'storage.quota_bytes' => $int($req->input('quota_gb', '0'), 0, 100000, 'سهمیه فضا') * 1073741824,
+                'storage.user_quota_bytes' => $int($req->input('user_quota_mb', (string)intdiv((int)$s->get('storage.user_quota_bytes'), 1048576)), 0, 100000000, 'سهمیه پیش‌فرض کاربر') * 1048576,
                 'app.accent' => isset(Settings::ACCENTS[$req->input('accent')]) ? $req->input('accent') : (string)$s->get('app.accent'),
                 'limits.send_per_hour' => $int($req->input('limit_send', (string)$s->get('limits.send_per_hour')), 100, 100000, 'سقف ارسال'),
                 'limits.search_per_hour' => $int($req->input('limit_search', (string)$s->get('limits.search_per_hour')), 10, 10000, 'سقف جست‌وجو'),
@@ -641,7 +665,12 @@ final class AdminController extends Controller
         $last = $this->app->db()->one("SELECT finished_at, trigger_source, stats FROM cron_runs WHERE job = 'maintenance' AND status = 'ok' ORDER BY id DESC LIMIT 1");
         return $this->page($req, 'admin/storage', $this->vars(['st' => $files->stats(), 'last' => $last, 'result' => $result, 'nav' => 'storage',
             'chunk' => \PM\Files\AttachmentService::chunkSize(), 'max' => (int)$this->app->settings()->get('files.max_bytes'), 'msg' => $this->msg($req),
-            'retention' => $this->app->settings()->int('files.retention_days')]));
+            'retention' => $this->app->settings()->int('files.retention_days'),
+            'top' => $this->app->db()->all("SELECT u.id, u.username, u.display_name, u.storage_quota_bytes, COALESCE(SUM(a.size_bytes), 0) AS used, COUNT(a.id) AS files
+                                              FROM attachments a JOIN users u ON u.id = a.uploader_user_id
+                                             WHERE a.upload_status IN ('initiated','uploading') OR (a.upload_status = 'complete' AND (a.expires_at IS NULL OR a.expires_at > ?))
+                                             GROUP BY u.id ORDER BY used DESC LIMIT 20", [Clock::db()]),
+            'default_quota' => (int)$this->app->settings()->get('storage.user_quota_bytes')]));
     }
 
     private function storageCleanup(Request $req): Response

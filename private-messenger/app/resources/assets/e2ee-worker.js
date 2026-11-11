@@ -899,6 +899,7 @@ const commands = {
   remove_avatar: () => removeAvatar(),
   avatar: ({ user_id }) => getAvatar(user_id),
   push_test: () => api('/push/test', { method: 'POST', body: {} }),
+  my_storage: () => api('/me/storage'),
   report: ({ type, id, reason, details }) => api('/reports', { method: 'POST', body: { target_type: type, target_id: id, reason, details } }),
   conv_prefs: ({ cid, prefs }) => api(`/conversations/${encodeURIComponent(cid)}/prefs`, { method: 'POST', body: prefs }),
   async presence({ cid }) { const r = await api(`/conversations/${encodeURIComponent(cid)}/presence`); return { online: r.devices.length > 0, seen: r.peer_seen }; },
