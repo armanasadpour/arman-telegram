@@ -151,8 +151,22 @@ const block = Buffer.from('FILE-CANARY-plaintext-'.repeat(1000));
 const big = Buffer.concat([...Array(Math.ceil(15 * 1048576 / block.length))].map(() => block)).subarray(0, 15 * 1048576 + 12345);
 let chunk1 = 0;
 await aCtx.route(/\/attachments\/[0-9a-f]+\/chunks\/1$/, async (route) => { chunk1++; if (chunk1 === 1) await route.abort('connectionreset'); else await route.continue(); });
+await aCtx.route(/\/attachments\/[0-9a-f]+\/chunks\/[2-9]$/, async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.continue(); });
 await sendFiles(alice, [{ name: 'report.bin', mimeType: 'application/octet-stream', buffer: big }]);
+const samples = [];
+for (let i = 0; i < 40; i++) {
+  const s = await alice.evaluate(() => { const b = [...document.querySelectorAll('.c-msg.out')].pop()?.querySelector('.up-bar');
+    return b && { pct: b.querySelector('.up-pct').textContent, size: b.querySelector('.up-size').textContent, fill: b.querySelector('.up-fill').style.transform }; });
+  if (!s) { if (samples.length) break; } else samples.push(s);
+  if (process.env.PM_SHOTS && samples.length === 6) await alice.locator('.c-msg.out').last().screenshot({ path: process.env.PM_SHOTS + '/up-file.png' });
+  await alice.waitForTimeout(150);
+}
+const pcts = samples.map((x) => Number(x.pct.replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('٪', '')));
+check('upload shows a percentage (in Persian digits) and «x از y» size while sending', samples.length > 3 && samples.every((x) => /٪$/.test(x.pct) && x.size.includes(' از ')), JSON.stringify(samples.slice(0, 3)));
+check('the percentage climbs through many values (not chunk jumps)', new Set(pcts).size >= 5 && pcts.at(-1) > pcts[0], pcts.join(','));
+check('the bar fill follows the percentage', samples.some((x) => /scaleX\(0\.\d+/.test(x.fill)));
 await alice.waitForSelector('.c-msg.out:has-text("report.bin") .st:text("✓")', { timeout: 120000 });
+await aCtx.unroute(/\/attachments\/[0-9a-f]+\/chunks\/[2-9]$/);
 check('upload resumed after the connection dropped mid-transfer', chunk1 >= 2, `chunk-1 attempts: ${chunk1}`);
 check('file uploaded in several chunks', Number(sql("SELECT MAX(chunk_count) FROM attachments")) >= 3);
 await bob.waitForSelector('.c-msg.in:has-text("report.bin")', { timeout: T });
@@ -181,7 +195,21 @@ const webm = Buffer.from(await alice.evaluate(async () => {
   await new Promise((r) => setTimeout(r, 1500)); clearInterval(t); rec.stop(); await new Promise((r) => (rec.onstop = r));
   return [...new Uint8Array(await new Blob(parts).arrayBuffer())];
 }));
+const slow0 = /\/attachments\/[0-9a-f]+\/chunks\/0$/;
+await aCtx.route(slow0, async (route) => { await new Promise((r) => setTimeout(r, 2500)); await route.continue(); });
 await sendFiles(alice, [{ name: 'clip.webm', mimeType: 'video/webm', buffer: webm }]);
+await alice.waitForSelector('.c-msg.out .c-media .up-ring .up-pct', { timeout: T });
+const ring = await alice.evaluate(() => { const m = [...document.querySelectorAll('.c-msg.out')].pop();
+  const r = m.querySelector('.up-ring').getBoundingClientRect(), d = m.querySelector('.up-dial').getBoundingClientRect(), t = m.querySelector('.c-meta').getBoundingClientRect();
+  return { pct: m.querySelector('.up-pct').textContent, play: !!m.querySelector('.c-play'), metaHidden: getComputedStyle(m.querySelector('.c-meta')).opacity === '0',
+    overlap: !(d.bottom <= t.top || d.top >= t.bottom || d.right <= t.left || d.left >= t.right), covers: r.width > 100 };
+});
+if (process.env.PM_SHOTS) await alice.locator('.c-msg.out').last().screenshot({ path: process.env.PM_SHOTS + '/up-media.png' });
+check('photo/video upload: a progress ring with the percentage sits over the picture', /٪$/.test(ring.pct) && ring.covers && !ring.play, JSON.stringify(ring));
+check('photo/video upload: the time does not sit on the progress', ring.metaHidden || !ring.overlap, JSON.stringify(ring));
+await aCtx.unroute(slow0);
+await alice.waitForFunction(() => !document.querySelector('.c-msg.out .up-ring'), null, { timeout: 60000 });
+check('the ring goes away when the upload finishes', true);
 await bob.waitForSelector('.c-msg.in .c-play', { timeout: 60000 });
 await bob.locator('.c-msg.in .c-media:has(.c-play)').last().click();
 await bob.waitForSelector('dialog video.c-view', { timeout: T });

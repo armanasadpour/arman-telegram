@@ -324,7 +324,23 @@ input[type=range] { accent-color: var(--accent); }
 /* attachments */
 .c-att { margin: 2px 0; }
 .c-att.busy { opacity: .6; cursor: progress; }
-.c-att progress { width: 100%; accent-color: var(--accent); }
+/* upload progress: a ring over photos/videos, a bar under files and voice; both eased frame by frame in chat.js */
+.c-att.uploading .c-media { cursor: default; pointer-events: none; }
+.up-ring { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(0, 0, 0, .38); color: #fff; }
+.up-dial { position: relative; width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; background: rgba(0, 0, 0, .35); }
+.up-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.up-svg circle { fill: none; stroke-width: 3.5; }
+.up-bg { stroke: rgba(255, 255, 255, .25); }
+.up-arc { stroke: #fff; stroke-linecap: round; }
+.up-ring .up-pct { position: relative; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.up-ring .up-size { font-size: 11px; background: rgba(0, 0, 0, .45); border-radius: 999px; padding: 1px 8px; }
+.up-bar { margin-top: 6px; }
+.up-track { height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); overflow: hidden; }
+.up-fill { display: block; height: 100%; background: var(--accent); border-radius: inherit; transform: scaleX(0); transform-origin: right; will-change: transform; }
+[dir="ltr"] .up-fill { transform-origin: left; }
+.up-txt { display: flex; justify-content: space-between; gap: 8px; margin-top: 3px; font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.up-txt .up-pct { font-weight: 700; color: var(--accent); }
+.c-msg.media:has(.c-att.uploading) .c-meta { opacity: 0; }
 .c-media { position: relative; display: block; border: 0; padding: 0; background: transparent; cursor: pointer; border-radius: 15px; overflow: hidden; }
 .c-thumb { display: block; max-width: min(300px, 62vw); max-height: 320px; min-width: 140px; border-radius: 15px; object-fit: cover; }
 .c-ph { width: 220px; height: 140px; display: grid; place-items: center; background: var(--surface-2); }

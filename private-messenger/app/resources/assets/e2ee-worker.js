@@ -401,15 +401,28 @@ function nonce(prefix, i, last) {
   n.set(prefix, 0); new DataView(n.buffer).setUint32(7, i); n[11] = last ? 1 : 0;
   return n;
 }
-async function putChunk(id, index, body) {
+/** POST with upload progress (fetch has none): resolves {status, ok, json} like a small Response. */
+function xhrPost(url, body, headers, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', url); x.withCredentials = true;
+    for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v);
+    if (onProgress) x.upload.onprogress = (e) => onProgress(e.loaded);
+    x.onload = () => resolve({ status: x.status, ok: x.status >= 200 && x.status < 300, json: async () => JSON.parse(x.responseText) });
+    x.onerror = x.ontimeout = () => reject(new Error('network'));
+    x.send(body);
+  });
+}
+async function putChunk(id, index, body, onProgress) {
   const sha = hex(await crypto.subtle.digest('SHA-256', body));
   for (let attempt = 0; ; attempt++) {
     let status = 0;
     try {
-      const r = await fetch(`${API}/attachments/${id}/chunks/${index}`, { method: 'POST', credentials: 'same-origin', body,
-        headers: { 'Content-Type': 'application/octet-stream', 'X-PM-Request': '1', 'X-Chunk-SHA256': sha } });
+      const r = await xhrPost(`${API}/attachments/${id}/chunks/${index}`, body,
+        { 'Content-Type': 'application/octet-stream', 'X-PM-Request': '1', 'X-Chunk-SHA256': sha }, onProgress);
       status = r.status;
       if (r.ok) return;
+      onProgress?.(0);
       const j = await r.json().catch(() => ({}));
       if (status >= 400 && status < 500 && status !== 408 && status !== 429) throw Object.assign(new Error(j?.error?.code || `http_${status}`), { fatal: true });
       if (status === 507) throw Object.assign(new Error('insufficient_storage'), { fatal: true });
@@ -431,7 +444,13 @@ async function uploadFile(file, cid, mid) {
       const plain = new Uint8Array(await file.slice(s * SEG, Math.min(size, (s + 1) * SEG)).arrayBuffer());
       parts.push(new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce(prefix, s, s === nseg - 1), additionalData: FILE_AAD }, key, plain)));
     }
-    await putChunk(up.id, c, concat(...parts));
+    const base = c * up.chunk_size;
+    let last = 0;
+    await putChunk(up.id, c, concat(...parts), (sent) => {
+      const now = Date.now();
+      if (now - last < 120) return; // at most ~8 updates a second; the page animates between them
+      last = now; emit('progress', { mid, done: Math.min(csize, base + sent), total: csize });
+    });
     emit('progress', { mid, done: Math.min(csize, (c + 1) * up.chunk_size), total: csize });
   }
   const done = await api(`/attachments/${up.id}/complete`, { method: 'POST', body: {} });

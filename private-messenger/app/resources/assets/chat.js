@@ -183,9 +183,9 @@ worker.onmessage = ({ data }) => {
   if (data.id) { const p = pending.get(data.id); pending.delete(data.id); data.ok ? p.resolve(data.result) : p.reject(new Error(data.error)); return; }
   const { event, data: d } = data;
   if (event === 'message') { if (current && (d.cid === current.id || current.inbox && current.cids.includes(d.cid))) { upsertMessage(d); if (d.dir === 'in') scheduleRead(); } scheduleRefresh(); if (d.status === 'received') notifyIncoming(d); }
-  if (event === 'status') { const m = byMid.get(d.mid); if (m) { m.status = d.status; upsertMessage(m, false); } }
+  if (event === 'status') { if (d.status !== 'uploading') upProg.delete(d.mid); const m = byMid.get(d.mid); if (m) { m.status = d.status; upsertMessage(m, false); } }
   if (event === 'removed') { byMid.delete(d.mid); document.querySelector(`[data-mid="${CSS.escape(d.mid)}"]`)?.remove(); }
-  if (event === 'progress') { const b = document.querySelector(`[data-mid="${CSS.escape(d.mid)}"] progress`); if (b) { b.max = d.total; b.value = d.done; } }
+  if (event === 'progress') upProgress(d.mid, d.done, d.total);
   if (event === 'typing' && current?.id === d.cid) showTyping();
   if (event === 'key_changed' && current?.peer?.id === d.user_id) renderBanner();
   if (event === 'conversations_changed') scheduleRefresh();
@@ -1325,12 +1325,68 @@ function groupReacts(reacts) {
   return [...by].map(([e, us]) => el('span', { class: us.includes(me.id) ? 'mine' : '', title: us.map(nameOf).join('، '), text: e + (us.length > 1 ? ' ' + faNum.format(us.length) : '') }));
 }
 
+// ------------------------------------------------------------------ upload progress
+// The worker reports bytes a few times a second; the page eases the bar, ring and percentage toward that
+// value every frame so they move smoothly instead of jumping chunk by chunk.
+const upProg = new Map(); // mid -> { target, shown } (fractions 0..1)
+let upRaf = 0;
+function upProgress(mid, done, total) {
+  const p = upProg.get(mid) || { target: 0, shown: 0 };
+  p.target = total > 0 ? Math.min(1, done / total) : 0;
+  if (p.target < p.shown) p.shown = p.target; // a retried chunk starts over
+  upProg.set(mid, p);
+  if (!upRaf) upRaf = requestAnimationFrame(upTick);
+}
+function upTick() {
+  upRaf = 0;
+  let moving = false;
+  for (const [mid, p] of upProg) {
+    const gap = p.target - p.shown;
+    if (gap > 0.0005) { p.shown += Math.max(gap * 0.12, Math.min(gap, 0.002)); moving = true; } else p.shown = p.target;
+    upPaint(mid);
+  }
+  if (moving) upRaf = requestAnimationFrame(upTick);
+}
+const RING = 2 * Math.PI * 21;
+function upPaint(mid) {
+  const p = upProg.get(mid);
+  if (!p) return;
+  for (const n of document.querySelectorAll(`[data-up="${CSS.escape(mid)}"]`)) {
+    const f = p.shown, total = +n.dataset.size || 0;
+    n.querySelector('.up-pct').textContent = faNum.format(Math.floor(f * 100)) + '٪';
+    const arc = n.querySelector('.up-arc');
+    if (arc) arc.style.strokeDashoffset = String(RING * (1 - f));
+    const fill = n.querySelector('.up-fill');
+    if (fill) fill.style.transform = `scaleX(${f})`;
+    const sz = n.querySelector('.up-size');
+    if (sz && total) sz.textContent = size(total * f) + ' از ' + size(total);
+  }
+}
+function svgEl(tag, attrs) { const n = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; }
+function uploadView(m, a, media) {
+  if (!upProg.has(m.mid)) upProg.set(m.mid, { target: 0, shown: 0 });
+  let node;
+  if (media) {
+    const svg = svgEl('svg', { viewBox: '0 0 48 48', class: 'up-svg', 'aria-hidden': 'true' });
+    svg.append(svgEl('circle', { cx: 24, cy: 24, r: 21, class: 'up-bg' }), svgEl('circle', { cx: 24, cy: 24, r: 21, class: 'up-arc', 'stroke-dasharray': RING, 'stroke-dashoffset': RING }));
+    node = el('div', { class: 'up-ring', role: 'status', 'aria-label': 'در حال ارسال' }, el('div', { class: 'up-dial' }, svg, el('span', { class: 'up-pct' })), el('span', { class: 'up-size' }));
+  } else {
+    node = el('div', { class: 'up-bar', role: 'status', 'aria-label': 'در حال ارسال' },
+      el('div', { class: 'up-track' }, el('i', { class: 'up-fill' })), el('div', { class: 'up-txt' }, el('span', { class: 'up-size' }), el('span', { class: 'up-pct' })));
+  }
+  node.dataset.up = m.mid; node.dataset.size = String(a.size || 0);
+  queueMicrotask(() => upPaint(m.mid));
+  return node;
+}
+
 function attachmentView(m) {
   const a = m.att;
   const left = a.exp ? Math.ceil((Date.parse(a.exp.replace(' ', 'T') + 'Z') - Date.now()) / 86400000) : null;
   const expiry = a.id ? el('div', { class: 'c-exp', text: left === null ? 'نگهداری دائمی روی سرور' : left > 0 ? `تا ${faNum.format(left)} روز دیگر روی سرور` : 'از سرور حذف شده است' }) : null;
-  const progress = m.status === 'uploading' ? el('progress', { max: a.size || 1, value: 0 }) : null;
-  const box = el('div', { class: 'c-att' });
+  const uploading = m.status === 'uploading';
+  const isMedia = a.kind === 'image' || a.kind === 'video';
+  const progress = uploading && !isMedia ? uploadView(m, a, false) : null;
+  const box = el('div', { class: 'c-att' + (uploading ? ' uploading' : '') });
   const open = async () => {
     box.classList.add('busy');
     try {
@@ -1349,14 +1405,14 @@ function attachmentView(m) {
         el('a', { class: 'btn block mt', href: url, download: a.name, text: 'ذخیره روی دستگاه' }));
       dlg.classList.add('viewer');
       dlg.showModal();
-    } }, thumb, a.kind === 'video' ? el('span', { class: 'c-play' }, ico('play')) : null,
+    } }, thumb, uploading ? uploadView(m, a, true) : a.kind === 'video' ? el('span', { class: 'c-play' }, ico('play')) : null,
       el('span', { class: 'c-att-info', text: `${a.q === 'hd' ? 'HD · ' : a.q === 'original' ? 'اصلی · ' : ''}${size(a.size)}${a.dur ? ' · ' + dur(a.dur) : ''}` })));
   } else if (a.kind === 'audio') {
     box.append(voicePlayer(m, open));
   } else {
     const ext = (a.name.split('.').pop() || '').slice(0, 4).toUpperCase();
     box.append(el('button', { class: 'c-file', onclick: save }, el('span', { class: 'c-file-ico' }, ico('file'), el('small', { text: ext })),
-      el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: a.name }), el('span', { class: 'c-prev', text: size(a.size) + ' · بارگیری' }))));
+      el('span', { class: 'c-body' }, el('span', { class: 'c-name', text: a.name }), el('span', { class: 'c-prev', text: size(a.size) + (uploading ? '' : ' · بارگیری') }))));
   }
   box.append(progress || '', expiry || '');
   return box;
