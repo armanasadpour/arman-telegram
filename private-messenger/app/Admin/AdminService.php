@@ -50,6 +50,12 @@ final class AdminService
         'reports.view' => 'مشاهده گزارش‌های آماری (غیرمحتوایی)',
         'backup.download' => 'دریافت نسخه پشتیبان دیتابیس (فقط مدیرکل)',
         'system.paths.manage' => 'تغییر آدرس‌های مخفی (فقط مدیرکل)',
+        'conversations.view' => 'مشاهده فهرست گروه‌ها و کانال‌ها (بدون پیام)',
+        'conversations.manage' => 'مسدودسازی گروه/کانال و حذف عضو',
+        'services.manage' => 'فعال/غیرفعال کردن سرویس‌ها',
+        'abuse.handle' => 'بررسی گزارش‌های تخلف',
+        'appeals.handle' => 'بررسی درخواست‌های بازبینی',
+        'support.manage' => 'تنظیم چت پشتیبانی',
     ];
     /** Permissions that only a super role may ever hold, regardless of role configuration. */
     public const SUPER_ONLY = ['users.retention.manage', 'admins.manage', 'backup.download', 'system.paths.manage'];

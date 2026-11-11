@@ -139,20 +139,28 @@ final class PushService
             if ($conv === null) {
                 continue;
             }
-            // Members who did not mute the conversation; their devices that are NOT currently open (an open app notifies by itself).
-            $rows = $this->db->all("SELECT ps.id, ps.endpoint, ps.p256dh, ps.auth_secret, ps.device_id
-                                      FROM conversation_members cm
-                                      JOIN devices d ON d.user_id = cm.user_id AND d.status = 'active'
-                                      JOIN push_subscriptions ps ON ps.device_id = d.id
-                                     WHERE cm.conversation_id = ? AND cm.left_at IS NULL AND d.id <> ?
-                                       AND (cm.user_id <> ? OR ? = 'sync')
-                                       AND (cm.muted_until IS NULL OR cm.muted_until < ? OR ? = 'call')
-                                       AND (d.last_seen_at IS NULL OR d.last_seen_at < ?)",
-                [$convId, $senderDevice, $senderUser, $type, $now, $type, $online]);
-            $payload = json_encode(['t' => $type === 'call' ? 'c' : 'm', 'c' => $conv['public_id'], 'g' => $conv['type'] === 'group' ? 1 : 0]);
+            $isCall = in_array($type, ['call', 'call_video', 'call_missed'], true);
+            if ($type === 'call_answered') {
+                // the callee's OTHER devices: stop their ringing notification
+                $rows = $this->db->all("SELECT ps.id, ps.endpoint, ps.p256dh, ps.auth_secret, ps.device_id FROM devices d JOIN push_subscriptions ps ON ps.device_id = d.id
+                                         WHERE d.user_id = ? AND d.status = 'active' AND d.id <> ?", [$senderUser, $senderDevice]);
+            } else {
+                // Members who did not mute the conversation; their devices that are NOT currently open (an open app notifies by itself).
+                // Calls ring on every device, muted or not, open or not: a backgrounded phone browser freezes the page.
+                $rows = $this->db->all("SELECT ps.id, ps.endpoint, ps.p256dh, ps.auth_secret, ps.device_id
+                                          FROM conversation_members cm
+                                          JOIN devices d ON d.user_id = cm.user_id AND d.status = 'active'
+                                          JOIN push_subscriptions ps ON ps.device_id = d.id
+                                         WHERE cm.conversation_id = ? AND cm.left_at IS NULL AND d.id <> ? AND cm.user_id <> ?
+                                           AND (? OR cm.muted_until IS NULL OR cm.muted_until < ?)
+                                           AND (? OR d.last_seen_at IS NULL OR d.last_seen_at < ?)",
+                    [$convId, $senderDevice, $senderUser, $isCall ? 1 : 0, $now, $isCall ? 1 : 0, $online]);
+            }
+            $t = ['call' => 'c', 'call_video' => 'c', 'call_missed' => 'x', 'call_answered' => 'a'][$type] ?? 'm';
+            $payload = json_encode(['t' => $t, 'c' => $conv['public_id'], 'g' => $conv['type'] === 'direct' ? 0 : 1] + ($type === 'call_video' ? ['v' => 1] : []));
             foreach ($rows as $r) {
                 $jobs[(int)$r['id']] = ['id' => (int)$r['id'], 'endpoint' => $r['endpoint'], 'p256dh' => $r['p256dh'], 'auth' => $r['auth_secret'],
-                    'payload' => $payload, 'ttl' => $type === 'call' ? 60 : 86400, 'urgency' => $type === 'call' ? 'high' : 'normal'];
+                    'payload' => $payload, 'ttl' => in_array($type, ['call', 'call_video'], true) ? 60 : ($type === 'call_answered' ? 120 : 86400), 'urgency' => $type === 'message' ? 'normal' : 'high'];
             }
         }
         if ($jobs === []) {

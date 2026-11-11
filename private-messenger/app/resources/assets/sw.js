@@ -69,9 +69,20 @@ self.addEventListener('push', (e) => e.waitUntil((async () => {
     await self.registration.showNotification('اعلان آزمایشی ✓', { body: 'اعلان وقتی برنامه بسته است روی این دستگاه کار می‌کند.', tag: 'push-test', icon: m.icon || undefined, badge: m.badge || undefined });
     return;
   }
+  if (p.t === 'a' || p.t === 'x') { // answered on another device / the caller gave up
+    for (const n of await self.registration.getNotifications({ tag: 'call-' + cid })) n.close();
+    if (p.t === 'x' && !visible && !(m.muted[cid] && m.muted[cid] > Date.now())) {
+      await self.registration.showNotification('📞 تماس ازدست‌رفته', { body: m.preview === 'sender' && m.names[cid] ? m.names[cid] : 'برای دیدن، برنامه را باز کنید',
+        tag: 'missed-' + cid, icon: m.icon || undefined, badge: m.badge || undefined, data: { c: cid }, silent: true });
+    } else if (p.t === 'a') {
+      await self.registration.showNotification('تماس روی دستگاه دیگرتان پاسخ داده شد', { tag: 'call-' + cid, silent: true, icon: m.icon || undefined, badge: m.badge || undefined, data: { c: cid } });
+      setTimeout(async () => { for (const n of await self.registration.getNotifications({ tag: 'call-' + cid })) n.close(); }, 4000);
+    }
+    return;
+  }
   if (p.t === 'c') {
     if (visible) return; // the open app is ringing already
-    await self.registration.showNotification('📞 تماس ورودی', {
+    await self.registration.showNotification(p.v ? '🎥 تماس تصویری ورودی' : '📞 تماس ورودی', {
       body: (m.preview === 'sender' && m.names[cid] ? m.names[cid] + ' — ' : '') + 'برای پاسخ، برنامه را باز کنید',
       tag: 'call-' + cid, renotify: true, requireInteraction: true, vibrate: [400, 200, 400, 200, 400],
       icon: m.icon || undefined, badge: m.badge || undefined, data: { c: cid, call: true }, actions: [{ action: 'open', title: 'باز کردن' }],

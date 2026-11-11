@@ -65,13 +65,15 @@ final class MessageService
 
     public function conversations(int $meId): array
     {
-        return $this->db->all("SELECT c.public_id AS id, c.type, c.is_channel, c.last_activity_at, cm.archived, cm.muted_until, cm.role,
+        return $this->db->all("SELECT c.id AS internal_id, c.public_id AS id, c.type, c.is_channel, c.status, c.banned_until, c.ban_reason, c.last_activity_at, cm.archived, cm.muted_until, cm.role,
+                                      so.public_id AS owner_id, so.display_name AS owner_name, so.username AS owner_username,
                                       p.public_id AS peer_id, p.display_name AS peer_name, p.username AS peer_username, p.status AS peer_status,
                                       (SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id = c.id AND x.left_at IS NULL) AS member_count
                                  FROM conversation_members cm
                                  JOIN conversations c ON c.id = cm.conversation_id
                                  LEFT JOIN conversation_members pm ON c.type = 'direct' AND pm.conversation_id = c.id AND pm.user_id <> cm.user_id
                                  LEFT JOIN users p ON p.id = pm.user_id
+                                 LEFT JOIN users so ON c.type = 'support' AND so.id = c.created_by
                                 WHERE cm.user_id = ? AND cm.left_at IS NULL
                                 ORDER BY c.last_activity_at IS NULL, c.last_activity_at DESC, c.id DESC", [$meId]);
     }
@@ -104,7 +106,7 @@ final class MessageService
 
     private function membership(int $meId, string $convPublicId): ?array
     {
-        return $this->db->one('SELECT c.id, c.type, c.is_channel, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
+        return $this->db->one('SELECT c.id, c.type, c.is_channel, c.status, c.banned_until, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
                                 WHERE c.public_id = ? AND cm.user_id = ? AND cm.left_at IS NULL', [$convPublicId, $meId]);
     }
 
@@ -119,6 +121,23 @@ final class MessageService
         $conv = is_string($in['conversation_id'] ?? null) ? $this->membership($meId, $in['conversation_id']) : null;
         if ($conv === null) {
             throw new UserError('conversation_not_found');
+        }
+        if ($conv['type'] === 'support' && !(new \PM\Moderation\SupportService($this->db, new \PM\Settings\Settings($this->db, '')))->enabled()) {
+            throw new UserError('support_closed');
+        }
+        if ($conv['status'] === 'banned' && ($conv['banned_until'] === null || strtotime($conv['banned_until'] . ' UTC') > Clock::now()->getTimestamp())) {
+            throw new UserError('conversation_banned');
+        }
+        $kind = in_array($in['kind'] ?? null, ['text', 'image', 'video', 'audio', 'file'], true) ? $in['kind'] : null;
+        if ($kind === null && is_array($in['attachment_ids'] ?? null) && $in['attachment_ids'] !== []) {
+            $kind = 'file';
+        }
+        $policy = new \PM\Moderation\PolicyService($this->db);
+        if ($conv['type'] === 'group') {
+            $policy->assertAllowed('group_message', $meId, (int)$conv['id']);
+        }
+        if ($kind !== null) {
+            $policy->assertAllowed($kind, $meId, (int)$conv['id']);
         }
         if ((int)$conv['is_channel'] === 1 && $conv['role'] === 'member') {
             throw new UserError('channel_read_only'); // in a channel only its admins post (clients enforce the same on the encrypted roster)
@@ -162,7 +181,7 @@ final class MessageService
         }
         // Direct chats: every device must be covered. Groups: the client deliberately encrypts only for members
         // announced in the end-to-end encrypted roster, so "missing" is allowed — but never a non-member device.
-        $missing = $conv['type'] === 'group' ? [] : array_values(array_diff(array_keys($expected), array_keys($given)));
+        $missing = $conv['type'] !== 'direct' ? [] : array_values(array_diff(array_keys($expected), array_keys($given)));
         $stale = array_values(array_diff(array_keys($given), array_keys($expected)));
         if ($missing !== [] || $stale !== []) {
             throw new DeviceMismatch($missing, $stale);

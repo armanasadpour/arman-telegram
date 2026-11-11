@@ -47,6 +47,11 @@ final class AdminController extends Controller
         'logo_saved' => 'لوگو ذخیره شد.',
         'logo_deleted' => 'لوگو حذف شد و نماد پیش‌فرض استفاده می‌شود.',
         'path_app' => 'آدرس مخفی برنامه تغییر کرد. آدرس جدید را برای کاربران بفرستید.',
+        'services' => 'محدودیت سرویس‌ها ذخیره شد.',
+        'banned' => 'مسدود شد.',
+        'unbanned' => 'رفع مسدودیت انجام شد.',
+        'member_removed' => 'عضو حذف شد.',
+        'handled' => 'ثبت شد.',
     ];
 
     public function handle(Request $req): Response
@@ -100,6 +105,23 @@ final class AdminController extends Controller
         $r->post('/settings/logo', $this->need('settings.edit', fn (Request $q) => $this->logoUpload($q), true));
         $r->post('/settings/logo/delete', $this->need('settings.edit', fn (Request $q) => $this->logoDelete($q), true));
         $r->get('/theme.css', $this->need(null, fn () => $this->themeCss()));
+        $r->get('/cron/{tok}', fn (Request $q) => $this->webCron($q));
+        $r->get('/services', $this->need('services.manage', fn (Request $q) => $this->servicesPage($q)));
+        $r->post('/services', $this->need('services.manage', fn (Request $q) => $this->servicesSave($q, 'global', 0, '/services'), true));
+        $r->post('/services/{id}/remove', $this->need('services.manage', fn (Request $q) => $this->serviceRemove($q), true));
+        $r->post('/users/{id}/services', $this->need('services.manage', fn (Request $q) => $this->servicesSave($q, 'user', $this->userId($q), '/users/' . $this->userId($q)), true));
+        $r->get('/conversations', $this->need('conversations.view', fn (Request $q) => $this->convList($q)));
+        $r->get('/conversations/{id}', $this->need('conversations.view', fn (Request $q) => $this->convDetail($q)));
+        $r->post('/conversations/{id}/ban', $this->need('conversations.manage', fn (Request $q) => $this->convBan($q), true));
+        $r->post('/conversations/{id}/unban', $this->need('conversations.manage', fn (Request $q) => $this->convUnban($q), true));
+        $r->post('/conversations/{id}/remove-member', $this->need('conversations.manage', fn (Request $q) => $this->convRemoveMember($q), true));
+        $r->post('/conversations/{id}/services', $this->need('services.manage', fn (Request $q) => $this->servicesSave($q, 'conversation', (int)$q->param('id'), '/conversations/' . (int)$q->param('id')), true));
+        $r->get('/abuse', $this->need('abuse.handle', fn (Request $q) => $this->abusePage($q)));
+        $r->post('/abuse/{id}', $this->need('abuse.handle', fn (Request $q) => $this->abuseSet($q), true));
+        $r->get('/appeals', $this->need('appeals.handle', fn (Request $q) => $this->appealsPage($q)));
+        $r->post('/appeals/{id}', $this->need('appeals.handle', fn (Request $q) => $this->appealHandle($q), true));
+        $r->get('/support', $this->need('support.manage', fn (Request $q) => $this->supportPage($q)));
+        $r->post('/support', $this->need('support.manage', fn (Request $q) => $this->supportSave($q), true));
         $r->get('/system', $this->need('system.capabilities.view', fn (Request $q) => $this->systemPage($q)));
 
         $r->get('/account', $this->need(null, fn (Request $q) => $this->accountPage($q)));
@@ -223,6 +245,14 @@ final class AdminController extends Controller
         if ((int)$this->admin['totp_enabled'] === 0) {
             $warnings[] = 'ورود دومرحله‌ای (TOTP) برای حساب مدیریتی شما فعال نیست. از صفحه «حساب من» فعال کنید.';
         }
+        $openReports = (int)$db->scalar("SELECT COUNT(*) FROM abuse_reports WHERE status = 'open'");
+        $openAppeals = (int)$db->scalar("SELECT COUNT(*) FROM user_appeals WHERE status = 'open'");
+        if ($openReports && AdminService::can($this->admin, 'abuse.handle')) {
+            $warnings[] = \PM\Support\Fa::digits($openReports) . ' گزارش تخلف بررسی‌نشده (صفحه «تخلفات»).';
+        }
+        if ($openAppeals && AdminService::can($this->admin, 'appeals.handle')) {
+            $warnings[] = \PM\Support\Fa::digits($openAppeals) . ' درخواست بازبینی در انتظار پاسخ (صفحه «بازبینی»).';
+        }
         $remind = $s->int('backup.reminder_days');
         $last = (string)$s->get('backup.last_at');
         if ($remind > 0 && AdminService::can($this->admin, 'backup.download')
@@ -284,7 +314,9 @@ final class AdminController extends Controller
             $this->audit()->record('admin', (int)$this->admin['id'], 'user.view', 'user', $id, [], $req->ip());
         }
         return $this->page($req, 'admin/user', $this->vars(['u' => $u, 'sessions' => $sessions, 'audit' => $audit, 'temp' => $tempPassword, 'devices' => $devices,
-            'ustats' => (new \PM\Admin\Stats($db))->forUser($id), 'retention_days' => $this->app->settings()->int('files.retention_days'),
+            'ustats' => (new \PM\Admin\Stats($db))->forUser($id), 'upolicies' => $this->policy()->list('user', $id),
+            'appeals' => $db->all('SELECT * FROM user_appeals WHERE user_id = ? ORDER BY id DESC LIMIT 5', [$id]),
+            'ureports' => (new \PM\Moderation\ReportService($db))->list('all', 'user', $id), 'retention_days' => $this->app->settings()->int('files.retention_days'),
             'retention_by' => $retBy, 'method' => (string)$this->app->settings()->get('auth.method'),
             'msg' => $msg ?? $this->msg($req), 'error' => null, 'nav' => 'users']));
     }
@@ -317,7 +349,8 @@ final class AdminController extends Controller
             return $this->page($req, 'admin/error', $this->vars(['error' => 'برای حذف، کلمه «حذف» را در کادر تأیید بنویسید.', 'back' => '/users/' . $this->userId($req)]), 422);
         }
         return $this->withUserError($req, function () use ($req, $status): Response {
-            $this->usersSvc()->setStatus((int)$this->admin['id'], $this->userId($req), $status, $req->ip());
+            $this->usersSvc()->setStatus((int)$this->admin['id'], $this->userId($req), $status, $req->ip(),
+                \PM\Moderation\PolicyService::untilFrom($req->input('duration')), $req->input('reason') ?: null);
             return $status === 'deleted' ? $this->back('/users', 'status') : $this->back('/users/' . $this->userId($req), 'status');
         });
     }
@@ -830,6 +863,156 @@ final class AdminController extends Controller
         return $this->back('/system', 'path_app');
     }
 
+    // ------------------------------------------------------------------ moderation
+    private function policy(): \PM\Moderation\PolicyService
+    {
+        return new \PM\Moderation\PolicyService($this->app->db());
+    }
+
+    private function servicesPage(Request $req): Response
+    {
+        $all = $this->policy()->list();
+        return $this->page($req, 'admin/services', $this->vars(['global' => array_filter($all, fn ($p) => $p['scope'] === 'global'),
+            'scoped' => array_filter($all, fn ($p) => $p['scope'] !== 'global'), 'nav' => 'services', 'msg' => $this->msg($req)]));
+    }
+
+    private function servicesSave(Request $req, string $scope, int $scopeId, string $back): Response
+    {
+        $svc = array_values(array_filter((array)($req->post['off'] ?? []), 'is_string'));
+        $until = \PM\Moderation\PolicyService::untilFrom($req->input('duration'));
+        $set = $this->policy()->setScope($scope, $scopeId, $svc, $until, $req->input('reason') ?: null, (int)$this->admin['id']);
+        $this->audit()->record('admin', (int)$this->admin['id'], 'services.set', $scope === 'global' ? null : $scope, $scope === 'global' ? null : $scopeId,
+            ['off' => $set, 'until' => $until], $req->ip());
+        return $this->back($back, 'services');
+    }
+
+    private function serviceRemove(Request $req): Response
+    {
+        $this->policy()->remove((int)$req->param('id'));
+        $this->audit()->record('admin', (int)$this->admin['id'], 'services.remove', null, null, ['id' => (int)$req->param('id')], $req->ip());
+        return $this->back('/services', 'services');
+    }
+
+    private function convAdmin(): \PM\Moderation\ConversationAdmin
+    {
+        return new \PM\Moderation\ConversationAdmin($this->app->db(), $this->audit());
+    }
+
+    private function convList(Request $req): Response
+    {
+        return $this->page($req, 'admin/conversations', $this->vars(['list' => $this->convAdmin()->list($req->queryString('kind', 'all'), trim($req->queryString('member')), $req->queryString('status', 'all')),
+            'kind' => $req->queryString('kind', 'all'), 'member' => $req->queryString('member'), 'status' => $req->queryString('status', 'all'), 'nav' => 'conversations']));
+    }
+
+    private function convDetail(Request $req): Response
+    {
+        $c = $this->convAdmin()->get((int)$req->param('id'));
+        if ($c === null) {
+            return Response::notFound();
+        }
+        $this->audit()->record('admin', (int)$this->admin['id'], 'conversation.view', 'conversation', (int)$c['id'], [], $req->ip());
+        return $this->page($req, 'admin/conversation', $this->vars(['c' => $c, 'nav' => 'conversations', 'msg' => $this->msg($req),
+            'policies' => $this->policy()->list('conversation', (int)$c['id']), 'reports' => (new \PM\Moderation\ReportService($this->app->db()))->list('all', 'conversation', (int)$c['id'])]));
+    }
+
+    private function convBan(Request $req): Response
+    {
+        $id = (int)$req->param('id');
+        $this->convAdmin()->ban((int)$this->admin['id'], $id, \PM\Moderation\PolicyService::untilFrom($req->input('duration')), $req->input('reason') ?: null, $req->ip());
+        return $this->back('/conversations/' . $id, 'banned');
+    }
+
+    private function convUnban(Request $req): Response
+    {
+        $id = (int)$req->param('id');
+        $this->convAdmin()->unban((int)$this->admin['id'], $id, $req->ip());
+        return $this->back('/conversations/' . $id, 'unbanned');
+    }
+
+    private function convRemoveMember(Request $req): Response
+    {
+        $id = (int)$req->param('id');
+        try {
+            $this->convAdmin()->removeMember((int)$this->admin['id'], $id, (int)$req->input('user'), $req->ip());
+        } catch (UserError $e) {
+            return $this->page($req, 'admin/error', $this->vars(['error' => $e->getMessage(), 'back' => '/conversations/' . $id]), 422);
+        }
+        return $this->back('/conversations/' . $id, 'member_removed');
+    }
+
+    private function abusePage(Request $req): Response
+    {
+        $st = in_array($req->queryString('status'), ['open', 'reviewed', 'dismissed', 'all'], true) ? $req->queryString('status') : 'open';
+        return $this->page($req, 'admin/abuse', $this->vars(['list' => (new \PM\Moderation\ReportService($this->app->db()))->list($st), 'status' => $st, 'nav' => 'abuse', 'msg' => $this->msg($req)]));
+    }
+
+    private function abuseSet(Request $req): Response
+    {
+        (new \PM\Moderation\ReportService($this->app->db()))->setStatus((int)$this->admin['id'], (int)$req->param('id'), $req->input('status'));
+        $this->audit()->record('admin', (int)$this->admin['id'], 'abuse.' . $req->input('status'), null, null, ['report' => (int)$req->param('id')], $req->ip());
+        return $this->back('/abuse', 'handled');
+    }
+
+    private function appealsPage(Request $req, ?string $error = null): Response
+    {
+        $st = in_array($req->queryString('status'), ['open', 'accepted', 'rejected', 'all'], true) ? $req->queryString('status') : 'open';
+        return $this->page($req, 'admin/appeals', $this->vars(['list' => (new \PM\Moderation\AppealService($this->app->db(), $this->audit()))->list($st), 'status' => $st,
+            'error' => $error, 'nav' => 'appeals', 'msg' => $this->msg($req)]));
+    }
+
+    private function appealHandle(Request $req): Response
+    {
+        try {
+            (new \PM\Moderation\AppealService($this->app->db(), $this->audit()))->handle((int)$this->admin['id'], (int)$req->param('id'),
+                $req->input('decision') === 'accept', $req->input('reply'), $this->usersSvc(), $req->ip());
+        } catch (UserError $e) {
+            return $this->appealsPage($req, $e->getMessage());
+        }
+        return $this->back('/appeals', 'handled');
+    }
+
+    private function supportSvc(): \PM\Moderation\SupportService
+    {
+        return new \PM\Moderation\SupportService($this->app->db(), $this->app->settings());
+    }
+
+    private function supportPage(Request $req, ?string $error = null): Response
+    {
+        $s = $this->supportSvc();
+        return $this->page($req, 'admin/support', $this->vars(['enabled' => (bool)$this->app->settings()->get('support.enabled'), 'name' => (string)$this->app->settings()->get('support.name'),
+            'effective' => $s->name(), 'agents' => $s->agentList(), 'stats' => $s->stats(), 'error' => $error, 'nav' => 'support', 'msg' => $this->msg($req)]));
+    }
+
+    private function supportSave(Request $req): Response
+    {
+        $s = $this->app->settings();
+        try {
+            $ids = $this->supportSvc()->setAgents(preg_split('/[\s,،]+/u', $req->input('agents')) ?: []);
+        } catch (UserError $e) {
+            return $this->supportPage($req, $e->getMessage());
+        }
+        $s->set('support.enabled', $req->input('enabled') === '1', (int)$this->admin['id']);
+        $s->set('support.name', mb_substr(trim($req->input('name')), 0, 60), (int)$this->admin['id']);
+        $this->supportSvc()->syncAll();
+        $this->audit()->record('admin', (int)$this->admin['id'], 'support.update', null, null, ['agents' => $ids, 'enabled' => $req->input('enabled') === '1'], $req->ip());
+        return $this->back('/support', 'saved');
+    }
+
+    /** Cron over HTTPS for hosts without a working cPanel cron (cron-job.org etc.). The token is derived from APP_KEY. */
+    private function cronToken(): string
+    {
+        return substr(hash_hmac('sha256', 'pm-web-cron-v1', $this->app->key()), 0, 32);
+    }
+
+    private function webCron(Request $req): Response
+    {
+        if (!hash_equals($this->cronToken(), $req->param('tok'))) {
+            return Response::notFound();
+        }
+        $stats = \PM\Maintenance::run($this->app, 'cron');
+        return new Response($stats === null ? "busy\n" : "ok\n", 200, ['Content-Type' => 'text/plain', 'Cache-Control' => 'no-store']);
+    }
+
     // ------------------------------------------------------------------ logo
     private function logoUpload(Request $req): Response
     {
@@ -890,7 +1073,9 @@ final class AdminController extends Controller
         return $this->page($req, 'admin/system', $this->vars(['reach' => $reach, 'push_overview' => $push->overview(), 'push_on' => $push->enabled(),
             'push_proxy' => $this->app->settings()->hasSecret('push.proxy'), 'checks' => $checks, 'runs' => $runs, 'nav' => 'system', 'fonts' => $fonts, 'msg' => $this->msg($req),
             'paths' => AdminService::can($this->admin, 'system.paths.manage') ? ['app' => $host . '/' . $this->app->env('APP_PATH') . '/', 'admin' => $host . '/' . $this->app->env('ADMIN_PATH') . '/'] : null,
-            'cron' => '*/15 * * * * ' . $php . ' ' . $this->app->root . '/app/Cli/cron.php maintenance']));
+            'cron' => '*/15 * * * * ' . $php . ' ' . $this->app->root . '/app/Cli/cron.php maintenance',
+            'cron_url' => $host . $this->base . '/cron/' . $this->cronToken(),
+            'cron_real' => $this->app->db()->scalar("SELECT MAX(finished_at) FROM cron_runs WHERE job = 'maintenance' AND trigger_source = 'cron'")]));
     }
 
     private function accountPage(Request $req, ?string $error = null, ?string $secret = null): Response

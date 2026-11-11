@@ -1,6 +1,6 @@
 # Private Messenger — پیام‌رسان خصوصی با رمزنگاری سرتاسری
 
-> وضعیت: **فاز ۸ (طراحی حرفه‌ای، PWA، قفل زوم، اعلان پیشرفته، کانال، تست و انتشار)** — پیاده‌سازی و تست شد (۳۹۵ تست).
+> وضعیت: **نسخه ۰٫۹** — همه ۸ فاز + مدیریت محتوا، کنترل سرویس‌ها، چت پشتیبانی، عکس پروفایل رمزنگاری‌شده (۴۵۴ تست).
 > نصب: فقط فایل `install.php` را در public_html آپلود و باز کنید — [docs/12-installation-guide.md](docs/12-installation-guide.md)
 > گزارش‌ها: [فاز ۲](docs/13-phase-2-report.md) · [فاز ۳](docs/14-phase-3-report.md) · [فاز ۴](docs/15-phase-4-report.md) · [فاز ۵](docs/16-phase-5-report.md) · [فاز ۶](docs/17-phase-6-report.md) · [فاز ۷](docs/18-phase-7-report.md) · [فاز ۸](docs/19-phase-8-report.md)
 
@@ -31,6 +31,7 @@
 | [docs/16-phase-5-report.md](docs/16-phase-5-report.md) | گزارش فاز ۵: تماس، جست‌وجوی کاربر، بارگذاری فونت |
 | [docs/17-phase-6-report.md](docs/17-phase-6-report.md) | گزارش فاز ۶: چنددستگاهی، کلید بازیابی، گروه‌ها |
 | [docs/18-phase-7-report.md](docs/18-phase-7-report.md) | گزارش فاز ۷: داشبورد، گزارش‌ها، نقش‌ها، پشتیبان‌گیری، تغییر آدرس مخفی |
+| [docs/20-moderation-support.md](docs/20-moderation-support.md) | نسخه ۰٫۹: سرویس‌ها، گروه/کانال در پنل، بن و بازبینی، گزارش تخلف، چت پشتیبانی، اعلان تماس، Cron |
 | [docs/19-phase-8-report.md](docs/19-phase-8-report.md) | گزارش فاز ۸: طراحی جدید، PWA، قفل زوم، اعلان پیشرفته (Web Push)، کانال، تست نهایی |
 | [tools/host-probe/](tools/host-probe/) | اسکریپت بررسی واقعی قابلیت‌های هاست cPanel (ابزار فاز ۱) |
 | [prototype/](prototype/) | نمونه اولیه رابط کاربری (HTML/CSS/JS ایستا، بدون سرور) |

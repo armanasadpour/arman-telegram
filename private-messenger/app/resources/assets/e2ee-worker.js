@@ -206,12 +206,15 @@ async function targetsFor(cid, peerId, refresh, users = null) {
     if (!Object.keys(peer.devices).length) throw new Error('peer_has_no_devices');
   } else {
     const g = await get('groups', cid);
-    if (!g) throw new Error('group_state_missing');
+    if (!g && convTypes.get(cid) === 'support') {
+      // Support chat: there is no member-run roster — the members are the user and the agents the operator appointed.
+      users = (await membersOf(cid, refresh)).map((m) => m.id);
+    } else if (!g) throw new Error('group_state_missing');
     const onServer = new Set((await membersOf(cid, refresh)).map((m) => m.id));
     const skipped = [];
     // Intersection: a member the server added WITHOUT an admin's encrypted announcement gets nothing;
     // a member the server removed gets nothing either.
-    for (const u of users || g.members) {
+    for (const u of users || g?.members || []) {
       if (u === me.id || !onServer.has(u)) continue;
       let c;
       try { c = await contact(u, refresh); } catch { skipped.push(u); continue; }
@@ -246,8 +249,10 @@ async function deliver(cid, peerId, mid, payload, attachmentIds = [], attempt = 
   await write(sessionOps(Object.keys(targets)));
   try {
     // notify: a visible message → the server may wake recipients' closed apps (push carries no content).
-    const notify = ['text', 'file'].includes(JSON.parse(payload).t);
-    await api('/messages', { method: 'POST', body: { conversation_id: cid, client_msg_id: mid, protocol_version: 1, envelopes, attachment_ids: attachmentIds, notify } });
+    // kind: declared so the server can apply the admin's service switches (it cannot see the content).
+    const pl = JSON.parse(payload), notify = ['text', 'file'].includes(pl.t);
+    const kind = pl.t === 'text' ? 'text' : pl.t === 'file' ? (['image', 'video', 'audio'].includes(pl.body?.att?.kind) ? pl.body.att.kind : 'file') : null;
+    await api('/messages', { method: 'POST', body: { conversation_id: cid, client_msg_id: mid, protocol_version: 1, envelopes, attachment_ids: attachmentIds, notify, kind } });
   } catch (e) {
     if (e.message === 'devices_mismatch' && attempt < 2) {
       for (const d of e.data.stale || []) sessions.delete(d);
@@ -814,7 +819,7 @@ async function start() {
   if (!self.indexedDB || !self.crypto?.subtle || !self.WebAssembly || !navigator.locks) return { state: 'unsupported' };
   await init();
   const boot = await api('/bootstrap');
-  me = boot.me; notifyCfg = boot.notify || notifyCfg; bootInfo = { retention_days: boot.retention_days || 7, version: boot.version || '' };
+  me = boot.me; notifyCfg = boot.notify || notifyCfg; bootInfo = { retention_days: boot.retention_days || 7, version: boot.version || '', services_off: boot.services_off || {}, support: boot.support || {} };
   // One tab at a time: two tabs advancing the same ratchet would corrupt it.
   const got = await new Promise((resolve) => {
     navigator.locks.request(`pm-e2ee-${me.id}`, { ifAvailable: true }, (lock) => {
@@ -858,9 +863,11 @@ async function ready(name) {
   return { state: 'ready', me, device_id: deviceId, name, needs_recovery: needsRecovery, notify: notifyCfg, info: bootInfo };
 }
 
+const convTypes = new Map(); // conversation id -> 'direct' | 'group' | 'support'
 async function conversations() {
   const { conversations: list } = await api('/conversations');
   for (const c of list) {
+    convTypes.set(c.id, c.type);
     const rows = await convRows(c.id, 30);
     const last = rows.length ? await readMessage(rows[0]) : null;
     c.last = last ? { text: last.deleted ? '' : last.text, att: last.att ? last.att.kind : null, deleted: !!last.deleted, flag: last.flag, ts: last.ts, dir: last.dir } : null;
@@ -892,6 +899,7 @@ const commands = {
   remove_avatar: () => removeAvatar(),
   avatar: ({ user_id }) => getAvatar(user_id),
   push_test: () => api('/push/test', { method: 'POST', body: {} }),
+  report: ({ type, id, reason, details }) => api('/reports', { method: 'POST', body: { target_type: type, target_id: id, reason, details } }),
   conv_prefs: ({ cid, prefs }) => api(`/conversations/${encodeURIComponent(cid)}/prefs`, { method: 'POST', body: prefs }),
   async presence({ cid }) { const r = await api(`/conversations/${encodeURIComponent(cid)}/presence`); return { online: r.devices.length > 0, seen: r.peer_seen }; },
   push_config: () => api('/push'),
@@ -938,7 +946,7 @@ const commands = {
   async contacts() { return (await api('/contacts')).users; },
   async follow({ user_id, on }) { await api(on ? '/contacts' : '/contacts/remove', { method: 'POST', body: { user_id } }); },
   async call_ice() { return api('/calls/ice'); },
-  async call_start({ cid }) { return (await api('/calls', { method: 'POST', body: { conversation_id: cid } })).id; },
+  async call_start({ cid, video = false }) { return (await api('/calls', { method: 'POST', body: { conversation_id: cid, video: !!video } })).id; },
   async call_status({ id, status, reason }) { try { return (await api(`/calls/${encodeURIComponent(id)}/status`, { method: 'POST', body: { status, reason } })).status; } catch { return null; } },
   async call_history() { return (await api('/calls')).calls; },
   /** Sends an end-to-end encrypted call signal (offer / answer / hangup …). Not stored as a chat message. */

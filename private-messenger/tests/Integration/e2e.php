@@ -116,13 +116,13 @@ check('revoke other sessions → device 2 logged out', str_contains($u2->get("/$
 
 $p = new Browser($BASE);
 $p->post("/$APP/login", ['username' => 'pending1', 'password' => $pendTemp]);
-check('pending (not activated) account cannot log in', str_contains($p->last['body'], 'حساب شما فعال نیست') && !isset($p->jar['__Host-sid']));
+check('pending (not activated) account cannot log in', str_contains($p->last['body'], 'هنوز فعال نشده') && !isset($p->jar['__Host-sid']));
 
 echo "\n# Admin actions on user\n";
 $admin->post("/$ADM/users/$aliId/status", ['status' => 'suspended']);
 check('suspend → user session revoked immediately', str_contains($u1->get("/$APP/")['body'], 'name="password"'));
 $u1->post("/$APP/login", ['username' => 'ali', 'password' => $ALI_PW]);
-check('suspended user cannot log in', str_contains($u1->last['body'], 'حساب شما فعال نیست'));
+check('suspended user cannot log in (sees the suspension page with an appeal form)', str_contains($u1->last['body'], 'تعلیق شده است') && str_contains($u1->last['body'], 'درخواست بازبینی'));
 $admin->post("/$ADM/users/$aliId/status", ['status' => 'active']);
 $u1->post("/$APP/login", ['username' => 'ali', 'password' => $ALI_PW]);
 check('re-activated user can log in', $u1->last['status'] === 303);

@@ -41,7 +41,7 @@ final class ApiController extends Controller
         $r->post('/api/v1/contacts/remove', fn (Request $q) => $this->auth($q, fn () => $this->follow($q, false)));
         $r->get('/api/v1/calls', fn (Request $q) => $this->auth($q, fn () => Response::json(['calls' => $this->calls()->history((int)$this->s['id'])])));
         $r->get('/api/v1/calls/ice', fn (Request $q) => $this->auth($q, fn () => Response::json($this->calls()->iceConfig((string)$this->s['public_id']))));
-        $r->post('/api/v1/calls', fn (Request $q) => $this->auth($q, fn () => Response::json(['id' => $this->calls()->start((int)$this->s['id'], (string)($this->json($q)['conversation_id'] ?? ''))], 201), true));
+        $r->post('/api/v1/calls', fn (Request $q) => $this->auth($q, fn () => Response::json(['id' => $this->calls()->start((int)$this->s['id'], (string)($this->json($q)['conversation_id'] ?? ''), ($this->json($q)['video'] ?? false) === true)], 201), true));
         $r->post('/api/v1/calls/{id}/status', fn (Request $q) => $this->auth($q, fn () => Response::json(['status' => $this->calls()->update((int)$this->s['id'], $q->param('id'),
             (string)($this->json($q)['status'] ?? ''), isset($this->json($q)['reason']) ? (string)$this->json($q)['reason'] : null)]), true));
         $r->get('/api/v1/conversations', fn (Request $q) => $this->auth($q, fn () => $this->conversations()));
@@ -81,6 +81,8 @@ final class ApiController extends Controller
         $r->post('/api/v1/conversations/{id}/prefs', fn (Request $q) => $this->auth($q, fn () => Response::json($this->msgs()->setPrefs((int)$this->s['id'], $q->param('id'), $this->json($q))), true));
         $r->get('/api/v1/push', fn (Request $q) => $this->auth($q, fn () => $this->pushConfig($q), true));
         $r->post('/api/v1/push', fn (Request $q) => $this->auth($q, fn () => $this->pushSubscribe($q), true));
+        $r->post('/api/v1/reports', fn (Request $q) => $this->auth($q, fn () => $this->ok((new \PM\Moderation\ReportService($this->app->db()))->create((int)$this->s['id'],
+            (string)($this->json($q)['target_type'] ?? ''), (string)($this->json($q)['target_id'] ?? ''), (string)($this->json($q)['reason'] ?? ''), (string)($this->json($q)['details'] ?? ''))), true));
         $r->post('/api/v1/push/test', fn (Request $q) => $this->auth($q, fn () => $this->pushTest($q), true));
         $r->post('/api/v1/me/avatar', fn (Request $q) => $this->auth($q, fn () => Response::json(['version' => (new \PM\Users\AvatarService($this->app->db()))->put((int)$this->s['id'], $this->json($q)['ciphertext'] ?? null)], 201), true));
         $r->post('/api/v1/me/avatar/remove', fn (Request $q) => $this->auth($q, fn () => $this->ok((new \PM\Users\AvatarService($this->app->db()))->remove((int)$this->s['id'])), true));
@@ -203,10 +205,13 @@ final class ApiController extends Controller
             return self::err('devices_mismatch', 409, ['missing' => $e->missing, 'stale' => $e->stale]);
         } catch (UserError $e) {
             $code = $e->getMessage();
+            if (preg_match('/^service_disabled:([a-z_]+)$/', $code, $m)) {
+                return self::err('service_disabled', 403, ['service' => $m[1]]);
+            }
             $status = match ($code) {
                 'identity_exists' => 409, 'insufficient_storage' => 507, 'file_too_large' => 413,
                 'upload_not_found', 'attachment_not_found', 'call_not_found', 'user_not_found', 'link_not_found', 'group_not_found', 'device_not_found', 'avatar_not_found' => 404,
-                'too_many_devices', 'group_full', 'push_disabled' => 409, 'channel_read_only' => 403, 'not_group_admin', 'not_group_owner' => 403, default => 400,
+                'too_many_devices', 'group_full', 'push_disabled' => 409, 'channel_read_only', 'conversation_banned', 'support_closed' => 403, 'not_group_admin', 'not_group_owner' => 403, default => 400,
             };
             return self::err(preg_match('/^[a-z_]+$/', $code) ? $code : 'invalid_request', $status);
         }
@@ -242,6 +247,8 @@ final class ApiController extends Controller
             'name' => (string)$this->app->settings()->get('app.internal_name'),
             'notify' => ['enabled' => (bool)$this->app->settings()->get('notify.enabled'), 'preview' => (string)$this->app->settings()->get('notify.preview')],
             'retention_days' => $this->app->settings()->int('files.retention_days'),
+            'services_off' => (new \PM\Moderation\PolicyService($this->app->db()))->forUser((int)$this->s['id']),
+            'support' => ['enabled' => $this->support()->enabled(), 'name' => $this->support()->name(), 'agent' => $this->support()->isAgent((int)$this->s['id'])],
             'version' => is_file($this->app->root . '/VERSION') ? trim((string)file_get_contents($this->app->root . '/VERSION')) : 'dev',
         ]);
     }
@@ -319,14 +326,35 @@ final class ApiController extends Controller
         return Response::json(['ok' => true]);
     }
 
+    private function support(): \PM\Moderation\SupportService
+    {
+        return new \PM\Moderation\SupportService($this->app->db(), $this->app->settings());
+    }
+
     private function conversations(): Response
     {
         $out = [];
-        foreach ($this->msgs()->conversations((int)$this->s['id']) as $c) {
+        $sup = $this->support();
+        $sup->ensureFor((int)$this->s['id']);
+        $supOn = $sup->enabled();
+        $list = $this->msgs()->conversations((int)$this->s['id']);
+        $blocked = (new \PM\Moderation\PolicyService($this->app->db()))->forConversations(array_map(fn ($c) => (int)$c['internal_id'], $list));
+        $now = time();
+        foreach ($list as $c) {
+            if ($c['type'] === 'support' && !$supOn) {
+                continue;
+            }
+            $banned = $c['status'] === 'banned' && ($c['banned_until'] === null || strtotime($c['banned_until'] . ' UTC') > $now);
+            $extra = ['banned' => $banned ? ['until' => $c['banned_until'], 'reason' => $c['ban_reason']] : null, 'blocked_services' => $blocked[(int)$c['internal_id']] ?? []];
+            if ($c['type'] === 'support') {
+                $mine = $c['owner_id'] === $this->s['public_id'];
+                $extra += ['support' => true, 'verified' => $mine, 'name' => $mine ? $sup->name() : 'پشتیبانی: ' . $c['owner_name'],
+                    'support_user' => $mine ? null : ['id' => $c['owner_id'], 'display_name' => $c['owner_name'], 'username' => $c['owner_username']]];
+            }
             $out[] = ['id' => $c['id'], 'type' => $c['type'], 'last_activity_at' => $c['last_activity_at'], 'member_count' => (int)$c['member_count'], 'role' => $c['role'],
                 'channel' => (int)$c['is_channel'] === 1, 'archived' => (int)$c['archived'] === 1,
                 'muted_until' => $c['muted_until'] !== null && strtotime($c['muted_until'] . ' UTC') > time() ? $c['muted_until'] : null,
-                'peer' => $c['peer_id'] ? ['id' => $c['peer_id'], 'display_name' => $c['peer_name'], 'username' => $c['peer_username'], 'active' => $c['peer_status'] === 'active'] : null];
+                'peer' => $c['peer_id'] ? ['id' => $c['peer_id'], 'display_name' => $c['peer_name'], 'username' => $c['peer_username'], 'active' => $c['peer_status'] === 'active'] : null] + $extra;
         }
         return Response::json(['conversations' => $out]);
     }

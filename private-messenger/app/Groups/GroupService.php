@@ -45,6 +45,7 @@ final class GroupService
         if ($ids === [] || count($ids) + 1 > self::MAX_MEMBERS) {
             throw new UserError('invalid_members');
         }
+        (new \PM\Moderation\PolicyService($this->db))->assertAllowed($channel ? 'create_channel' : 'create_group', $meId);
         return $this->db->transaction(function () use ($meId, $ids, $channel): string {
             $now = Clock::db();
             $pub = Ulid::generate();
@@ -63,7 +64,7 @@ final class GroupService
     private function group(int $meId, string $groupPublicId): array
     {
         $g = $this->db->one("SELECT c.id, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
-                              WHERE c.public_id = ? AND c.type = 'group' AND cm.user_id = ? AND cm.left_at IS NULL", [$groupPublicId, $meId]);
+                              WHERE c.public_id = ? AND c.type IN ('group', 'support') AND cm.user_id = ? AND cm.left_at IS NULL", [$groupPublicId, $meId]);
         if ($g === null) {
             throw new UserError('group_not_found');
         }

@@ -35,6 +35,8 @@ final class Maintenance
                 'ephemeral_deleted' => $db->run('DELETE FROM ephemeral_envelopes WHERE expires_at < ?', [Clock::db()])->rowCount(),
                 'envelopes_expired' => $db->run('DELETE FROM message_envelopes WHERE expires_at < ?', [Clock::db()])->rowCount(),
                 'files' => (new Files\AttachmentService($db, $app->settings(), $app->root . '/storage/attachments'))->cleanup(),
+                'moderation_expired' => \PM\Moderation\ConversationAdmin::expire($db),
+                'support_synced' => (new \PM\Moderation\SupportService($db, $app->settings()))->syncAll(),
                 'cron_runs_deleted' => $db->run('DELETE FROM cron_runs WHERE started_at < ?', [Clock::dbIn('-90 days')])->rowCount(),
             ];
             $db->run('UPDATE cron_runs SET finished_at = ?, status = ?, stats = ? WHERE id = ?', [Clock::db(), 'ok', json_encode($stats), $runId]);

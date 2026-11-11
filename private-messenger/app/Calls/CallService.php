@@ -24,7 +24,7 @@ final class CallService
     {
     }
 
-    public function start(int $meId, string $convPublicId): string
+    public function start(int $meId, string $convPublicId, bool $video = false): string
     {
         $c = $this->db->one('SELECT c.id, (SELECT cm2.user_id FROM conversation_members cm2 WHERE cm2.conversation_id = c.id AND cm2.user_id <> ? LIMIT 1) AS peer
                                FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
@@ -32,12 +32,16 @@ final class CallService
         if ($c === null || $c['peer'] === null) {
             throw new UserError('conversation_not_found');
         }
+        $policy = new \PM\Moderation\PolicyService($this->db);
+        foreach ([$meId, (int)$c['peer']] as $u) { // neither side may have the service switched off
+            $policy->assertAllowed($video ? 'video_call' : 'voice_call', $u);
+        }
         $pub = Ulid::generate();
         $now = Clock::db();
-        $id = $this->db->insert('INSERT INTO calls (public_id, conversation_id, caller_user_id, callee_user_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [$pub, $c['id'], $meId, $c['peer'], 'ringing', $now]);
+        $id = $this->db->insert('INSERT INTO calls (public_id, conversation_id, caller_user_id, callee_user_id, is_video, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [$pub, $c['id'], $meId, $c['peer'], $video ? 1 : 0, 'ringing', $now]);
         $this->db->run('INSERT INTO call_participants (call_id, user_id, joined_at) VALUES (?, ?, ?)', [$id, $meId, $now]);
-        \PM\Push\PushService::queue('call', (int)$c['id'], $meId, 0); // wakes the callee's closed apps ("incoming call", nothing else)
+        \PM\Push\PushService::queue($video ? 'call_video' : 'call', (int)$c['id'], $meId, 0); // wakes the callee's closed apps ("incoming call", nothing else)
         return $pub;
     }
 
@@ -63,6 +67,7 @@ final class CallService
         $now = Clock::db();
         $reason = in_array($reason, ['hangup', 'timeout', 'ice_failed', 'busy', 'error'], true) ? $reason : null;
         if ($status === 'active') {
+            \PM\Push\PushService::queue('call_answered', (int)$c['conversation_id'], $meId, 0); // stop ringing on the callee's other devices
             $this->db->run('UPDATE calls SET status = ?, answered_at = ? WHERE id = ?', ['active', $now, $c['id']]);
             $this->db->run('INSERT INTO call_participants (call_id, user_id, joined_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE joined_at = VALUES(joined_at)', [$c['id'], $meId, $now]);
         } else {
@@ -72,6 +77,10 @@ final class CallService
             $dur = $c['answered_at'] !== null ? max(0, Clock::now()->getTimestamp() - strtotime($c['answered_at'] . ' UTC')) : null;
             $this->db->run('UPDATE calls SET status = ?, end_reason = ?, ended_at = ?, duration_seconds = ? WHERE id = ?', [$status, $reason, $now, $dur, $c['id']]);
             $this->db->run('UPDATE call_participants SET left_at = ? WHERE call_id = ? AND left_at IS NULL', [$now, $c['id']]);
+            if ($c['answered_at'] === null && in_array($status, ['cancelled', 'missed'], true)) {
+                // the caller gave up: turn the ringing notification on closed apps into «missed call»
+                \PM\Push\PushService::queue('call_missed', (int)$c['conversation_id'], (int)$c['caller_user_id'], 0);
+            }
         }
         return $status;
     }

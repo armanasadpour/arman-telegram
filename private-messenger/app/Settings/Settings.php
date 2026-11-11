@@ -58,6 +58,9 @@ final class Settings
         'backup.last_at' => '',
         'push.enabled' => true,          // background notifications through the browsers' push services (payload: type + conversation id only)
         'push.vapid_public' => '',
+        'support.enabled' => false,      // «support» chat pinned at the top of every user's list
+        'support.name' => '',            // shown to users instead of the agent's name ('' = «پشتیبانی <app name>»)
+        'support.agents' => [],          // user ids of the support agents
     ];
 
     public const ACCENTS = ['#7c3aed' => 'بنفش (پیش‌فرض)', '#2563eb' => 'آبی', '#0d9488' => 'فیروزه‌ای', '#16a34a' => 'سبز', '#db2777' => 'صورتی', '#ea580c' => 'نارنجی', '#475569' => 'خاکستری'];

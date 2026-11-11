@@ -16,7 +16,7 @@ let tab = 'chats', filter = 'all', installEvt = null, swReg = null;
 const names = new Map(); // user id -> display name (group members, contacts)
 const pid = () => current?.peer?.id || null;           // null for groups
 const cname = () => current?.peer?.display_name || current?.name || 'گروه';
-const nameOf = (u) => u === me?.id ? 'شما' : names.get(u) || (current?.peer?.id === u ? current.peer.display_name : 'عضو گروه');
+const nameOf = (u) => u === me?.id ? 'شما' : supportUserView() ? (current.name || 'پشتیبانی') : names.get(u) || (current?.peer?.id === u ? current.peer.display_name : 'عضو گروه');
 const isGroup = () => current?.type === 'group';
 const pending = new Map(), byMid = new Map(), urls = new Map();
 
@@ -110,6 +110,8 @@ function ico(name, cls = '') {
   s.innerHTML = ICONS[name] || '';
   return s;
 }
+const verified = () => { const b = el('span', { class: 'verified', title: 'حساب رسمی', 'aria-label': 'حساب رسمی' }); const sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  sv.setAttribute('viewBox', '0 0 24 24'); sv.innerHTML = '<path d="M12 1.5l2.6 2 3.3-.3 1 3.1 2.8 1.8-1 3.1 1 3.1-2.8 1.8-1 3.1-3.3-.3-2.6 2-2.6-2-3.3.3-1-3.1-2.8-1.8 1-3.1-1-3.1 2.8-1.8 1-3.1 3.3.3z"/><path class="ck" d="m8 12.2 2.7 2.7L16.3 9"/>'; b.append(sv); return b; };
 const sr = (t) => el('span', { class: 'sr', text: t });            // text for screen readers (and tests)
 const iconBtn = (name, label, onclick, cls = '') => el('button', { class: 'ib ' + cls, 'aria-label': label, title: label, onclick }, ico(name));
 const call = (cmd, args) => new Promise((resolve, reject) => { const id = ++seq; pending.set(id, { resolve, reject }); worker.postMessage({ id, cmd, args }); });
@@ -123,6 +125,8 @@ const ERR = {
   not_group_admin: 'فقط مدیران این کار را می‌توانند انجام دهند', group_state_missing: 'اطلاعات رمزنگاری‌شده گروه هنوز دریافت نشده است', link_not_found: 'درخواست منقضی شده است', query_too_short: 'حداقل ۳ حرف وارد کنید',
   channel_read_only: 'در کانال فقط مدیران می‌توانند پیام بفرستند', push_service_not_allowed: 'سرویس اعلان این مرورگر پشتیبانی نمی‌شود', push_disabled: 'اعلان پس‌زمینه توسط مدیر غیرفعال است',
   'Failed to fetch': 'اتصال به سرور برقرار نیست',
+  service_disabled: 'این امکان توسط مدیر سامانه غیرفعال شده است', conversation_banned: 'این گروه/کانال توسط مدیر سامانه مسدود شده است',
+  support_closed: 'چت پشتیبانی در حال حاضر غیرفعال است', invalid_report: 'گزارش نامعتبر است',
 };
 const errText = (e) => ERR[e] || ERR[e?.message] || 'خطا: ' + (e?.message || e);
 function toast(text) {
@@ -137,6 +141,7 @@ const avatarUrls = new Map(); // user id -> Promise<data URL | null> (decrypted 
 const loadAvatar = (id) => { if (!avatarUrls.has(id)) avatarUrls.set(id, call('avatar', { user_id: id }).catch(() => null)); return avatarUrls.get(id); };
 function avatar(name, id, kind = 'user', cls = '') {
   const a = el('span', { class: `c-av g${hash(id || name) % 8} ${cls}`, 'aria-hidden': 'true', 'data-uid': kind === 'user' && id ? id : null });
+  if (kind === 'support') { a.classList.add('photo', 'support'); a.append(el('img', { src: brand('icon/192') || '', alt: '' })); return a; }
   if (kind === 'group' || kind === 'channel') a.append(ico(kind === 'channel' ? 'channel' : 'users'));
   else a.textContent = initials(name);
   if (kind === 'user' && id && me) loadAvatar(id).then((url) => { if (url) { a.classList.add('photo'); a.replaceChildren(el('img', { src: url, alt: '' })); } });
@@ -163,8 +168,13 @@ function lastSeen(s) {
   if (new Date().toDateString() === d.toDateString()) return 'آخرین بازدید امروز ' + fa.format(d);
   return 'آخرین بازدید ' + faShort.format(d);
 }
+/** Is a service switched off by the admin (globally, for me, or in this conversation)? */
+const svcOff = (name, c = current) => !!(info.services_off?.[name] || c?.blocked_services?.includes(name));
+const isSupport = (c = current) => c?.type === 'support';
+const supportUserView = (c = current) => isSupport(c) && c.verified; // the user (not an agent) looking at their support chat
+const bannedConv = (c = current) => c?.banned || null;
 const isMuted = (c) => !!(c?.muted_until && dbDate(c.muted_until) > new Date());
-const kindOf = (c) => c.type === 'group' ? (c.channel ? 'channel' : 'group') : 'user';
+const kindOf = (c) => c.type === 'support' ? 'support' : c.type === 'group' ? (c.channel ? 'channel' : 'group') : 'user';
 const titleOf = (c) => c.peer ? c.peer.display_name : c.name;
 
 // ------------------------------------------------------------------ worker events
@@ -465,6 +475,7 @@ async function groupInfo() {
     g.is_admin ? el('details', { class: 'mt' }, el('summary', { text: '+ افزودن عضو' }), ...userPicker(async (u) => {
       try { await call('group_add', { cid: current.id, user_id: u.id }); toast(u.display_name + ' اضافه شد.'); } catch (e) { toast(errText(e)); }
     }, new Set(g.members.map((m) => m.id)))) : null,
+    el('button', { class: 'btn secondary block mt', text: '⚑ گزارش تخلف این ' + word, onclick: () => { close(dlg); reportDialog('conversation', current.id, g.name); } }),
     el('button', { class: 'btn danger block mt', text: 'ترک ' + word, onclick: async () => {
       if (!confirm(`از این ${word} خارج شوید؟`)) return;
       try { await call('group_leave', { cid: current.id }); close(dlg); closeConversation(); } catch (e) { toast(errText(e)); } } }));
@@ -525,14 +536,17 @@ function scheduleRefresh() { clearTimeout(refreshTimer); refreshTimer = setTimeo
 const KIND = { image: '📷 تصویر', video: '🎬 ویدیو', audio: '🎤 پیام صوتی', file: '📎 فایل' };
 function preview(c) {
   const l = c.last;
+  if (!l && supportUserView(c)) return 'سؤال یا مشکلی دارید؟ اینجا بنویسید.';
   if (!l) return c.type === 'group' ? (c.channel ? 'کانال رمزنگاری‌شده' : 'گروه رمزنگاری‌شده') : 'رمزنگاری سرتاسری';
   if (l.deleted) return 'پیام حذف شد';
   if (l.flag && l.dir === 'in' && !l.text && !l.att) return '⚠ پیام قابل نمایش نیست';
   return (l.dir === 'out' ? 'شما: ' : '') + (l.att ? KIND[l.att] + (l.text ? ' — ' : '') : '') + (l.text || '').replace(/\s+/g, ' ').slice(0, 60);
 }
 function matchFilter(c) {
+  if (filter === 'support') return isSupport(c);
   if (filter === 'archive') return c.archived;
   if (c.archived) return false;
+  if (isSupport(c) && !supportUserView(c)) return filter === 'all';
   if (filter === 'direct') return c.type === 'direct';
   if (filter === 'groups') return c.type === 'group' && !c.channel;
   if (filter === 'channels') return c.type === 'group' && c.channel;
@@ -541,13 +555,16 @@ function matchFilter(c) {
 async function refreshList() {
   if (!sideEl) return;
   const fresh = await call('conversations');
-  convs = fresh.filter((c) => c.peer || c.type === 'group');
+  convs = fresh.filter((c) => c.peer || c.type === 'group' || c.type === 'support');
   for (const c of convs) if (c.peer) names.set(c.peer.id, c.peer.display_name);
   updateBadges(); syncSwMeta();
   if (current) { const c = convs.find((x) => x.id === current.id); if (c) { current.muted_until = c.muted_until; current.archived = c.archived; } }
   if (tab !== 'chats' || !listEl || (searchEl && searchEl.value.trim().length >= 2)) return;
   const pinned = new Set(prefs.pinned);
-  const shown = convs.filter(matchFilter).sort((a, b) => (pinned.has(b.id) - pinned.has(a.id)) || ((b.last?.ts || 0) - (a.last?.ts || 0)));
+  const shown = convs.filter(matchFilter).sort((a, b) => (supportUserView(b) - supportUserView(a)) || (pinned.has(b.id) - pinned.has(a.id)) || ((b.last?.ts || 0) - (a.last?.ts || 0)));
+  if (info.support?.agent && !document.querySelector('.chip[data-f=support]')) {
+    document.querySelector('.c-filters')?.append(el('button', { class: 'chip' + (filter === 'support' ? ' on' : ''), 'data-f': 'support', onclick: (e) => { filter = 'support'; e.currentTarget.parentNode.querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); refreshList(); } }, el('span', { text: 'پشتیبانی' })));
+  }
   const archived = convs.filter((c) => c.archived).length;
   const arch = document.querySelector('.chip[data-f=archive] span');
   if (arch) arch.textContent = 'آرشیو' + (archived ? ` (${faNum.format(archived)})` : '');
@@ -561,11 +578,11 @@ function convItem(c, isPinned) {
     oncontextmenu: (e) => { e.preventDefault(); quickActions(c); } },
     avatar(titleOf(c), c.peer?.id || c.id, kindOf(c)),
     el('span', { class: 'c-body' },
-      el('span', { class: 'c-name' }, el('span', { class: 'c-title', text: titleOf(c) }), isMuted(c) ? ico('bellOff', 'mini') : null),
+      el('span', { class: 'c-name' }, el('span', { class: 'c-title', text: titleOf(c) }), c.verified ? verified() : null, c.banned ? el('span', { class: 'tag fail', text: 'مسدود' }) : null, isMuted(c) ? ico('bellOff', 'mini') : null),
       el('span', { class: 'c-prev', text: preview(c) })),
     el('span', { class: 'c-side-meta' }, el('span', { class: 'c-time', text: c.last ? when(c.last.ts) : '' }),
       unread ? el('span', { class: 'badge' + (isMuted(c) ? ' muted' : ''), text: faNum.format(c.unread) })
-        : isPinned ? ico('pin', 'mini pinned') : c.last?.dir === 'out' ? ico('checks', 'mini tick') : null));
+        : isPinned || supportUserView(c) ? ico('pin', 'mini pinned') : c.last?.dir === 'out' ? ico('checks', 'mini tick') : null));
   longPress(item, () => quickActions(c));
   return item;
 }
@@ -598,7 +615,7 @@ function quickActions(c) {
   const pinned = prefs.pinned.includes(c.id);
   sheet(titleOf(c),
     sheetItem('pin', pinned ? 'برداشتن سنجاق' : 'سنجاق کردن بالای فهرست', () => { prefs.pinned = pinned ? prefs.pinned.filter((x) => x !== c.id) : [c.id, ...prefs.pinned].slice(0, 10); savePrefs(); refreshList(); }),
-    sheetItem('archive', c.archived ? 'خارج کردن از آرشیو' : 'آرشیو', () => setPrefs(c, { archived: !c.archived }).then(() => toast(c.archived ? 'به آرشیو منتقل شد.' : 'از آرشیو خارج شد.'))),
+    supportUserView(c) ? null : sheetItem('archive', c.archived ? 'خارج کردن از آرشیو' : 'آرشیو', () => setPrefs(c, { archived: !c.archived }).then(() => toast(c.archived ? 'به آرشیو منتقل شد.' : 'از آرشیو خارج شد.'))),
     isMuted(c) ? sheetItem('bell', 'روشن کردن اعلان', () => setPrefs(c, { muted_until: null })) : sheetItem('bellOff', 'بی‌صدا…', () => muteSheet(c)),
     sheetItem('trash', 'پاک کردن تاریخچه روی این دستگاه', async () => {
       if (!confirm('همه پیام‌های این گفتگو فقط از همین دستگاه پاک شوند؟ (روی دستگاه‌های دیگر و طرف مقابل باقی می‌مانند)')) return;
@@ -633,8 +650,8 @@ async function openDirectory() {
   const input = el('input', { type: 'search', placeholder: 'جست‌وجوی کاربر: حداقل ۳ حرف از نام یا نام کاربری', 'aria-label': 'جست‌وجوی کاربر' });
   const dlg = dialog('شروع گفتگو',
     el('div', { class: 'c-newbtns' },
-      el('button', { class: 'c-newbtn', onclick: () => { close(dlg); createGroup(false); } }, el('span', { class: 'c-ico-box' }, ico('users')), el('span', { text: 'گروه جدید' })),
-      el('button', { class: 'c-newbtn', onclick: () => { close(dlg); createGroup(true); } }, el('span', { class: 'c-ico-box' }, ico('channel')), el('span', { text: 'کانال جدید' }))),
+      svcOff('create_group', null) ? null : el('button', { class: 'c-newbtn', onclick: () => { close(dlg); createGroup(false); } }, el('span', { class: 'c-ico-box' }, ico('users')), el('span', { text: 'گروه جدید' })),
+      svcOff('create_channel', null) ? null : el('button', { class: 'c-newbtn', onclick: () => { close(dlg); createGroup(true); } }, el('span', { class: 'c-ico-box' }, ico('channel')), el('span', { text: 'کانال جدید' }))),
     input, hint, listBox);
   const row = userRow(listBox, () => close(dlg));
   const showContacts = async () => {
@@ -1001,14 +1018,19 @@ async function openConversation(c, focusMid = null) {
   fileInput = el('input', { type: 'file', multiple: true, hidden: true, onchange: () => { const fs = [...fileInput.files]; fileInput.value = ''; if (fs.length) sendDialog(fs); } });
   camInput = el('input', { type: 'file', accept: 'image/*,video/*', capture: 'environment', hidden: true, onchange: () => { const fs = [...camInput.files]; camInput.value = ''; if (fs.length) sendDialog(fs); } });
   sendBtn = el('button', { class: 'c-send', onclick: doSend }, ico('send'), sr('ارسال'));
-  micBtn = recorderButton();
+  micBtn = svcOff('audio', c) ? null : recorderButton();
   emojiPanel = el('div', { class: 'c-emoji-panel', hidden: true }, ...EMOJI_PANEL.map((e) => el('button', { text: e, onclick: () => { insertAtCursor(e); } })));
   chatHead = el('div', { class: 'c-head' });
-  const readOnly = c.type === 'group' && c.channel && !c.is_admin;
+  const ban = bannedConv(c);
+  const readOnly = ban ? `این ${c.channel ? 'کانال' : 'گروه'} توسط مدیر سامانه مسدود شده است${ban.until ? ' تا ' + faDay.format(dbDate(ban.until)) : ''}${ban.reason ? ' — ' + ban.reason : ''}.`
+    : c.type === 'group' && c.channel && !c.is_admin ? 'فقط مدیران کانال می‌توانند پیام بفرستند.'
+    : c.type === 'group' && svcOff('group_message', c) ? 'ارسال پیام در گروه‌ها و کانال‌ها توسط مدیر سامانه غیرفعال شده است.'
+    : ['text', 'image', 'video', 'audio', 'file'].every((k) => svcOff(k, c)) ? 'ارسال پیام برای شما توسط مدیر سامانه غیرفعال شده است.' : null;
+  if (svcOff('text', c)) { composer.disabled = true; composer.placeholder = 'ارسال پیام متنی غیرفعال است'; }
   mainEl.replaceChildren(chatHead, bannerEl, pinEl, findBar,
     el('div', { class: 'c-msgs-wrap' }, msgsEl),
     replyBar, emojiPanel,
-    readOnly ? el('div', { class: 'c-compose ro' }, ico('channel'), el('span', { text: 'فقط مدیران کانال می‌توانند پیام بفرستند.' }), el('textarea', { hidden: true }))
+    readOnly ? el('div', { class: 'c-compose ro' + (ban ? ' banned' : '') }, ico(ban ? 'lock' : 'channel'), el('span', { text: readOnly }), el('textarea', { hidden: true }))
       : el('div', { class: 'c-compose' },
         el('button', { class: 'ib c-attach', 'aria-label': 'پیوست فایل یا تصویر', title: 'پیوست', onclick: attachSheet }, ico('plus')),
         fileInput, camInput,
@@ -1016,8 +1038,8 @@ async function openConversation(c, focusMid = null) {
         micBtn, sendBtn));
   renderHead();
   toggleSend();
-  msgsEl.append(el('div', { class: 'c-e2ee' }, ico('lock'), el('span', { text: c.type === 'group' ? 'پیام‌های این ' + (c.channel ? 'کانال' : 'گروه') + ' رمزنگاری سرتاسری دارند.' : 'گفتگوی رمزنگاری‌شده (E2EE) — فقط شما و ' + cname() + ' می‌توانید این پیام‌ها را بخوانید.' })));
-  if (c.type === 'group') { try { for (const m of (await call('group_info', { cid: c.id })).members) names.set(m.id, m.display_name); } catch { /* names fall back */ } }
+  msgsEl.append(el('div', { class: 'c-e2ee' }, ico('lock'), el('span', { text: isSupport(c) ? (supportUserView(c) ? 'سؤال، مشکل یا پیشنهادتان را اینجا بنویسید. پیام‌ها رمزنگاری سرتاسری دارند و فقط تیم پشتیبانی آن‌ها را می‌خواند.' : 'گفتگوی پشتیبانی — پاسخ شما با نام «' + (info.support?.name || 'پشتیبانی') + '» به کاربر نمایش داده می‌شود.') : c.type === 'group' ? 'پیام‌های این ' + (c.channel ? 'کانال' : 'گروه') + ' رمزنگاری سرتاسری دارند.' : 'گفتگوی رمزنگاری‌شده (E2EE) — فقط شما و ' + cname() + ' می‌توانید این پیام‌ها را بخوانید.' })));
+  if (c.type !== 'direct') { try { for (const m of (await call('group_info', { cid: c.id })).members) names.set(m.id, m.display_name); } catch { /* names fall back */ } }
   const list = await call('messages', { cid: c.id });
   if (current !== c) return;
   let lastDay = '';
@@ -1041,13 +1063,14 @@ function renderHead() {
   const word = c.channel ? 'مشترک' : 'عضو';
   chatHead.replaceChildren(...[
     iconBtn('back', 'بازگشت', () => closeConversation(), 'c-back'),
-    el('button', { class: 'c-head-who', onclick: c.type === 'group' ? groupInfo : showSafety, 'aria-label': 'اطلاعات گفتگو' }, avatar(titleOf(c), c.peer?.id || c.id, kindOf(c))),
-    el('div', { class: 'c-head-name' }, el('b', { text: titleOf(c) }),
-      c.type === 'group' ? el('button', { class: 'c-lock', onclick: groupInfo }, ico('lock', 'mini'), el('span', { text: ` ${faNum.format(c.member_count)} ${word} — اطلاعات ${c.channel ? 'کانال' : 'گروه'}` }))
+    el('button', { class: 'c-head-who', onclick: isSupport(c) ? supportInfo : c.type === 'group' ? groupInfo : showSafety, 'aria-label': 'اطلاعات گفتگو' }, avatar(titleOf(c), c.peer?.id || c.id, kindOf(c))),
+    el('div', { class: 'c-head-name' }, el('b', {}, el('span', { text: titleOf(c) }), c.verified ? verified() : null),
+      isSupport(c) ? el('button', { class: 'c-lock', onclick: supportInfo }, ico('lock', 'mini'), el('span', { text: supportUserView(c) ? ' تیم پشتیبانی — رمزنگاری سرتاسری' : ' @' + (c.support_user?.username || '') }))
+        : c.type === 'group' ? el('button', { class: 'c-lock', onclick: groupInfo }, ico('lock', 'mini'), el('span', { text: ` ${faNum.format(c.member_count)} ${word} — اطلاعات ${c.channel ? 'کانال' : 'گروه'}` }))
         : el('button', { class: 'c-lock', onclick: showSafety }, statusEl, typingEl)),
     isMuted(c) ? ico('bellOff', 'mini muted-ic') : null,
-    c.type === 'group' ? null : iconBtn('phone', 'تماس صوتی', () => startCall(false)),
-    c.type === 'group' ? null : iconBtn('video', 'تماس تصویری', () => startCall(true)),
+    c.type !== 'direct' || svcOff('voice_call', c) ? null : iconBtn('phone', 'تماس صوتی', () => startCall(false)),
+    c.type !== 'direct' || svcOff('video_call', c) ? null : iconBtn('video', 'تماس تصویری', () => startCall(true)),
     iconBtn('more', 'گزینه‌های گفتگو', chatMenu)].filter(Boolean));
   if (c.type === 'direct') { statusEl.textContent = c.seenText || '🔒 رمزنگاری سرتاسری'; }
 }
@@ -1062,15 +1085,39 @@ async function updatePresence() {
 function chatMenu() {
   const c = current;
   sheet(titleOf(c),
-    sheetItem('info', c.type === 'group' ? 'اطلاعات ' + (c.channel ? 'کانال' : 'گروه') : 'اطلاعات و شماره امنیتی', c.type === 'group' ? groupInfo : showSafety),
+    isSupport(c) ? sheetItem('info', 'درباره پشتیبانی', supportInfo) : sheetItem('info', c.type === 'group' ? 'اطلاعات ' + (c.channel ? 'کانال' : 'گروه') : 'اطلاعات و شماره امنیتی', c.type === 'group' ? groupInfo : showSafety),
+    isSupport(c) ? null : sheetItem('shield', 'گزارش تخلف', () => reportDialog(c.type === 'group' ? 'conversation' : 'user', c.type === 'group' ? c.id : c.peer.id, titleOf(c))),
     sheetItem('search', 'جست‌وجو در گفتگو', openFind),
     sheetItem('image', 'رسانه‌ها، فایل‌ها و لینک‌ها', showMedia),
     isMuted(c) ? sheetItem('bell', 'روشن کردن اعلان', () => setPrefs(c, { muted_until: null }).then(renderHead)) : sheetItem('bellOff', 'بی‌صدا…', () => muteSheet(c)),
-    sheetItem('archive', c.archived ? 'خارج کردن از آرشیو' : 'آرشیو', () => setPrefs(c, { archived: !c.archived }).then(() => toast(c.archived ? 'به آرشیو منتقل شد.' : 'از آرشیو خارج شد.'))),
+    supportUserView(c) ? null : sheetItem('archive', c.archived ? 'خارج کردن از آرشیو' : 'آرشیو', () => setPrefs(c, { archived: !c.archived }).then(() => toast(c.archived ? 'به آرشیو منتقل شد.' : 'از آرشیو خارج شد.'))),
     sheetItem('trash', 'پاک کردن تاریخچه روی این دستگاه', async () => {
       if (!confirm('همه پیام‌های این گفتگو فقط از همین دستگاه پاک شوند؟')) return;
       await call('clear_chat', { cid: c.id }); openConversation(c);
     }, 'danger'));
+}
+const REPORT_REASONS = [['spam', 'هرزنامه یا تبلیغ'], ['abuse', 'توهین، آزار یا تهدید'], ['illegal', 'محتوای غیرقانونی'], ['fraud', 'کلاهبرداری'], ['fake', 'جعل هویت'], ['other', 'سایر']];
+function reportDialog(type, id, name) {
+  const details = el('textarea', { rows: '4', maxlength: '1000', placeholder: 'توضیح (اختیاری)' });
+  let reason = 'spam';
+  const dlg = dialog('گزارش تخلف: ' + name,
+    el('div', { class: 'c-reasons' }, ...REPORT_REASONS.map(([k, l], i) => el('label', { class: 'check' },
+      el('input', { type: 'radio', name: 'reason', value: k, checked: i === 0 || null, onchange: () => { reason = k; } }), el('span', { text: l })))),
+    details,
+    el('p', { class: 'small muted', text: 'مدیر سامانه پیام‌ها، عکس‌ها و فایل‌های گفتگو را نمی‌بیند (رمزنگاری سرتاسری)؛ فقط همین دلیل و توضیح شما برایش ارسال می‌شود. گزارش ناشناس به طرف مقابل است.' }),
+    el('button', { class: 'btn block', text: 'ارسال گزارش', onclick: async (e) => {
+      e.target.disabled = true;
+      try { await call('report', { type, id, reason, details: details.value }); close(dlg); toast('گزارش شما ثبت شد. ممنون.'); } catch (x) { toast(errText(x)); e.target.disabled = false; }
+    } }));
+  dlg.showModal();
+}
+function supportInfo() {
+  const c = current;
+  dialog(titleOf(c),
+    el('div', { class: 'c-profile' }, avatar(titleOf(c), c.id, 'support', 'xl'), el('h3', {}, el('span', { text: titleOf(c) }), c.verified ? verified() : null)),
+    el('p', { text: supportUserView(c) ? 'این گفتگوی رسمی پشتیبانی است و همیشه بالای فهرست می‌ماند. پیام‌های شما رمزنگاری سرتاسری دارند و فقط برای دستگاه‌های کارکنان پشتیبانی (که مدیر سامانه تعیین کرده) رمز می‌شوند.'
+      : `گفتگوی پشتیبانی کاربر ${c.support_user?.display_name || ''} (@${c.support_user?.username || ''}). پاسخ‌های شما با نام «${info.support?.name || 'پشتیبانی'}» به کاربر نمایش داده می‌شود و همکاران پشتیبانی هم آن‌ها را می‌بینند.` }),
+    el('p', { class: 'small muted', text: 'پشتیبان تازه، پیام‌های قبل از اضافه‌شدنش را نمی‌بیند (رمزنگاری سرتاسری).' })).showModal();
 }
 function muteRow(c) {
   return el('button', { class: 'c-row', onclick: () => isMuted(c) ? setPrefs(c, { muted_until: null }).then(() => toast('اعلان روشن شد.')) : muteSheet(c) },
@@ -1096,11 +1143,14 @@ function insertAtCursor(t) {
 function attachSheet() {
   emojiPanel.hidden = true;
   const tile = (icon, label, fn, cls) => el('button', { class: 'tile ' + cls, onclick: () => { document.querySelector('.c-sheet-wrap')?.remove(); fn(); } }, el('span', { class: 'tile-ic' }, ico(icon)), el('span', { text: label }));
+  const img = !svcOff('image'), vid = !svcOff('video');
+  const gal = [img && 'image/*', vid && 'video/*'].filter(Boolean).join(',');
   sheet(null, el('div', { class: 'tiles' },
-    tile('image', 'گالری', () => { fileInput.accept = 'image/*,video/*'; fileInput.click(); fileInput.accept = ''; }, 't1'),
-    tile('camera', 'دوربین', () => camInput.click(), 't2'),
-    tile('file', 'فایل', () => { fileInput.accept = ''; fileInput.click(); }, 't3'),
-    tile('music', 'صوت', () => { fileInput.accept = 'audio/*'; fileInput.click(); fileInput.accept = ''; }, 't4')),
+    gal ? tile('image', 'گالری', () => { fileInput.accept = gal; fileInput.click(); fileInput.accept = ''; }, 't1') : null,
+    gal ? tile('camera', 'دوربین', () => { camInput.accept = gal; camInput.click(); }, 't2') : null,
+    svcOff('file') ? null : tile('file', 'فایل', () => { fileInput.accept = ''; fileInput.click(); }, 't3'),
+    svcOff('audio') ? null : tile('music', 'صوت', () => { fileInput.accept = 'audio/*'; fileInput.click(); fileInput.accept = ''; }, 't4')),
+    !img || !vid || svcOff('file') || svcOff('audio') ? el('p', { class: 'small alert warn', text: 'بعضی از انواع فایل توسط مدیر سامانه غیرفعال شده‌اند.' }) : null,
     el('p', { class: 'small muted', text: `🔒 فایل‌ها پیش از خروج از این دستگاه رمزنگاری می‌شوند و ${faNum.format(info.retention_days)} روز روی سرور می‌مانند. بدون سقف مصنوعی حجم.` }));
 }
 function scheduleRead() {
@@ -1113,15 +1163,16 @@ function showTyping() {
 }
 async function renderBanner() {
   if (!current) return;
+  if (isSupport()) { composer.disabled = svcOff('text'); return; }
   if (isGroup()) {
     const blocked = current.has_state === false;
-    composer.disabled = blocked; sendBtn.disabled = blocked;
+    composer.disabled = blocked || svcOff('text'); sendBtn.disabled = blocked;
     bannerEl.replaceChildren(...(blocked ? [el('div', { class: 'alert c-banner', text: 'در انتظار دریافت اطلاعات رمزنگاری‌شده گروه از مدیر گروه…' })] : []));
     return;
   }
   const st = await call('contact_state', { user_id: pid() }).catch(() => ({ pending: false }));
   const blocked = !!st.pending;
-  composer.disabled = blocked; sendBtn.disabled = blocked;
+  composer.disabled = blocked || svcOff('text'); sendBtn.disabled = blocked;
   bannerEl.replaceChildren(...(blocked ? [el('div', { class: 'alert warn c-banner' },
     el('span', { text: `کلید امنیتی ${cname()} تغییر کرده است (ورود از دستگاه جدید یا بازنشانی حساب). تا تأیید شما پیامی برای او ارسال نمی‌شود. در صورت امکان شماره امنیتی را حضوری مقایسه کنید.` }),
     el('button', { class: 'btn sm', text: 'پذیرفتن کلید جدید', onclick: async () => { await call('accept_key', { user_id: pid() }); renderBanner(); } }))] : []));
@@ -1181,7 +1232,7 @@ function upsertMessage(m, scroll = true) {
     const media = !m.deleted && m.att && (m.att.kind === 'image' || m.att.kind === 'video') && m.att.thumb;
     node = el('div', { class: 'c-msg ' + (m.dir === 'out' ? 'out' : 'in') + (m.deleted ? ' deleted' : '') + (media && !m.text ? ' media' : ''), 'data-mid': m.mid,
       oncontextmenu: (e) => { if (m.deleted || m.status === 'uploading' || m.status === 'sending') return; e.preventDefault(); menu(m, e.currentTarget); }, ondblclick: () => !m.deleted && setReply(m) },
-      isGroup() && m.dir === 'in' ? el('div', { class: 'c-sender g' + (hash(m.from) % 8), text: nameOf(m.from) }) : null,
+      (isGroup() || (isSupport() && !supportUserView())) && m.dir === 'in' ? el('div', { class: 'c-sender g' + (hash(m.from) % 8), text: nameOf(m.from) }) : null,
       m.flag === 'not_in_roster' ? el('div', { class: 'c-flag', text: '⚠ فرستنده در فهرست رمزنگاری‌شده اعضای گروه نیست' }) : null,
       m.fwd ? el('div', { class: 'c-fwd', text: '↪ بازارسال‌شده' }) : null,
       target ? el('button', { class: 'c-quote', onclick: () => msgsEl.querySelector(`[data-mid="${CSS.escape(target.mid)}"]`)?.scrollIntoView({ block: 'center' }) },
@@ -1347,6 +1398,11 @@ function videoMeta(file) {
   });
 }
 async function sendDialog(files) {
+  const kindOfFile = (f) => f.type.startsWith('image/') && f.type !== 'image/svg+xml' ? 'image' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'file';
+  const dropped = files.filter((f) => svcOff(kindOfFile(f)));
+  if (dropped.length) toast(`${faNum.format(dropped.length)} فایل حذف شد: ارسال این نوع فایل توسط مدیر غیرفعال است.`);
+  files = files.filter((f) => !svcOff(kindOfFile(f)));
+  if (!files.length) return;
   const items = [];
   for (const f of files) {
     const kind = f.type.startsWith('image/') && f.type !== 'image/svg+xml' ? 'image' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'file';
@@ -1451,7 +1507,8 @@ async function showSafety() {
     state,
     s.pending ? el('p', { class: 'alert warn small', text: 'کلید این مخاطب تغییر کرده و هنوز پذیرفته نشده است؛ این شماره مربوط به کلید قبلی است.' }) : null,
     s.verified || s.pending ? null : el('button', { class: 'btn', text: 'اعداد یکسان است — تأیید', onclick: async () => { await call('verify', { user_id: pid() }); state.textContent = '✔ شما این مخاطب را تأیید کرده‌اید.'; } }),
-    el('p', { class: 'small muted mt', text: `فایل‌ها پس از ${faNum.format(info.retention_days)} روز به‌طور خودکار از سرور حذف می‌شوند.` }));
+    el('p', { class: 'small muted mt', text: `فایل‌ها پس از ${faNum.format(info.retention_days)} روز به‌طور خودکار از سرور حذف می‌شوند.` }),
+    el('button', { class: 'btn danger block mt', text: '⚑ گزارش تخلف این کاربر', onclick: () => { close(dlg); reportDialog('user', pid(), cname()); } }));
   dlg.showModal();
 }
 
@@ -1587,7 +1644,7 @@ async function startCall(video) {
     cur.ui.local.srcObject = cur.stream; cur.ui.root.classList.add('has-local');
     await initRoute();
     cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length;
-    cur.id = await call('call_start', { cid: cur.cid });
+    cur.id = await call('call_start', { cid: cur.cid, video });
     cur.pc = makePc(cfg);
     cur.stream.getTracks().forEach((t) => cur.pc.addTrack(t, cur.stream));
     await cur.pc.setLocalDescription(await cur.pc.createOffer());
@@ -1695,6 +1752,8 @@ function endCall(status, reason, message) {
 
 // ------------------------------------------------------------------ boot
 document.body.dataset.title = document.title;
+// Session ended on the server (signed out elsewhere, account suspended…): back to the login page.
+window.addEventListener('unhandledrejection', (e) => { if (['unauthenticated', 'http_401', 'session_expired'].includes(e.reason?.message)) { e.preventDefault(); location.reload(); } });
 navigator.storage?.persist?.().catch(() => {});
 document.addEventListener('visibilitychange', () => { const v = document.visibilityState === 'visible'; call('visibility', { visible: v }); if (v) { scheduleRead(); if (current) swPost({ type: 'read', c: current.id }); } });
 window.addEventListener('online', () => { document.body.classList.remove('offline'); call('sync_now').catch(() => {}); });

@@ -102,31 +102,44 @@ final class UserService
         }
     }
 
-    public function setStatus(int $adminId, int $id, string $status, string $ip): void
+    /** A timed suspension/ban that has run out turns the account back to active. Returns the fresh row. */
+    public function expireStatus(array $u): array
+    {
+        if (in_array($u['status'], ['suspended', 'blocked'], true) && $u['status_until'] !== null && strtotime($u['status_until'] . ' UTC') <= Clock::now()->getTimestamp()) {
+            $this->db->run("UPDATE users SET status = 'active', status_until = NULL, status_reason = NULL, updated_at = ? WHERE id = ? AND status = ?", [Clock::db(), $u['id'], $u['status']]);
+            $this->audit->record('system', null, 'user.status', 'user', (int)$u['id'], ['from' => $u['status'], 'to' => 'active', 'why' => 'expired'], null);
+            return $this->get((int)$u['id']) ?? $u;
+        }
+        return $u;
+    }
+
+    public function setStatus(int $adminId, int $id, string $status, string $ip, ?string $until = null, ?string $reason = null): void
     {
         $u = $this->getOrFail($id);
         if (!isset(self::STATUSES[$status]) || $u['status'] === 'deleted') {
             throw new UserError('تغییر وضعیت نامعتبر است.');
         }
-        if ($u['status'] === $status) {
+        if ($u['status'] === $status && $u['status_until'] === $until && ($u['status_reason'] ?? null) === $reason) {
             return;
         }
-        $this->db->transaction(function () use ($id, $status, $u): void {
+        $until = in_array($status, ['suspended', 'blocked'], true) ? $until : null;
+        $reason = in_array($status, ['suspended', 'blocked'], true) && $reason !== null && trim($reason) !== '' ? mb_substr(trim($reason), 0, 500) : null;
+        $this->db->transaction(function () use ($id, $status, $u, $until, $reason): void {
             $now = Clock::db();
             if ($status === 'deleted') {
                 // Free the username/phone for reuse; keep the row for referential integrity.
                 $this->db->run('UPDATE users SET status = ?, deleted_at = ?, updated_at = ?, username = ?, phone_e164 = NULL, password_hash = NULL WHERE id = ?',
                     ['deleted', $now, $now, 'deleted-' . $id . '-' . bin2hex(random_bytes(3)), $id]);
             } else {
-                $this->db->run('UPDATE users SET status = ?, updated_at = ?, activated_at = COALESCE(activated_at, IF(? = \'active\', ?, NULL)) WHERE id = ?',
-                    [$status, $now, $status, $now, $id]);
+                $this->db->run('UPDATE users SET status = ?, status_until = ?, status_reason = ?, updated_at = ?, activated_at = COALESCE(activated_at, IF(? = \'active\', ?, NULL)) WHERE id = ?',
+                    [$status, $until, $reason, $now, $status, $now, $id]);
             }
             if ($status !== 'active') {
                 $this->sessions->revokeAll($id, 'account_status');
             }
             $this->db->insert('INSERT INTO notifications (user_id, type, created_at) VALUES (?, ?, ?)', [$id, 'account_status', $now]);
         });
-        $this->audit->record('admin', $adminId, 'user.status', 'user', $id, ['from' => $u['status'], 'to' => $status], $ip);
+        $this->audit->record('admin', $adminId, 'user.status', 'user', $id, ['from' => $u['status'], 'to' => $status] + ($until ? ['until' => $until] : []) + ($reason ? ['reason' => $reason] : []), $ip);
     }
 
     /** @return string one-time temporary password */

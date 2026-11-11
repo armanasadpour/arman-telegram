@@ -47,11 +47,10 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
 <div class="panel">
   <h2>وضعیت و دسترسی</h2>
   <div class="row">
-    <?php foreach (['active' => ['users.activate', 'فعال‌سازی', 'btn'], 'suspended' => ['users.suspend', 'تعلیق', 'btn secondary'], 'blocked' => ['users.block', 'مسدودسازی', 'btn secondary']] as $st => [$perm, $label, $cls]):
-        if ($u['status'] !== $st && A::can($admin, $perm)): ?>
+    <?php if ($u['status'] !== 'active' && A::can($admin, 'users.activate')): ?>
       <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/status" class="inline"><?php include __DIR__ . '/../_csrf.php'; ?>
-        <input type="hidden" name="status" value="<?= e($st) ?>"><button class="<?= e($cls) ?>"><?= e($label) ?></button></form>
-    <?php endif; endforeach; ?>
+        <input type="hidden" name="status" value="active"><button class="btn">فعال‌سازی</button></form>
+    <?php endif; ?>
     <?php if (A::can($admin, 'users.sessions.revoke')): ?>
       <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/password" class="inline"><?php include __DIR__ . '/../_csrf.php'; ?><button class="btn secondary">ساخت رمز موقت جدید</button></form>
     <?php endif; ?>
@@ -59,6 +58,19 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
       <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/unlock" class="inline"><?php include __DIR__ . '/../_csrf.php'; ?><button class="btn secondary">برداشتن قفل ورود</button></form>
     <?php endif; ?>
   </div>
+  <?php if (in_array($u['status'], ['suspended', 'blocked'], true)): ?>
+    <div class="alert warn small"><?= $u['status'] === 'suspended' ? 'تعلیق' : 'مسدود' ?> <?= $u['status_until'] ? 'تا ' . e(Fa::dateTime($u['status_until'])) . ' (بعد از آن خودکار فعال می‌شود)' : 'دائمی' ?><?= $u['status_reason'] ? ' — دلیل: ' . e($u['status_reason']) : '' ?></div>
+  <?php endif; ?>
+  <?php if (A::can($admin, 'users.suspend') || A::can($admin, 'users.block')): ?>
+  <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/status" class="grid2 mt"><?php include __DIR__ . '/../_csrf.php'; ?>
+    <label class="field"><span>اقدام</span><select name="status">
+      <?php if (A::can($admin, 'users.suspend')): ?><option value="suspended">تعلیق (موقت؛ کاربر می‌تواند درخواست بازبینی بفرستد)</option><?php endif; ?>
+      <?php if (A::can($admin, 'users.block')): ?><option value="blocked">بن / مسدودسازی</option><?php endif; ?></select></label>
+    <label class="field"><span>مدت</span><select name="duration"><?php foreach (\PM\Moderation\PolicyService::DURATIONS as $k => $l): ?><option value="<?= e($k) ?>"><?= e($l) ?></option><?php endforeach; ?></select></label>
+    <label class="field"><span>دلیل (به کاربر نمایش داده می‌شود)</span><input type="text" name="reason" maxlength="500"></label>
+    <div class="field"><span>&nbsp;</span><button class="btn danger">اعمال</button></div>
+  </form>
+  <?php endif; ?>
   <?php if ($locked): ?><p class="small"><span class="tag warn">ورود موقتاً قفل است تا <?= e(Fa::dateTime($u['locked_until'])) ?></span></p><?php endif; ?>
   <p class="small muted">تعلیق، مسدودسازی و ساخت رمز موقت جدید، همه نشست‌های فعال کاربر را باطل می‌کند.</p>
   <?php if (A::can($admin, 'users.delete')): ?>
@@ -70,6 +82,17 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
   </details>
   <?php endif; ?>
 </div>
+
+<?php if (A::can($admin, 'services.manage')): ?>
+<div class="panel"><h2>محدودیت سرویس‌ها برای این کاربر</h2>
+  <?php $action = '/users/' . (int)$u['id'] . '/services'; $keys = array_keys(\PM\Moderation\PolicyService::SERVICES); $current = $upolicies; include __DIR__ . '/_services_form.php'; ?></div>
+<?php endif; ?>
+<?php if ($appeals || $ureports): ?>
+<div class="panel"><h2>درخواست بازبینی و گزارش‌ها</h2>
+  <?php foreach ($appeals as $a): ?><div class="small">بازبینی <?= e(Fa::dateTime($a['created_at'])) ?> — <b><?= e(['open' => 'در انتظار', 'accepted' => 'پذیرفته', 'rejected' => 'رد شده'][$a['status']]) ?></b>: <?= e(mb_substr($a['message'], 0, 200)) ?> <a href="<?= e($base) ?>/appeals">بررسی</a></div><?php endforeach; ?>
+  <?php foreach ($ureports as $r): ?><div class="small">گزارش تخلف <?= e(Fa::dateTime($r['created_at'])) ?> از <span class="ltr">@<?= e($r['reporter']) ?></span>: <?= e(\PM\Moderation\ReportService::REASONS[$r['reason']] ?? $r['reason']) ?> <?= e((string)$r['details']) ?> (<?= e($r['status']) ?>)</div><?php endforeach; ?>
+</div>
+<?php endif; ?>
 
 <div class="panel">
   <h2>نگهداری فایل‌ها</h2>

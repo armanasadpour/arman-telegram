@@ -30,8 +30,21 @@
   <a class="btn secondary sm mt" href="<?= e($base) ?>/system?push=1">بررسی دسترسی سرور به سرویس‌های اعلان</a>
 </div>
 <div class="panel">
-  <h2>دستور Cron (cPanel ← Cron Jobs)</h2>
-  <div class="secret"><?= e($cron) ?></div>
+  <h2>کارهای زمان‌بندی‌شده (Cron) <?= $cron_real ? '<span class="tag ok">آخرین اجرای واقعی: ' . e(Fa::dateTime($cron_real)) . '</span>' : '<span class="tag warn">Cron واقعی هنوز اجرا نشده</span>' ?></h2>
+  <p class="small">بدون Cron هم برنامه کار می‌کند: کارهای نگهداری هنگام بازدید کاربران انجام می‌شود. ولی برای حذف به‌موقع فایل‌های منقضی و پایان خودکار تعلیق‌ها و مسدودیت‌ها، یکی از دو روش زیر را فعال کنید.</p>
+  <h3>روش ۱ — Cron Jobs در cPanel (پیشنهادی)</h3>
+  <ol class="small">
+    <li>وارد cPanel شوید و در بخش «Advanced» روی <b>Cron Jobs</b> بزنید.</li>
+    <li>در «Common Settings» گزینه <b>Once Per Fifteen Minutes</b> (هر ۱۵ دقیقه) را انتخاب کنید.</li>
+    <li>دستور زیر را کامل در کادر <b>Command</b> بچسبانید و «Add New Cron Job» را بزنید.</li>
+  </ol>
+  <div class="secret"><?= e(preg_replace('/^\S+ \S+ \S+ \S+ \S+ /', '', $cron)) ?></div>
+  <p class="small muted">اگر بعد از ۱۵ دقیقه بالای همین بخش «آخرین اجرای واقعی» نمایش داده نشد، مسیر php هاست شما فرق دارد. به‌جای دستور بالا، این دستور را بگذارید (با curl و همان آدرس روش ۲):</p>
+  <div class="secret">curl -fsS "<?= e($cron_url) ?>" &gt; /dev/null</div>
+  <h3 class="mt">روش ۲ — سرویس Cron اینترنتی (اگر هاست Cron ندارد)</h3>
+  <p class="small">در یک سرویس مانند cron-job.org، این آدرس را برای اجرا «هر ۱۵ دقیقه» ثبت کنید. آدرس محرمانه است و فقط کارهای نگهداری را اجرا می‌کند:</p>
+  <div class="secret"><?= e($cron_url) ?></div>
+  <details class="small mt"><summary>دستور کامل با زمان‌بندی (برای مدیران فنی)</summary><div class="secret"><?= e($cron) ?></div></details>
   <p class="small muted">کارها: پاک‌سازی کدهای OTP قدیمی، شمارنده‌های محدودیت نرخ و نشست‌های منقضی. مسیر php را با مسیر هاست خود تطبیق دهید.</p>
 </div>
 <div class="panel table-wrap">

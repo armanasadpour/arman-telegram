@@ -38,6 +38,7 @@ final class AppController extends Controller
             ? $this->icon($q->param('variant')) : Response::notFound());
         $r->get('/sw.js', fn () => $this->serviceWorker());
         $r->post('/login', fn (Request $q) => $this->guard($q) ?? $this->passwordLogin($q));
+        $r->post('/appeal', fn (Request $q) => $this->guard($q) ?? $this->appeal($q));
         $r->post('/otp/request', fn (Request $q) => $this->guard($q) ?? $this->otpRequest($q));
         $r->get('/otp', fn (Request $q) => $this->otpForm($q));
         $r->post('/otp/verify', fn (Request $q) => $this->guard($q) ?? $this->otpVerify($q));
@@ -193,7 +194,11 @@ final class AppController extends Controller
             return $this->loginPage($req, 'نام کاربری یا رمز عبور نادرست است.', 200, $username);
         }
         if ($result === PasswordLogin::INACTIVE) {
-            return $this->loginPage($req, 'حساب شما فعال نیست. با مدیر سامانه تماس بگیرید.', 200, $username);
+            $users = new UserService($this->app->db(), $this->audit(), $this->sessions());
+            $user = $users->expireStatus($user);
+            if ($user['status'] !== 'active') {
+                return $this->blockedPage($req, $user);
+            }
         }
         if ($method === 'password_otp') {
             if (empty($user['phone_e164'])) {
@@ -252,10 +257,42 @@ final class AppController extends Controller
         }
         $users = new UserService($this->app->db(), $this->audit(), $this->sessions());
         $user = $users->get($userId);
+        if ($user !== null && $user['status'] !== 'active') {
+            $user = $users->expireStatus($user);
+        }
         if ($user === null || $user['status'] !== 'active') {
-            return $this->loginPage($req, 'حساب شما فعال نیست. با مدیر سامانه تماس بگیرید.');
+            return $user !== null ? $this->blockedPage($req, $user) : $this->loginPage($req, 'حساب شما فعال نیست. با مدیر سامانه تماس بگیرید.');
         }
         return $this->startSession($req, $user);
+    }
+
+    /** Suspended / banned account: why, until when, and a «request a review» form. Pending accounts get the old message. */
+    private function blockedPage(Request $req, array $user, ?string $msg = null, ?string $error = null): Response
+    {
+        if (!in_array($user['status'], ['suspended', 'blocked'], true)) {
+            return $this->loginPage($req, 'حساب شما هنوز فعال نشده است. با مدیر سامانه تماس بگیرید.');
+        }
+        $appeals = new \PM\Moderation\AppealService($this->app->db(), $this->audit());
+        return $this->page($req, 'app/blocked', ['u' => $user, 'last' => $appeals->latest((int)$user['id']), 'msg' => $msg, 'error' => $error,
+            'token' => \PM\Moderation\AppealService::token($this->app->key(), (int)$user['id'])]);
+    }
+
+    private function appeal(Request $req): Response
+    {
+        $uid = \PM\Moderation\AppealService::verifyToken($this->app->key(), $req->input('token'));
+        $user = $uid !== null ? (new UserService($this->app->db(), $this->audit(), $this->sessions()))->get($uid) : null;
+        if ($user === null) {
+            return $this->loginPage($req, 'زمان این صفحه تمام شده است؛ دوباره وارد شوید.');
+        }
+        if (!$this->limiter()->hit('appeal:ip:' . $req->ip(), 10, 3600)) {
+            return $this->blockedPage($req, $user, null, 'تلاش‌های زیادی انجام شده است؛ بعداً دوباره تلاش کنید.');
+        }
+        try {
+            (new \PM\Moderation\AppealService($this->app->db(), $this->audit()))->create($uid, $req->input('message'));
+        } catch (UserError $e) {
+            return $this->blockedPage($req, $user, null, $e->getMessage());
+        }
+        return $this->blockedPage($req, $user, 'درخواست بازبینی شما ثبت شد. نتیجه را با ورود دوباره در همین صفحه می‌بینید.');
     }
 
     private function passwordForm(Request $req, ?string $error = null): Response
