@@ -213,6 +213,7 @@ function chime() {
   if (!prefs.sound || inQuiet()) return;
   try {
     audioCtx ||= new AudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
     const t = audioCtx.currentTime;
     for (const [f, at] of [[880, 0], [1320, 0.09]]) {
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -1661,9 +1662,16 @@ function makePc(cfg) {
   const pc = new RTCPeerConnection({ iceServers: cfg.ice_servers, iceTransportPolicy: cfg.relay_only ? 'relay' : 'all' });
   pc.ontrack = (e) => {
     if (!cur?.ui) return;
-    cur.ui.remote.srcObject = e.streams[0];      // picture only (muted element)
-    cur.ui.audio.srcObject = e.streams[0];       // sound: one dedicated <audio> element whose output we can route
-    cur.ui.audio.play?.().catch(() => {});
+    const s = e.streams[0];
+    if (IOS) {
+      // iPhone/iPad: the set-up that is known to play there — one <video> element carries picture and sound.
+      cur.ui.remote.srcObject = s;
+      playRemote(cur.ui.remote);
+      return;
+    }
+    cur.ui.remote.srcObject = s;      // picture only (muted element)
+    cur.ui.audio.srcObject = s;       // sound: one dedicated <audio> element whose output we can route
+    playRemote(cur.ui.audio);
   };
   pc.onconnectionstatechange = () => {
     if (!cur || cur.pc !== pc) return;
@@ -1672,9 +1680,25 @@ function makePc(cfg) {
   };
   return pc;
 }
+// iPhone / iPad (iPadOS reports itself as a Mac with touch).
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/** Starts the remote sound; if the browser blocks it, a big «tap to hear» button starts it on the next touch. */
+function playRemote(m) {
+  const c = cur;
+  const p = m.play?.();
+  if (!p?.catch) return;
+  p.then(() => c?.ui?.root.querySelector('.cl-unmute')?.remove()).catch(() => {
+    if (!c?.ui || c.ui.root.querySelector('.cl-unmute')) return;
+    const b = el('button', { class: 'cl-unmute', type: 'button', onclick: () => { m.play().then(() => b.remove()).catch(() => {}); } }, ico('speaker'), el('span', { text: 'برای شنیدن صدا اینجا را بزنید' }));
+    c.ui.root.append(b);
+  });
+}
 const gathered = (pc) => new Promise((r) => { if (pc.iceGatheringState === 'complete') return r(); const t = setTimeout(r, 3000); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); r(); } }); });
 const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 async function media(video) {
+  // 0.9.3 switched Safari's audio session to «play-and-record»; an iPhone web app that stayed in memory can still
+  // carry that. Put it back to the default (the set-up under which calls played sound) before the microphone starts.
+  try { if (IOS && navigator.audioSession && navigator.audioSession.type !== 'auto') navigator.audioSession.type = 'auto'; } catch { /* unsupported */ }
   return navigator.mediaDevices.getUserMedia({ audio: MIC, video: video ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false });
 }
 // ---- Audio route: phone earpiece (گوشی) vs loudspeaker (بلندگو).
@@ -1694,7 +1718,7 @@ async function audioRoutes() {
   r.input = !!(r.inEar && r.inSpk);
   // iPhone / iPad: Safari offers web pages no earpiece/loudspeaker choice. Changing navigator.audioSession
   // during a call silenced the remote audio on real iPhones, so it is left alone there.
-  r.can = r.sink || r.input;
+  r.can = !IOS && (r.sink || r.input);
   return r;
 }
 async function setRoute(speaker) {
@@ -1730,10 +1754,16 @@ async function initRoute() {
 }
 // Tones (Web Audio, nothing to download): a melodic ringtone for incoming calls, the familiar 425 Hz
 // «tuuut… tuuut» ringback for the caller while the other phone is ringing.
+// One AudioContext for the whole page (shared with the message chime): creating and closing one per ring
+// can disturb the phone's audio session right when the call's own sound starts (seen on iPhone).
+let tonesOn = 0;
 function tone(pattern) {
   try {
-    const ctx = new AudioContext(), master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+    const ctx = (audioCtx ||= new AudioContext());
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
     let stopped = false;
+    tonesOn++;
     const play = () => {
       if (stopped) return;
       const t0 = ctx.currentTime + 0.05;
@@ -1748,7 +1778,12 @@ function tone(pattern) {
     };
     play();
     const iv = setInterval(play, pattern.every);
-    return { close: () => { stopped = true; clearInterval(iv); ctx.close().catch(() => {}); } };
+    return { close: () => {
+      if (stopped) return;
+      stopped = true; clearInterval(iv);
+      try { master.gain.value = 0; master.disconnect(); } catch { /* already */ }
+      if (--tonesOn === 0) ctx.suspend().catch(() => {}); // idle during the call itself
+    } };
   } catch { return null; } // autoplay blocked: the visual ring still shows
 }
 const RINGTONE = { every: 2600, wave: 'triangle', onCycle: () => buzz([500, 250, 500]),
@@ -1764,10 +1799,10 @@ function ringback(on) {
 }
 let pendingAnswer = null; // call id chosen with «Answer» on the notification
 function callUi() {
-  const remote = el('video', { class: 'cl-remote', autoplay: true, playsinline: true, muted: true });
+  const remote = el('video', { class: 'cl-remote', autoplay: true, playsinline: true });
   const audio = el('audio', { class: 'cl-audio', autoplay: true, playsinline: true });
   const local = el('video', { class: 'cl-local', autoplay: true, playsinline: true, muted: true });
-  remote.muted = true; // the attribute alone does not mute a script-created element
+  remote.muted = !IOS; // elsewhere the sound goes through the routable <audio>; the attribute alone does not mute a script-created element
   local.muted = true;  // never play your own microphone back
   const status = el('div', { class: 'cl-status' });
   const info2 = el('div', { class: 'cl-info' });

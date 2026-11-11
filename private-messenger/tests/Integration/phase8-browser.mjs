@@ -313,7 +313,7 @@ check('emoji panel inserts into the composer', (await a2.inputValue('.c-compose 
 
 console.log('\n# Call audio route (earpiece / loudspeaker)');
 // Android Chrome reports the routes as audio devices; emulate that with Chromium's fake microphone.
-await iph.context().addInitScript(() => {
+await a2.context().addInitScript(() => {
   const orig = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
   navigator.mediaDevices.enumerateDevices = async () => {
     const list = await orig(); const mic = list.find((d) => d.kind === 'audioinput');
@@ -322,30 +322,39 @@ await iph.context().addInitScript(() => {
     return [...list, fake('Headset earpiece'), fake('Speakerphone')];
   };
 });
-await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
-await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
-await iph.click('[aria-label="تماس صوتی"]');
-await iph.waitForSelector('.cl-overlay [aria-label="پخش از بلندگو"]', { timeout: T });
-check('voice call starts on the phone earpiece; a loudspeaker button is offered', true);
-check('call sound plays from a dedicated <audio> element (the picture element is muted)', await iph.evaluate(() => !!document.querySelector('.cl-overlay audio.cl-audio') && document.querySelector('.cl-remote').muted));
-await iph.click('.cl-overlay [aria-label="پخش از بلندگو"]');
-await iph.waitForSelector('.cl-overlay [aria-label="بلندگو روشن — پخش از گوشی"]', { timeout: T });
-check('loudspeaker toggle switches the route (and back)', true);
-check('microphone still live after the route switch', await iph.evaluate(() => [...document.querySelectorAll('video.cl-local')].some((v) => v.srcObject?.getAudioTracks().some((t) => t.readyState === 'live'))));
-await iph.click('.cl-overlay [aria-label="پایان تماس"]');
-await a2.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
-
-// iPhone: changing Safari's Audio Session during a call silenced the remote audio on real devices — the app must leave it alone.
-await a2.context().addInitScript(() => { if (!('audioSession' in navigator)) Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto' }, writable: false }); });
 await a2.reload(); await a2.waitForSelector('.c-side-head h1', { timeout: T });
 await openChat(a2, 'کارول');
 await a2.click('[aria-label="تماس صوتی"]');
-await a2.waitForSelector('.cl-overlay [aria-label="پایان تماس"]', { timeout: T });
-await a2.waitForTimeout(800);
-check('iPhone: a voice call leaves Safari\'s audio session untouched', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
+await a2.waitForSelector('.cl-overlay [aria-label="پخش از بلندگو"]', { timeout: T });
+check('Android: voice call starts on the phone earpiece; a loudspeaker button is offered', true);
+check('Android: call sound plays from a dedicated <audio> element (the picture element is muted)', await a2.evaluate(() => !!document.querySelector('.cl-overlay audio.cl-audio') && document.querySelector('.cl-remote').muted));
+await a2.click('.cl-overlay [aria-label="پخش از بلندگو"]');
+await a2.waitForSelector('.cl-overlay [aria-label="بلندگو روشن — پخش از گوشی"]', { timeout: T });
+check('Android: loudspeaker toggle switches the route (and back)', true);
+check('Android: microphone still live after the route switch', await a2.evaluate(() => [...document.querySelectorAll('video.cl-local')].some((v) => v.srcObject?.getAudioTracks().some((t) => t.readyState === 'live'))));
 await a2.click('.cl-overlay [aria-label="پایان تماس"]');
-check('iPhone: still untouched after the call', await a2.evaluate(() => navigator.audioSession.type) === 'auto');
 await iph.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
+await a2.waitForTimeout(1500);
+
+// iPhone: the set-up that played sound there — the remote <video> carries the sound; Safari's audio session is left
+// at its default (a web app that stayed in memory since 0.9.3 may still carry «play-and-record»: it is put back).
+await iph.context().addInitScript(() => { if (!('audioSession' in navigator)) Object.defineProperty(navigator, 'audioSession', { value: { type: 'play-and-record' } }); });
+await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
+await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
+await iph.click('[aria-label="تماس صوتی"]');
+await a2.waitForSelector('.cl-overlay [aria-label="پاسخ"]', { timeout: T });
+await a2.click('.cl-overlay [aria-label="پاسخ"]');
+await iph.waitForSelector('.cl-status:has-text("متصل")', { timeout: T });
+await iph.waitForTimeout(1000);
+const ios = await iph.evaluate(() => { const v = document.querySelector('.cl-remote'), a = document.querySelector('.cl-audio');
+  return { session: navigator.audioSession.type, muted: v.muted, paused: v.paused, audio: !!v.srcObject?.getAudioTracks().length, extra: !!a?.srcObject,
+    speakerBtn: !!document.querySelector('.cl-overlay [aria-label="پخش از بلندگو"]'), tap: !!document.querySelector('.cl-unmute') }; });
+check('iPhone: the remote sound plays from the call\'s <video> element (not muted, playing)', !ios.muted && !ios.paused && ios.audio && !ios.extra, JSON.stringify(ios));
+check('iPhone: a leftover «play-and-record» audio session is put back to the default', ios.session === 'auto', ios.session);
+check('iPhone: no loudspeaker button (Safari offers no switch)', !ios.speakerBtn);
+await iph.click('.cl-overlay [aria-label="پایان تماس"]');
+await a2.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
+await iph.waitForTimeout(800);
 
 console.log('\n# Delivery ticks');
 await openChat(a2, 'باب'); await a2.waitForSelector('.c-msg.out .st', { timeout: T });
