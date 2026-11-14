@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Media Optimizer (WebP + Video Compressor)
- * Description: تبدیل خودکار تصاویر به WebP هنگام آپلود، فشرده‌سازی ویدیوها با FFmpeg، و بهینه‌سازی گروهی همه رسانه‌های موجود سایت (با حذف فایل اصلی).
- * Version:     1.0.0
+ * Description: بهینه‌سازی مرحله‌ای رسانه: ۱) بررسی و یافتن فایل‌های بدون استفاده ۲) تبدیل تصاویر به WebP و فشرده‌سازی ویدیو ۳) حذف فایل اصلی با تایید مدیر یا بازگردانی کامل.
+ * Version:     2.0.0
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * Author:      Arman
@@ -14,12 +14,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPMO_VERSION', '1.0.0' );
+define( 'WPMO_VERSION', '2.0.0' );
 define( 'WPMO_FILE', __FILE__ );
 define( 'WPMO_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPMO_URL', plugin_dir_url( __FILE__ ) );
 
 require_once WPMO_DIR . 'includes/class-wpmo-settings.php';
+require_once WPMO_DIR . 'includes/class-wpmo-backup.php';
+require_once WPMO_DIR . 'includes/class-wpmo-usage.php';
 require_once WPMO_DIR . 'includes/class-wpmo-image.php';
 require_once WPMO_DIR . 'includes/class-wpmo-video.php';
 require_once WPMO_DIR . 'includes/class-wpmo-replacer.php';

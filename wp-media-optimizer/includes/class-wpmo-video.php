@@ -42,9 +42,10 @@ class WPMO_Video {
 	}
 
 	/**
-	 * Compress a video. Result is always an .mp4 file.
+	 * Encode a video to a temporary H.264/AAC MP4 next to the source.
+	 * The caller decides whether to keep it (see WPMO_Optimizer::optimize_video).
 	 *
-	 * @return array|WP_Error { path: new file path, replaced: bool (false = result was not smaller, original kept) }
+	 * @return array|WP_Error { tmp: temp file path, old_size: int, new_size: int }
 	 */
 	public static function compress( $src ) {
 		if ( ! file_exists( $src ) ) {
@@ -91,37 +92,11 @@ class WPMO_Video {
 			return new WP_Error( 'wpmo_ffmpeg', 'خطای FFmpeg: ' . implode( "\n", array_slice( $out, -5 ) ) );
 		}
 
-		$is_mp4   = (bool) preg_match( '/\.mp4$/i', $src );
-		$old_size = filesize( $src );
-		$new_size = filesize( $tmp );
-
-		// Already-optimized MP4: keep the original when we couldn't make it smaller.
-		if ( $is_mp4 && $new_size >= $old_size ) {
-			@unlink( $tmp );
-			return array(
-				'path'     => $src,
-				'replaced' => false,
-				'old_size' => $old_size,
-				'new_size' => $old_size,
-			);
-		}
-
-		if ( $is_mp4 ) {
-			$dest = $src; // Same name, overwrite in place.
-		} else {
-			$dest = $dir . '/' . wp_unique_filename( $dir, $stem . '.mp4' );
-		}
-
-		if ( ! @rename( $tmp, $dest ) ) {
-			@unlink( $tmp );
-			return new WP_Error( 'wpmo_rename', 'جایگزینی فایل ویدیو ناموفق بود.' );
-		}
-
+		clearstatcache();
 		return array(
-			'path'     => $dest,
-			'replaced' => true,
-			'old_size' => $old_size,
-			'new_size' => $new_size,
+			'tmp'      => $tmp,
+			'old_size' => filesize( $src ),
+			'new_size' => filesize( $tmp ),
 		);
 	}
 }

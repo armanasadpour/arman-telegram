@@ -23,7 +23,8 @@ class WPMO_Settings {
 			'video_preset'       => 'slow',
 			'video_max_width'    => 1920,// 0 = keep resolution.
 			'audio_bitrate'      => 128, // kbps.
-			'delete_originals'   => 1,   // Remove the original file after a successful conversion.
+			'require_approval'   => 1,   // Keep originals in a backup until the admin approves (reversible).
+			'skip_unused'        => 1,   // Don't convert media the scan found unused.
 		);
 	}
 
@@ -47,7 +48,7 @@ class WPMO_Settings {
 		$d   = self::defaults();
 		$out = array();
 
-		foreach ( array( 'convert_on_upload', 'png_lossless', 'skip_animated_gif', 'compress_videos', 'delete_originals' ) as $k ) {
+		foreach ( array( 'convert_on_upload', 'png_lossless', 'skip_animated_gif', 'compress_videos', 'require_approval', 'skip_unused' ) as $k ) {
 			$out[ $k ] = empty( $input[ $k ] ) ? 0 : 1;
 		}
 
