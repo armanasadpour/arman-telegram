@@ -92,33 +92,43 @@
 		var box = root.querySelector('[data-list="' + kind + '"]');
 		if (!box) return;
 		var data = lists[kind], t = box.querySelector('.wpmo-table');
-		box.querySelector('.wpmo-count').textContent = '(' + data.total + (data.bytes_h ? ' — ' + data.bytes_h : '') + ')';
+		box.querySelector('.wpmo-count').innerHTML = '(' + data.total + (data.total && data.bytes_h ? ' — <bdi>' + esc(data.bytes_h) + '</bdi>' : '') + ')';
 		box.querySelectorAll('[data-op]').forEach(function (b) { b.style.display = data.total ? '' : 'none'; });
 		if (!data.total) { t.innerHTML = '<p class="wpmo-empty">موردی وجود ندارد.</p>'; return; }
 
+		function fn(name) { return '<bdi dir="ltr" class="wpmo-fn">' + esc(name) + '</bdi>'; }
+		function cell(label, html, cls) { return '<td data-label="' + esc(label) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + html + '</td>'; }
 		var head, rows;
 		if (kind === 'unused') {
-			head = '<th></th><th>فایل</th><th>نوع</th><th>حجم</th><th>تاریخ</th>';
+			head = ['', 'فایل', 'نوع', 'حجم', 'تاریخ'];
 			rows = data.items.map(function (it) {
-				return '<td>' + thumb(it) + '</td><td><a href="' + esc(it.url) + '" target="_blank">' + esc(it.name) + '</a><br><small>#' + it.id + ' — ' + esc(it.title) + '</small></td>' +
-					'<td>' + esc(it.mime) + '</td><td>' + esc(it.size_h) + ' <small>(' + it.files + ' فایل)</small></td><td>' + esc(it.date) + '</td>';
+				return cell('', thumb(it), 'wpmo-c-thumb') +
+					cell('فایل', '<a href="' + esc(it.url) + '" target="_blank">' + fn(it.name) + '</a><small>#' + it.id + ' — ' + esc(it.title) + '</small>', 'wpmo-c-main') +
+					cell('نوع', '<bdi dir="ltr">' + esc(it.mime) + '</bdi>') +
+					cell('حجم', '<bdi>' + esc(it.size_h) + '</bdi> <small>(' + it.files + ' فایل)</small>') +
+					cell('تاریخ', esc(it.date));
 			});
 		} else if (kind === 'pending') {
-			head = '<th></th><th>فایل جدید</th><th>فایل اصلی</th><th>حجم قبل ← بعد</th><th>صرفه‌جویی</th>';
+			head = ['', 'فایل جدید', 'فایل اصلی', 'حجم قبل ← بعد', 'صرفه‌جویی'];
 			rows = data.items.map(function (it) {
-				return '<td>' + thumb(it) + '</td><td><a href="' + esc(it.url) + '" target="_blank">' + esc(it.name) + '</a><br><small>#' + it.id + (it.source === 'upload' ? ' — هنگام آپلود' : '') + '</small></td>' +
-					'<td><a href="' + esc(it.orig_url) + '" target="_blank">' + esc(it.orig) + '</a></td>' +
-					'<td dir="ltr" style="text-align:right">' + esc(it.old_h) + ' → ' + esc(it.new_h) + '</td><td class="wpmo-good">' + it.pct + '٪</td>';
+				return cell('', thumb(it), 'wpmo-c-thumb') +
+					cell('فایل جدید', '<a href="' + esc(it.url) + '" target="_blank">' + fn(it.name) + '</a><small>#' + it.id + (it.source === 'upload' ? ' — هنگام آپلود' : '') + '</small>', 'wpmo-c-main') +
+					cell('فایل اصلی', '<a href="' + esc(it.orig_url) + '" target="_blank">' + fn(it.orig) + '</a>') +
+					cell('حجم', '<bdi dir="ltr"><bdi>' + esc(it.old_h) + '</bdi> → <bdi>' + esc(it.new_h) + '</bdi></bdi>') +
+					cell('صرفه‌جویی', '<span class="wpmo-good">' + it.pct + '٪</span>');
 			});
 		} else {
-			head = '<th></th><th>فایل</th><th>حجم</th><th>زمان انتقال</th>';
+			head = ['', 'فایل', 'حجم', 'زمان انتقال'];
 			rows = data.items.map(function (it) {
-				return '<td>' + thumb(it) + '</td><td><a href="' + esc(it.orig_url) + '" target="_blank">' + esc(it.name) + '</a><br><small>#' + it.id + ' — ' + esc(it.title) + '</small></td>' +
-					'<td>' + esc(it.size_h) + ' <small>(' + it.files + ' فایل)</small></td><td>' + esc(it.when) + '</td>';
+				return cell('', thumb(it), 'wpmo-c-thumb') +
+					cell('فایل', '<a href="' + esc(it.orig_url) + '" target="_blank">' + fn(it.name) + '</a><small>#' + it.id + ' — ' + esc(it.title) + '</small>', 'wpmo-c-main') +
+					cell('حجم', '<bdi>' + esc(it.size_h) + '</bdi> <small>(' + it.files + ' فایل)</small>') +
+					cell('زمان انتقال', esc(it.when));
 			});
 		}
-		t.innerHTML = '<table class="widefat striped"><thead><tr><td class="check-column"><input type="checkbox" data-all></td>' + head + '</tr></thead><tbody>' +
-			data.items.map(function (it, n) { return '<tr><th class="check-column"><input type="checkbox" value="' + it.id + '"></th>' + rows[n] + '</tr>'; }).join('') +
+		t.innerHTML = '<label class="wpmo-selall"><input type="checkbox" data-all> انتخاب همه</label>' +
+			'<table class="widefat striped wpmo-grid"><thead><tr><td class="check-column"></td>' + head.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+			data.items.map(function (it, n) { return '<tr><td class="wpmo-c-check"><input type="checkbox" value="' + it.id + '" aria-label="انتخاب"></td>' + rows[n] + '</tr>'; }).join('') +
 			'</tbody></table>' + (data.total > data.items.length ? '<p class="wpmo-more">' + data.items.length + ' مورد از ' + data.total + ' نمایش داده شده؛ دکمه‌های «همه» روی همه موارد اعمال می‌شوند.</p>' : '');
 		t.querySelector('[data-all]').addEventListener('change', function (e) {
 			t.querySelectorAll('tbody input').forEach(function (c) { c.checked = e.target.checked; });

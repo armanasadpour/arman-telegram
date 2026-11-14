@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Media Optimizer (WebP + Video Compressor)
  * Description: بهینه‌سازی مرحله‌ای رسانه: ۱) بررسی و یافتن فایل‌های بدون استفاده ۲) تبدیل تصاویر به WebP و فشرده‌سازی ویدیو ۳) حذف فایل اصلی با تایید مدیر یا بازگردانی کامل.
- * Version:     2.0.0
+ * Version:     2.0.1
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * Author:      Arman
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPMO_VERSION', '2.0.0' );
+define( 'WPMO_VERSION', '2.0.1' );
 define( 'WPMO_FILE', __FILE__ );
 define( 'WPMO_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPMO_URL', plugin_dir_url( __FILE__ ) );

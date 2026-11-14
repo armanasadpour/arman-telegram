@@ -1,25 +1,80 @@
-.wpmo{max-width:1100px}
-.wpmo-env{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;padding:10px 14px;background:#fff;border:1px solid #dcdcde;border-radius:4px}
+/* ---------- Base ---------- */
+.wpmo{max-width:1100px;box-sizing:border-box}
+.wpmo *,.wpmo *::before,.wpmo *::after{box-sizing:border-box}
+.wpmo h1{line-height:1.4}
+.wpmo p,.wpmo label,.wpmo .wpmo-status{overflow-wrap:anywhere}
+.wpmo-env{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0;padding:10px 14px;background:#fff;border:1px solid #dcdcde;border-radius:6px}
 .wpmo-env .ok{color:#00a32a}.wpmo-env .bad{color:#d63638}
-.wpmo-steps{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid #c3c4c7;margin:16px 0 0}
-.wpmo-steps a{display:flex;align-items:center;gap:6px;padding:10px 16px;text-decoration:none;color:#1d2327;border:1px solid transparent;border-bottom:0;border-radius:4px 4px 0 0;margin-bottom:-1px;font-size:14px}
+
+/* ---------- Steps (tabs) ---------- */
+.wpmo-steps{display:flex;gap:4px;border-bottom:1px solid #c3c4c7;margin:16px 0 0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.wpmo-steps::-webkit-scrollbar{display:none}
+.wpmo-steps a{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:10px 16px;text-decoration:none;color:#1d2327;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;margin-bottom:-1px;font-size:14px;white-space:nowrap}
+.wpmo-steps a:focus{box-shadow:none;outline:2px solid #2271b1;outline-offset:-2px}
 .wpmo-steps a.active{background:#fff;border-color:#c3c4c7;font-weight:600}
 .wpmo-steps b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#2271b1;color:#fff;font-size:12px}
 .wpmo-steps em{font-style:normal;background:#dcdcde;border-radius:10px;padding:0 8px;font-size:12px}
-.wpmo-tab{display:none;background:#fff;border:1px solid #c3c4c7;border-top:0;padding:8px 20px 20px}
+.wpmo-tab{display:none;background:#fff;border:1px solid #c3c4c7;border-top:0;padding:8px 20px 20px;border-radius:0 0 6px 6px}
 .wpmo-tab.active{display:block}
+
+/* ---------- Progress / log / actions ---------- */
 .wpmo-progress{background:#dcdcde;border-radius:4px;height:20px;overflow:hidden;margin:12px 0;display:none}
 .wpmo-progress div{background:#2271b1;height:100%;width:0;transition:width .3s}
-.wpmo-log{background:#1d2327;color:#c3c4c7;padding:12px;max-height:280px;overflow:auto;font-size:12px;display:none;white-space:pre-wrap}
+.wpmo-log{background:#1d2327;color:#c3c4c7;padding:12px;max-height:280px;overflow:auto;font-size:12px;display:none;white-space:pre-wrap;word-break:break-all;border-radius:4px}
 .wpmo-actions{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .wpmo-sep{width:16px}
 .wpmo .button.wpmo-danger{color:#b32d2e;border-color:#b32d2e}
 .wpmo .button-primary.wpmo-danger{background:#b32d2e;border-color:#b32d2e;color:#fff}
-.wpmo-table table{width:100%}
-.wpmo-table td,.wpmo-table th{vertical-align:middle}
-.wpmo-table img{width:56px;height:56px;object-fit:cover;border-radius:3px;display:block;background:#f0f0f1}
-.wpmo-ph{width:56px;height:56px;border-radius:3px;background:#f0f0f1;display:grid;place-items:center;color:#787c82;font-size:11px}
-.wpmo-good{color:#00a32a;font-weight:600}
 .wpmo-list{margin-top:18px}
-.wpmo-empty{color:#646970;padding:12px 0}
-.wpmo-more{color:#646970}
+.wpmo-empty,.wpmo-more{color:#646970;padding:12px 0}
+
+/* ---------- Table ---------- */
+.wpmo-table{max-width:100%}
+.wpmo-grid{width:100%;table-layout:auto}
+.wpmo-grid td,.wpmo-grid th{vertical-align:middle}
+.wpmo-grid .wpmo-c-check{width:32px}
+.wpmo-grid .wpmo-c-thumb{width:64px}
+.wpmo-grid img{width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;background:#f0f0f1}
+.wpmo-ph{width:56px;height:56px;border-radius:4px;background:#f0f0f1;display:grid;place-items:center;color:#787c82;font-size:11px}
+.wpmo-c-main small{display:block;color:#646970;margin-top:2px}
+.wpmo-fn{display:inline-block;max-width:100%;word-break:break-all;unicode-bidi:isolate;text-align:left}
+.wpmo-good{color:#00a32a;font-weight:600}
+.wpmo-selall{display:none}
+
+/* ---------- Mobile ---------- */
+@media (max-width:782px){
+	.wpmo{margin-left:0;margin-right:0;padding:0 2px}
+	.wpmo h1{font-size:20px}
+	.wpmo-env{flex-direction:column;font-size:13px}
+	.wpmo-steps a{padding:9px 12px;font-size:13px}
+	.wpmo-tab{padding:4px 12px 16px}
+	.wpmo-tab h2{font-size:17px;line-height:1.5}
+	.wpmo-list h3{font-size:15px;line-height:1.6}
+
+	/* Full-width, easy-to-tap buttons */
+	.wpmo .button,.wpmo .button-hero,.wpmo select{width:100%;margin:0 0 6px!important;text-align:center;white-space:normal;height:auto;min-height:44px;line-height:1.4;padding:10px 12px}
+	.wpmo p>label{display:flex;gap:8px;align-items:flex-start;margin:8px 0}
+	.wpmo-actions{flex-direction:column;gap:0}
+	.wpmo-sep{display:none}
+
+	/* Table → cards */
+	.wpmo-selall{display:flex;align-items:center;gap:8px;padding:10px 4px;font-weight:600}
+	.wpmo-grid,.wpmo-grid tbody{display:block;border:0;background:none;box-shadow:none}
+	.wpmo-grid thead{display:none}
+	.wpmo-grid tr{display:grid;grid-template-columns:32px 60px minmax(0,1fr);column-gap:10px;align-items:start;padding:12px;margin:0 0 10px;border:1px solid #dcdcde;border-radius:8px;background:#fff!important}
+	.wpmo-grid td{display:block;padding:0!important;border:0;min-width:0;font-size:13px}
+	.wpmo-grid .wpmo-c-check{grid-column:1;grid-row:1 / span 2;width:auto;padding-top:4px!important}
+	.wpmo-grid .wpmo-c-check input{width:22px;height:22px;margin:0}
+	.wpmo-grid .wpmo-c-thumb{grid-column:2;grid-row:1 / span 2;width:auto}
+	.wpmo-grid .wpmo-c-main{grid-column:3;grid-row:1 / span 2;align-self:center;font-weight:600}
+	.wpmo-grid td:not(.wpmo-c-check):not(.wpmo-c-thumb):not(.wpmo-c-main){grid-column:1 / -1;display:flex;justify-content:space-between;gap:12px;padding:6px 0 0!important;margin-top:6px;border-top:1px dashed #e0e0e0}
+	.wpmo-grid td[data-label]:not([data-label=""]):not(.wpmo-c-main)::before{content:attr(data-label);color:#646970;font-weight:400;flex:0 0 auto}
+	.wpmo-grid td:nth-child(4){margin-top:10px}
+
+	/* Settings form */
+	.wpmo .form-table th{padding:14px 0 4px}
+	.wpmo .form-table td{padding:4px 0 12px}
+	.wpmo .form-table input[type=text]{width:100%}
+	.wpmo .form-table input.small-text{width:90px}
+	.wpmo .form-table .button{width:auto}
+}

@@ -334,7 +334,7 @@ class WPMO_Admin {
 			<div class="wpmo-env">
 				<span class="<?php echo $webp ? 'ok' : 'bad'; ?>">WebP: <?php echo $webp ? 'فعال' : 'پشتیبانی نمی‌شود'; ?></span>
 				<span class="<?php echo $ffmpeg ? 'ok' : 'bad'; ?>">FFmpeg: <?php echo $ffmpeg ? 'فعال' : 'در دسترس نیست (ویدیوها تبدیل نمی‌شوند)'; ?></span>
-				<span>فضای آزادشده تاکنون: <strong data-stat="saved_h"><?php echo esc_html( $st['saved_h'] ); ?></strong></span>
+				<span>فضای آزادشده تاکنون: <bdi><strong data-stat="saved_h"><?php echo esc_html( $st['saved_h'] ); ?></strong></bdi></span>
 			</div>
 
 			<nav class="wpmo-steps">
