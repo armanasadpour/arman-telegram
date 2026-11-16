@@ -123,6 +123,24 @@ check('video frames flow in both directions', true);
 await alice.waitForSelector('.cl-info:has-text("DTLS-SRTP")', { timeout: T });
 check('connection info shown (DTLS-SRTP, direct or relay)', true, await alice.textContent('.cl-info'));
 if (SHOTS) await alice.screenshot({ path: `${SHOTS}/call-connected.png` });
+// The phone silences / ends the microphone in the middle of the call: the app opens it again by itself.
+const before = await alice.evaluate(() => document.querySelector('video.cl-local').srcObject.getAudioTracks()[0].id);
+// Bob's side: measure the loudness of what his call speaker is playing (Chromium's fake microphone sends a beep).
+const loud = (p) => p.evaluate(async () => {
+  const ac = new AudioContext(); const an = ac.createAnalyser(); an.fftSize = 2048;
+  ac.createMediaStreamSource(document.querySelector('.cl-audio').srcObject).connect(an);
+  const d = new Float32Array(an.fftSize); let peak = 0;
+  for (let i = 0; i < 20; i++) { await new Promise((r) => setTimeout(r, 100)); an.getFloatTimeDomainData(d); for (const x of d) peak = Math.max(peak, Math.abs(x)); }
+  ac.close(); return peak;
+});
+await alice.evaluate(() => { const t = document.querySelector('video.cl-local').srcObject.getAudioTracks()[0]; t.stop(); t.dispatchEvent(new Event('ended')); });
+await alice.waitForFunction((id) => { const t = document.querySelector('video.cl-local')?.srcObject?.getAudioTracks()[0]; return t && t.id !== id && t.readyState === 'live'; }, before, { timeout: T });
+check('microphone ended by the phone mid-call: a new one is opened automatically', true);
+await alice.waitForSelector('.cl-warn:has-text("میکروفون دوباره وصل شد")', { timeout: T });
+check('… and the call screen says so', true);
+await bob.waitForTimeout(1500);
+const lv = await loud(bob);
+check('… and Bob hears Alice again', lv > 0.01, String(lv));
 const tf = (p, sel) => p.evaluate((q) => getComputedStyle(document.querySelector(q)).transform, sel);
 check('front camera: your own preview is shown like a mirror', (await tf(alice, '.cl-local')).startsWith('matrix(-1'), await tf(alice, '.cl-local'));
 check('the other side sees the real picture (remote view not mirrored)', !(await tf(bob, '.cl-remote')).startsWith('matrix(-1'));

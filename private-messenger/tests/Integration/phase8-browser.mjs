@@ -338,11 +338,24 @@ await a2.waitForTimeout(1500);
 
 // iPhone: the set-up that played sound there — the remote <video> carries the sound; Safari's audio session is left
 // at its default (a web app that stayed in memory since 0.9.3 may still carry «play-and-record»: it is put back).
+await iph.context().addInitScript(() => {
+  // Count Web Audio started while the microphone records (on a real iPhone that can silence the microphone).
+  window.__gum = false; window.__acWhileRec = 0; window.__wav = false;
+  const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  navigator.mediaDevices.getUserMedia = (c) => { window.__gum = true; return gum(c); };
+  const AC = window.AudioContext;
+  window.AudioContext = function (...a) { if (window.__gum) window.__acWhileRec++; return new AC(...a); };
+  const res = AC.prototype.resume; AC.prototype.resume = function () { if (window.__gum && this.state !== 'running') window.__acWhileRec++; return res.call(this); };
+  const play = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { if (String(this.src).startsWith('blob:')) window.__wav = true; return play.call(this); };
+});
 await iph.context().addInitScript(() => { if (!('audioSession' in navigator)) Object.defineProperty(navigator, 'audioSession', { value: { type: 'play-and-record' } }); });
 await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
 await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
 await iph.click('[aria-label="تماس صوتی"]');
 await a2.waitForSelector('.cl-overlay [aria-label="پاسخ"]', { timeout: T });
+await iph.waitForTimeout(1200);
+check('iPhone caller: the «ringing» tone plays from an <audio> file, no Web Audio started while the microphone records',
+  await iph.evaluate(() => window.__wav && window.__acWhileRec === 0), JSON.stringify(await iph.evaluate(() => [window.__wav, window.__acWhileRec])));
 await a2.click('.cl-overlay [aria-label="پاسخ"]');
 await iph.waitForSelector('.cl-status:has-text("متصل")', { timeout: T });
 await iph.waitForTimeout(1000);

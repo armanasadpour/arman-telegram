@@ -210,7 +210,7 @@ function inQuiet() {
 }
 let audioCtx = null;
 function chime() {
-  if (!prefs.sound || inQuiet()) return;
+  if (!prefs.sound || inQuiet() || cur) return; // never during a call: on iPhone, Web Audio while recording can silence the microphone
   try {
     audioCtx ||= new AudioContext();
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
@@ -1795,7 +1795,29 @@ function ring(on) {
 }
 function ringback(on) {
   if (!on) { cur?.back?.close?.(); if (cur) cur.back = null; return; }
-  if (!cur.back) cur.back = tone(RINGBACK);
+  if (!cur.back) cur.back = IOS ? wavTone() : tone(RINGBACK);
+}
+// iPhone: the caller's microphone is already recording while the ringback plays. Starting Web Audio at that
+// moment can make iOS silence the microphone for the whole call (the other side then hears nothing).
+// A looping <audio> element playing a small generated WAV (425 Hz, 1 s on / 4 s off) does not do that.
+let ringbackUrl = null;
+function wavTone() {
+  try {
+    if (!ringbackUrl) {
+      const rate = 8000, secs = 5, n = rate * secs, buf = new ArrayBuffer(44 + n * 2), d = new DataView(buf);
+      const str = (o, t) => { for (let i = 0; i < t.length; i++) d.setUint8(o + i, t.charCodeAt(i)); };
+      str(0, 'RIFF'); d.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt '); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true);
+      d.setUint32(24, rate, true); d.setUint32(28, rate * 2, true); d.setUint16(32, 2, true); d.setUint16(34, 16, true); str(36, 'data'); d.setUint32(40, n * 2, true);
+      for (let i = 0; i < rate; i++) {
+        const env = Math.min(1, i / 240, (rate - i) / 240);
+        d.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * 425 * i / rate) * 0.12 * 32767 * env), true);
+      }
+      ringbackUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    }
+    const a = new Audio(ringbackUrl);
+    a.loop = true; a.play().catch(() => {});
+    return { close: () => { a.pause(); a.removeAttribute('src'); a.load(); } };
+  } catch { return null; }
 }
 let pendingAnswer = null; // call id chosen with «Answer» on the notification
 function callUi() {
@@ -1818,6 +1840,9 @@ function renderCall() {
   const u = cur.ui;
   u.root.classList.toggle('ringing', ['incoming', 'ringing', 'calling'].includes(cur.state));
   u.status.textContent = cur.state === 'connected' ? CALL_STATE.connected + ' · ' + dur((Date.now() - cur.started) / 1000) : CALL_STATE[cur.state] + (cur.video ? ' (تصویری)' : ' (صوتی)');
+  const warn = [cur.micNote, cur.inNote].filter(Boolean).join(' · ');
+  let w = u.root.querySelector('.cl-warn');
+  if (warn) { if (!w) { w = el('div', { class: 'cl-warn', role: 'status' }); u.status.after(w); } if (w.textContent !== warn) w.textContent = warn; } else w?.remove();
   const btn = (label, icon, fn, cls = '') => el('button', { class: 'cl-btn ' + cls, 'aria-label': label, title: label, onclick: fn }, typeof icon === 'string' && ICONS[icon] ? ico(icon) : el('span', { text: icon }));
   if (cur.state === 'incoming') {
     u.controls.replaceChildren(btn('رد تماس', 'x', () => rejectCall(), 'red'), btn('پاسخ', cur.video ? 'video' : 'phone', () => acceptCall(), 'green'));
@@ -1935,6 +1960,7 @@ async function onConnected() {
   cur.state = 'connected'; cur.started = Date.now();
   cur.tick = setInterval(renderCall, 1000);
   renderCall();
+  watchAudio(cur);
   try {
     const stats = await cur.pc.getStats();
     let pair = null; const cands = {};
@@ -1942,6 +1968,55 @@ async function onConnected() {
     const relay = pair && cands[pair.localCandidateId]?.candidateType === 'relay';
     cur.ui.info.textContent = '🔒 رمزنگاری DTLS-SRTP · ' + (relay ? 'از طریق سرور رله (TURN)' : 'ارتباط مستقیم');
   } catch { /* stats unavailable */ }
+}
+// ---- Audio health during a call.
+// • Your microphone: if the phone silences or ends it (an iPhone can do this when another sound starts), the app
+//   opens the microphone again and puts the new one into the call — the other side hears you again.
+// • The other side: if no sound packets arrive for a while, a warning says so (then the problem is on their phone
+//   or the network, not on yours).
+async function freshMic(c, why) {
+  if (c.micFixes >= 4 || c.fixing) return;
+  c.fixing = true; c.micFixes = (c.micFixes || 0) + 1;
+  try {
+    const old = c.stream.getAudioTracks()[0];
+    const s2 = await navigator.mediaDevices.getUserMedia({ audio: MIC });
+    const t = s2.getAudioTracks()[0];
+    if (cur !== c) { t.stop(); return; }
+    t.enabled = old ? old.enabled : true;
+    await c.pc.getSenders().find((x) => x.track?.kind === 'audio')?.replaceTrack(t);
+    if (old) { old.stop(); c.stream.removeTrack(old); }
+    c.stream.addTrack(t);
+    watchTrack(c, t);
+    c.micNote = 'میکروفون دوباره وصل شد'; setTimeout(() => { if (c.micNote === 'میکروفون دوباره وصل شد') c.micNote = ''; }, 5000);
+    console.info('[pm] microphone reopened:', why);
+  } catch { c.micNote = 'میکروفون در دسترس نیست — صدای شما ارسال نمی‌شود'; } finally { c.fixing = false; renderCall(); }
+}
+function watchTrack(c, t) {
+  t.addEventListener('ended', () => { if (cur === c) freshMic(c, 'ended'); });
+  t.addEventListener('mute', () => setTimeout(() => { if (cur === c && t.muted && t.readyState === 'live') freshMic(c, 'muted'); }, 1500));
+}
+function watchAudio(c) {
+  const t = c.stream?.getAudioTracks()[0];
+  if (t) watchTrack(c, t);
+  let silent = 0, lastIn = -1, stalled = 0;
+  c.health = setInterval(async () => {
+    if (cur !== c) { clearInterval(c.health); return; }
+    let level = null, bytesIn = null;
+    try {
+      (await c.pc.getStats()).forEach((r) => {
+        if (r.type === 'media-source' && r.kind === 'audio' && typeof r.audioLevel === 'number') level = r.audioLevel;
+        if (r.type === 'inbound-rtp' && (r.kind || r.mediaType) === 'audio') bytesIn = r.bytesReceived;
+      });
+    } catch { return; }
+    const mic = c.stream?.getAudioTracks()[0];
+    // A live microphone always picks up a little noise; exactly 0 for 8 s while not muted by you = silenced by the phone.
+    silent = mic?.enabled && level === 0 ? silent + 1 : 0;
+    if (silent >= 4) { silent = 0; freshMic(c, 'silent'); }
+    stalled = bytesIn !== null && bytesIn === lastIn ? stalled + 1 : 0;
+    lastIn = bytesIn ?? lastIn;
+    const note = stalled >= 3 ? 'صدایی از طرف مقابل نمی‌رسد' : '';
+    if (note !== (c.inNote || '')) { c.inNote = note; renderCall(); }
+  }, 2000);
 }
 // Your own picture from the FRONT camera is shown like a mirror (as in WhatsApp/FaceTime), the back camera as it is.
 // This changes only your small preview: the other side always gets the real, un-mirrored picture.
@@ -1974,7 +2049,7 @@ async function switchCamera() {
 function endCall(status, reason, message) {
   if (!cur) return;
   const c = cur; cur = null;
-  c.ring?.close?.(); c.back?.close?.(); clearInterval(c.ringLoop);
+  c.ring?.close?.(); c.back?.close?.(); clearInterval(c.ringLoop); clearInterval(c.health);
   clearTimeout(c.ringTimer); clearInterval(c.tick);
   if (status && c.id) call('call_status', { id: c.id, status, reason });
   c.stream?.getTracks().forEach((t) => t.stop());
