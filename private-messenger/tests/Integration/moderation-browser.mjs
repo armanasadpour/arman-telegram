@@ -57,7 +57,7 @@ async function first(u) {
   await p.fill('input[name=username]', u); await p.fill('input[name=password]', temp[u]); await p.click('button');
   await p.fill('input[name=current]', temp[u]); await p.fill('input[name=new]', 'Strong pass 12345'); await p.fill('input[name=confirm]', 'Strong pass 12345'); await p.click('form button');
   await p.waitForSelector('.c-rk', { timeout: T });
-  await p.fill('input[placeholder="چهار کاراکتر آخر"]', (await p.textContent('.c-rk')).trim().slice(-4)); await p.click('text=ذخیره کردم');
+  await p.click('text=ذخیره کردم');
   await p.waitForSelector('.c-side-head h1', { timeout: T });
   return p;
 }

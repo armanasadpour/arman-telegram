@@ -341,11 +341,8 @@ function handleState(s) {
 async function showRecovery(first) {
   let key;
   try { key = await call('recovery_create'); } catch (e) { toast(errText(e)); return renderApp(); }
-  const last = key.slice(-4);
-  const input = el('input', { type: 'text', class: 'ltr', placeholder: 'چهار کاراکتر آخر', maxlength: '4', autocomplete: 'off' });
-  const err = el('p', { class: 'small', role: 'alert' });
   const box = el('div', { class: 'secret c-rk', text: key });
-  const done = () => { if (input.value.trim().toUpperCase() !== last) { err.textContent = 'درست نیست؛ کلید را دوباره بررسی کنید.'; return; } dlg?.close(); dlg?.remove(); if (first) renderApp(); else toast('کلید بازیابی جدید ذخیره شد؛ کلید قبلی دیگر کار نمی‌کند.'); };
+  const done = () => { dlg?.close(); dlg?.remove(); if (first) renderApp(); else toast('کلید بازیابی جدید ذخیره شد؛ کلید قبلی دیگر کار نمی‌کند.'); };
   const body = [
     el('p', { text: 'این کلید تنها راه بازگرداندن حساب شما روی گوشی یا مرورگر جدید است، اگر دستگاه فعلی در دسترس نباشد. سرور و مدیر سامانه آن را ندارند و نمی‌توانند بازیابی کنند.' }),
     box,
@@ -353,7 +350,6 @@ async function showRecovery(first) {
       el('button', { class: 'btn secondary sm', text: 'کپی', onclick: () => navigator.clipboard?.writeText(key).then(() => toast('کپی شد')) }),
       el('a', { class: 'btn secondary sm', href: URL.createObjectURL(new Blob([`کلید بازیابی\n${key}\n`], { type: 'text/plain' })), download: 'recovery-key.txt', text: 'ذخیره در فایل' })),
     el('p', { class: 'alert warn small', text: 'آن را روی کاغذ یا در مدیر رمز نگه دارید و به کسی ندهید.' }),
-    el('label', { class: 'field' }, el('span', { text: 'برای اطمینان، چهار کاراکتر آخر کلید را بنویسید' }), input), err,
     el('button', { class: 'btn block', text: 'ذخیره کردم', onclick: done })];
   let dlg = null;
   if (first) root.replaceChildren(el('div', { class: 'chat-status' }, el('div', { class: 'onb' }, el('div', { class: 'onb-logo' }, ico('key')), el('h2', { text: 'کلید بازیابی' }), ...body)));

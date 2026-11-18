@@ -14,7 +14,7 @@ async function appReady(p, timeout = 30000) {
   await p.waitForSelector('.c-side-head h1, .c-rk', { timeout });
   if (await p.$('.c-rk')) { // first device: confirm the recovery key like a user would
     const k = (await p.textContent('.c-rk')).trim();
-    await p.fill('input[placeholder="چهار کاراکتر آخر"]', k.slice(-4)); await p.click('text=ذخیره کردم');
+    await p.click('text=ذخیره کردم');
     await p.waitForSelector('.c-side-head h1', { timeout });
   }
 }

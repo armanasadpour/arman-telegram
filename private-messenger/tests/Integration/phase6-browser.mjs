@@ -64,7 +64,7 @@ async function login(user) {
 async function confirmRecovery(p) {
   await p.waitForSelector('.c-rk', { timeout: T });
   const key = (await p.textContent('.c-rk')).trim();
-  await p.fill('input[placeholder="چهار کاراکتر آخر"]', key.slice(-4)); await p.click('text=ذخیره کردم');
+  await p.click('text=ذخیره کردم');
   await p.waitForSelector('.c-side-head h1', { timeout: T });
   return key;
 }
@@ -75,9 +75,8 @@ const a1 = await firstLogin('alice');
 await a1.waitForSelector('.c-rk', { timeout: T });
 const RK = (await a1.textContent('.c-rk')).trim();
 check('recovery key shown on first use: 52 characters (256 bits), grouped', /^([0-9A-Z]{4}-){12}[0-9A-Z]{4}$/.test(RK), RK);
-await a1.fill('input[placeholder="چهار کاراکتر آخر"]', 'ZZZZ'); await a1.click('text=ذخیره کردم');
-check('wrong confirmation is refused', (await a1.textContent('[role=alert]')).includes('درست نیست'));
-await a1.fill('input[placeholder="چهار کاراکتر آخر"]', RK.slice(-4)); await a1.click('text=ذخیره کردم');
+check('no «type the last four characters» step', !(await a1.$('input[placeholder="چهار کاراکتر آخر"]')));
+await a1.click('text=ذخیره کردم');
 await a1.waitForSelector('.c-side-head h1', { timeout: T });
 check('confirmed → app opens', true);
 check('server stores only an encrypted backup (no master key, no recovery key)',

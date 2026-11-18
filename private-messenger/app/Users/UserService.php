@@ -164,6 +164,14 @@ final class UserService
         $this->audit->record('admin', $adminId, 'user.unlock', 'user', $id, [], $ip);
     }
 
+    /** Exempts (or not) one account from the login attempt limits: no per-IP limit, no account lock. */
+    public function setLoginUnlimited(int $adminId, int $id, bool $on, string $ip): void
+    {
+        $this->getOrFail($id);
+        $this->db->run('UPDATE users SET login_unlimited = ?, failed_login_count = 0, locked_until = NULL, updated_at = ? WHERE id = ?', [$on ? 1 : 0, Clock::db(), $id]);
+        $this->audit->record('admin', $adminId, $on ? 'user.login_unlimited_on' : 'user.login_unlimited_off', 'user', $id, [], $ip);
+    }
+
     public function changeOwnPassword(array $user, string $current, string $new, string $confirm, int $keepSessionId): void
     {
         $fresh = $this->getOrFail((int)$user['id']);

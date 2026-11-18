@@ -58,7 +58,7 @@ await ul.goto(APP); await ul.fill('input[name=username]', 'alice'); await ul.fil
 await ul.fill('input[name=username]', 'alice'); await ul.fill('input[name=password]', temp.alice); await ul.click('button');
 await ul.fill('input[name=current]', temp.alice); await ul.fill('input[name=new]', 'Alice strong pass 1'); await ul.fill('input[name=confirm]', 'Alice strong pass 1'); await ul.click('form button');
 await ul.waitForSelector('.c-rk', { timeout: T });
-await ul.fill('input[placeholder="چهار کاراکتر آخر"]', (await ul.textContent('.c-rk')).trim().slice(-4)); await ul.click('text=ذخیره کردم');
+await ul.click('text=ذخیره کردم');
 await ul.waitForSelector('.c-side-head h1', { timeout: T });
 
 // ---------------------------------------------------------------- dashboard
@@ -99,6 +99,13 @@ const [adl] = await Promise.all([admin.waitForEvent('download'), admin.click('te
 const acsv = readFileSync(await adl.path(), 'utf8');
 check('audit CSV export (filtered)', acsv.includes('user.create') && acsv.includes('bob') && !acsv.includes('alice'));
 check('audit hash chain intact', (await admin.textContent('main')).includes('زنجیره هش سالم است'));
+await admin.goto(ADM + 'users/' + aliceId);
+await admin.click('button:has-text("برداشتن محدودیت تلاش ورود برای این کاربر")');
+await admin.waitForSelector('text=برداشته شده (بدون محدودیت)', { timeout: T });
+check('admin lifts the login attempt limit for one user', sql("SELECT login_unlimited FROM users WHERE id = " + aliceId) === '1');
+await admin.click('button:has-text("برگرداندن محدودیت تلاش ورود")');
+await admin.waitForSelector('button:has-text("برداشتن محدودیت تلاش ورود برای این کاربر")', { timeout: T });
+check('… and can put it back', sql("SELECT login_unlimited FROM users WHERE id = " + aliceId) === '0');
 
 // ---------------------------------------------------------------- roles
 console.log('\n# Roles');

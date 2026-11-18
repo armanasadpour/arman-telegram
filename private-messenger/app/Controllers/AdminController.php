@@ -71,6 +71,7 @@ final class AdminController extends Controller
         $r->post('/users/{id}/status', $this->need('users.view', fn (Request $q) => $this->userStatus($q), true));
         $r->post('/users/{id}/password', $this->need('users.sessions.revoke', fn (Request $q) => $this->userPasswordReset($q), true));
         $r->post('/users/{id}/unlock', $this->need('users.edit', fn (Request $q) => $this->userUnlock($q), true));
+        $r->post('/users/{id}/login-limit', $this->need('users.edit', fn (Request $q) => $this->userLoginLimit($q), true));
         $r->post('/users/{id}/sessions/revoke', $this->need('users.sessions.revoke', fn (Request $q) => $this->userSessionRevoke($q), true));
         $r->post('/users/{id}/sessions/revoke-all', $this->need('users.sessions.revoke', fn (Request $q) => $this->userSessionRevokeAll($q), true));
         $r->post('/users/{id}/devices/revoke', $this->need('users.devices.revoke', fn (Request $q) => $this->userDeviceRevoke($q), true));
@@ -363,6 +364,14 @@ final class AdminController extends Controller
         return $this->withUserError($req, function () use ($req): Response {
             $temp = $this->usersSvc()->resetPassword((int)$this->admin['id'], $this->userId($req), $req->ip());
             return $this->userDetail($req, null, $temp, 'رمز موقت جدید ساخته شد و همه نشست‌های کاربر باطل شد.');
+        });
+    }
+
+    private function userLoginLimit(Request $req): Response
+    {
+        return $this->withUserError($req, function () use ($req): Response {
+            $this->usersSvc()->setLoginUnlimited((int)$this->admin['id'], $this->userId($req), $req->input('unlimited') === '1', $req->ip());
+            return $this->back('/users/' . $this->userId($req), 'saved');
         });
     }
 

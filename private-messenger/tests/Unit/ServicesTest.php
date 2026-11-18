@@ -82,6 +82,26 @@ test('DB: per-IP login rate limit', function () {
     eq(PasswordLogin::INVALID, $login->attempt('u', 'x', '9.9.9.8')[0], 'other IPs unaffected');
 });
 
+test('DB: admin can lift the login attempt limits for one user (IP limit and account lock)', function () {
+    [$db, $users, $audit, , $settings] = svc();
+    $settings->set('login.per_ip_15min', 5);
+    $settings->set('login.user_fail_lock', 3);
+    [$id, $temp] = $users->create(1, 'nima', 'نیما', '', true, '');
+    [$id2, $temp2] = $users->create(1, 'omid', 'امید', '', true, '');
+    $login = new PasswordLogin($db, $settings, new RateLimiter($db), $audit);
+    for ($i = 0; $i < 5; $i++) { $login->attempt('someone', 'x', '7.7.7.7'); }
+    eq(PasswordLogin::RATE_LIMITED, $login->attempt('nima', $temp, '7.7.7.7')[0], 'shared IP is limited');
+    $users->setLoginUnlimited(1, $id, true, '');
+    eq(PasswordLogin::OK, $login->attempt('nima', $temp, '7.7.7.7')[0], 'exempt user gets in through the limited IP');
+    for ($i = 0; $i < 6; $i++) { eq(PasswordLogin::INVALID, $login->attempt('nima', 'wrong-password', '7.7.7.7')[0]); }
+    eq(PasswordLogin::OK, $login->attempt('nima', $temp, '7.7.7.7')[0], 'exempt user is never locked');
+    eq(null, $db->scalar('SELECT locked_until FROM users WHERE id = ?', [$id]));
+    eq(PasswordLogin::RATE_LIMITED, $login->attempt('omid', $temp2, '7.7.7.7')[0], 'other users on that IP still limited');
+    ok((int)$db->scalar("SELECT COUNT(*) FROM audit_logs WHERE action = 'user.login_unlimited_on'") === 1);
+    $users->setLoginUnlimited(1, $id, false, '');
+    eq(PasswordLogin::RATE_LIMITED, $login->attempt('nima', $temp, '7.7.7.7')[0], 'limit back after turning it off');
+});
+
 test('DB: suspending a user revokes all sessions; deleted frees username', function () {
     [$db, $users, , $sessions] = svc();
     [$id] = $users->create(1, 'reza', 'رضا', '', true, '');

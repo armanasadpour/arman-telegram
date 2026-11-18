@@ -72,6 +72,15 @@ $locked = $u['locked_until'] !== null && strtotime($u['locked_until'] . ' UTC') 
   </form>
   <?php endif; ?>
   <?php if ($locked): ?><p class="small"><span class="tag warn">ورود موقتاً قفل است تا <?= e(Fa::dateTime($u['locked_until'])) ?></span></p><?php endif; ?>
+  <div class="mt">
+    <p class="small">محدودیت تلاش ورود: <b><?= !empty($u['login_unlimited']) ? 'برداشته شده (بدون محدودیت)' : 'فعال' ?></b></p>
+    <p class="small muted">با برداشتن محدودیت، رمز اشتباهِ پشت‌سرهم دیگر این حساب را قفل نمی‌کند و پیام «تلاش‌های زیادی انجام شده است» برای این کاربر نمی‌آید، حتی اگر کاربران دیگر هم با همان IP (مثلاً همان اینترنت همراه) وارد شوند. دقت کنید: برای این حساب حدس زدن رمز هم محدود نمی‌شود، پس رمز آن باید قوی باشد.</p>
+    <?php if (A::can($admin, 'users.edit')): ?>
+    <form method="post" action="<?= e($base) ?>/users/<?= (int)$u['id'] ?>/login-limit" class="inline"><?php include __DIR__ . '/../_csrf.php'; ?>
+      <input type="hidden" name="unlimited" value="<?= !empty($u['login_unlimited']) ? '0' : '1' ?>">
+      <button class="btn secondary sm"><?= !empty($u['login_unlimited']) ? 'برگرداندن محدودیت تلاش ورود' : 'برداشتن محدودیت تلاش ورود برای این کاربر' ?></button></form>
+    <?php endif; ?>
+  </div>
   <p class="small muted">تعلیق، مسدودسازی و ساخت رمز موقت جدید، همه نشست‌های فعال کاربر را باطل می‌کند.</p>
   <?php if (A::can($admin, 'users.delete')): ?>
   <details><summary>حذف حساب</summary>

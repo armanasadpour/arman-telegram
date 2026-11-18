@@ -27,20 +27,22 @@ final class PasswordLogin
     /** @return array{0:string, 1:?array} result code and user row on success/inactive */
     public function attempt(string $username, string $password, string $ip): array
     {
-        if (!$this->limiter->hit('login:ip:' . $ip, $this->settings->int('login.per_ip_15min'), 900)) {
-            return [self::RATE_LIMITED, null];
-        }
         $username = mb_strtolower(trim($username));
         $user = ($username === '' || mb_strlen($username) > 64) ? null
             : $this->db->one('SELECT * FROM users WHERE username = ? AND status <> ?', [$username, 'deleted']);
+        // An admin can exempt one account from the attempt limits (e.g. many users behind one mobile-network IP).
+        $unlimited = $user !== null && (int)($user['login_unlimited'] ?? 0) === 1;
 
-        if ($user !== null && $user['locked_until'] !== null && strtotime($user['locked_until'] . ' UTC') > Clock::now()->getTimestamp()) {
+        if (!$unlimited && !$this->limiter->hit('login:ip:' . $ip, $this->settings->int('login.per_ip_15min'), 900)) {
+            return [self::RATE_LIMITED, null];
+        }
+        if (!$unlimited && $user !== null && $user['locked_until'] !== null && strtotime($user['locked_until'] . ' UTC') > Clock::now()->getTimestamp()) {
             Passwords::verify($password, null); // keep timing uniform
             \PM\Admin\Stats::bump($this->db, 'login.failed');
             return [self::INVALID, null];
         }
         if (!Passwords::verify($password, $user['password_hash'] ?? null)) {
-            if ($user !== null) {
+            if ($user !== null && !$unlimited) {
                 $this->registerFailure($user, $ip);
             }
             \PM\Admin\Stats::bump($this->db, 'login.failed');
