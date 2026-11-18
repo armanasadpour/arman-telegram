@@ -1,0 +1,9 @@
+# Block direct access to everything except index.php
+Options -Indexes
+<FilesMatch "^(config\.php|config\.sample\.php)$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(src|tests)(/|$) - [F,L]
+</IfModule>
