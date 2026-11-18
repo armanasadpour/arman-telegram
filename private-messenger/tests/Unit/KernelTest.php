@@ -75,3 +75,18 @@ test('Kernel (not installed): only /install answers; everything else 404', funct
     ok(str_contains($r->body, 'install-token.txt'));
     eq(301, $k->handle(req('/install/', 'GET', false))->status, 'installer requires https');
 });
+
+test('CSP: only browsers too old for wasm-unsafe-eval (iOS < 16 etc.) get unsafe-eval for the WebAssembly engine', function () {
+    $ios15 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6 Mobile/15E148 Safari/604.1';
+    $ios17 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
+    $ios15chrome = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0 Mobile/15E148 Safari/604.1';
+    $ipad15 = 'Mozilla/5.0 (iPad; CPU OS 15_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Mobile/15E148 Safari/604.1';
+    $mac15 = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6 Safari/605.1.15';
+    $android = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
+    $oldChrome = 'Mozilla/5.0 (Linux; Android 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36';
+    $ff = 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0';
+    foreach ([$ios15, $ios15chrome, $ipad15, $mac15, $oldChrome] as $ua) { ok(\PM\Http\Csp::legacyWasm($ua), $ua); }
+    foreach ([$ios17, $android, $ff, ''] as $ua) { ok(!\PM\Http\Csp::legacyWasm($ua), $ua); }
+    eq("script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'", \PM\Http\Csp::scriptSrc($ios15));
+    eq("script-src 'self' 'wasm-unsafe-eval'", \PM\Http\Csp::scriptSrc($android));
+});

@@ -62,7 +62,8 @@ abstract class Controller
         ]);
         if ($ext === 'js') {
             // Policy for the crypto Web Worker (worker scripts carry their own CSP).
-            $res->header('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; object-src 'none'");
+            $res->header('Content-Security-Policy', "default-src 'self'; " . \PM\Http\Csp::scriptSrc($req->userAgent()) . "; connect-src 'self'; object-src 'none'");
+            $res->header('Vary', 'User-Agent');
         }
         return $res;
     }
