@@ -49,12 +49,15 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
       <textarea name="calls_turn_urls" class="ltr" rows="2" <?= $dis ?>><?= e($v('calls.turn_urls')) ?></textarea></label>
     <div class="grid2">
       <label class="field"><span>نوع احراز هویت TURN</span><select name="calls_turn_mode" <?= $dis ?>>
-        <?php foreach (['none' => 'بدون TURN', 'secret' => 'راز مشترک (coturn use-auth-secret) — پیشنهادی', 'static' => 'نام کاربری و رمز ثابت'] as $k => $l): ?><option value="<?= e($k) ?>" <?= $v('calls.turn_mode') === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?>
+        <?php foreach (['none' => 'بدون TURN', 'cloudflare' => 'Cloudflare (رایگان، بدون نیاز به سرور)', 'secret' => 'راز مشترک (coturn use-auth-secret) — سرور خودتان', 'static' => 'نام کاربری و رمز ثابت'] as $k => $l): ?><option value="<?= e($k) ?>" <?= $v('calls.turn_mode') === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?>
       </select></label>
       <label class="field"><span>راز مشترک TURN (خالی = حفظ مقدار فعلی)</span><input type="password" name="calls_turn_secret" class="ltr" autocomplete="off" placeholder="<?= $s->hasSecret('calls.turn_secret') ? '•••••• (ذخیره شده)' : '' ?>" <?= $dis ?>></label>
       <label class="field"><span>نام کاربری TURN (حالت ثابت)</span><input type="text" name="calls_turn_username" class="ltr" value="<?= e($v('calls.turn_username')) ?>" <?= $dis ?>></label>
       <label class="field"><span>رمز TURN (حالت ثابت؛ خالی = حفظ مقدار فعلی)</span><input type="password" name="calls_turn_password" class="ltr" autocomplete="off" <?= $dis ?>></label>
+      <label class="field"><span>Cloudflare — TURN Key ID</span><input type="text" name="calls_cf_key_id" class="ltr" value="<?= e($v('calls.cf_key_id')) ?>" autocomplete="off" <?= $dis ?>></label>
+      <label class="field"><span>Cloudflare — API Token (خالی = حفظ مقدار فعلی)</span><input type="password" name="calls_cf_token" class="ltr" autocomplete="off" placeholder="<?= $s->hasSecret('calls.cf_token') ? '•••••• (ذخیره شده)' : '' ?>" <?= $dis ?>></label>
     </div>
+    <p class="small muted">حالت Cloudflare: نشانی سرورها و رمزهای کوتاه‌مدت را سرور خودتان از Cloudflare می‌گیرد (فیلد «سرور TURN» لازم نیست). API Token هرگز به گوشی‌ها فرستاده نمی‌شود. راهنما: docs/22-cloudflare-turn.md</p>
     <label class="check"><input type="checkbox" name="calls_relay_only" value="1" <?= $v('calls.relay_only') ? 'checked' : '' ?> <?= $dis ?>> همه تماس‌ها فقط از طریق TURN (IP کاربران از هم پنهان می‌ماند؛ نیازمند TURN)</label>
     <div class="mt">
       <button type="button" class="btn secondary sm" id="ice-test" data-url="<?= e($base) ?>/calls/ice-test">آزمایش STUN / TURN از همین مرورگر</button>

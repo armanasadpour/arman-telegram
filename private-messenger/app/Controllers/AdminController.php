@@ -82,7 +82,7 @@ final class AdminController extends Controller
         $r->get('/settings', $this->need('settings.view', fn (Request $q) => $this->settingsPage($q)));
         // The same ICE servers (and short-lived TURN credentials) a user gets, for the admin's STUN/TURN test button.
         $r->get('/calls/ice-test', $this->need('settings.view', fn (Request $q) => Response::json(
-            (new \PM\Calls\CallService($this->app->db(), $this->app->settings()))->iceConfig('admin-test'))));
+            \PM\Calls\CallService::for($this->app)->iceConfig('admin-test', true))));
         $r->post('/settings', $this->need('settings.edit', fn (Request $q) => $this->settingsSave($q), true));
         $r->post('/settings/sms-test', $this->need('settings.edit', fn (Request $q) => $this->smsTest($q), true));
 
@@ -490,7 +490,8 @@ final class AdminController extends Controller
                 'files.max_bytes' => $int($req->input('files_max_mb', '0'), 0, 1048576, 'سقف حجم فایل') * 1048576,
                 'calls.stun' => trim(preg_replace('/[^A-Za-z0-9:.\-\s,]/', '', $req->input('calls_stun')) ?? ''),
                 'calls.turn_urls' => trim(preg_replace('/[^A-Za-z0-9:.\-\s,?=&_]/', '', $req->input('calls_turn_urls')) ?? ''),
-                'calls.turn_mode' => in_array($req->input('calls_turn_mode'), ['none', 'secret', 'static'], true) ? $req->input('calls_turn_mode') : 'none',
+                'calls.turn_mode' => in_array($req->input('calls_turn_mode'), ['none', 'secret', 'static', 'cloudflare'], true) ? $req->input('calls_turn_mode') : 'none',
+                'calls.cf_key_id' => preg_replace('/[^A-Za-z0-9_-]/', '', mb_substr(trim($req->input('calls_cf_key_id')), 0, 128)) ?? '',
                 'calls.turn_username' => mb_substr(trim($req->input('calls_turn_username')), 0, 100),
                 'calls.relay_only' => $req->input('calls_relay_only') === '1',
                 'storage.quota_bytes' => $int($req->input('quota_gb', '0'), 0, 100000, 'سهمیه فضا') * 1073741824,
@@ -530,11 +531,14 @@ final class AdminController extends Controller
                 $changed[] = $k;
             }
         }
-        foreach (['calls_turn_secret' => 'calls.turn_secret', 'calls_turn_password' => 'calls.turn_password'] as $field => $key) {
+        foreach (['calls_turn_secret' => 'calls.turn_secret', 'calls_turn_password' => 'calls.turn_password', 'calls_cf_token' => 'calls.cf_token'] as $field => $key) {
             if ($req->input($field) !== '') {
                 $s->setSecret($key, $req->input($field), (int)$this->admin['id']);
                 $changed[] = $key;
             }
+        }
+        if ($req->input('calls_cf_token') !== '' || in_array('calls.cf_key_id', $changed, true)) {
+            $s->setSecret('calls.cf_cache', '', (int)$this->admin['id']); // new Cloudflare key: fetch fresh credentials
         }
         $proxy = trim($req->input('push_proxy'));
         if ($proxy !== '') {

@@ -43,6 +43,7 @@ final class Settings
         'calls.turn_urls' => '',
         'calls.turn_mode' => 'none',     // none | secret (coturn use-auth-secret) | static
         'calls.turn_username' => '',
+        'calls.cf_key_id' => '',         // Cloudflare Realtime TURN key ID (the API token is a sealed secret)
         'calls.relay_only' => false,
         'files.max_bytes' => 0,          // 0 = no software limit (real limit: disk/quota)
         'storage.quota_bytes' => 0,      // hosting quota entered by the admin (PHP cannot read cPanel quotas); 0 = unknown

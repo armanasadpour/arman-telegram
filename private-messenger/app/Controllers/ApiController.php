@@ -120,7 +120,7 @@ final class ApiController extends Controller
 
     private function calls(): \PM\Calls\CallService
     {
-        return new \PM\Calls\CallService($this->app->db(), $this->app->settings());
+        return \PM\Calls\CallService::for($this->app);
     }
 
     private static function users(array $rows): array

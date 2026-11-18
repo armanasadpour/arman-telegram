@@ -2,7 +2,7 @@
 // notifications settings, backup download and secret path rotation.
 //   node tests/Integration/phase7-browser.mjs https://pm.test /srv/pmhost/private-messenger DB USER PASS
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { gunzipSync, deflateSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
@@ -160,6 +160,22 @@ await admin.selectOption('select[name=calls_turn_mode]', 'none');
 await admin.click('text=ذخیره تنظیمات');
 ice = await iceRun();
 check('admin test: «no TURN» explains that mobile-data calls may fail', ice.includes('سرور TURN تنظیم نشده است'), ice);
+// Cloudflare mode (no server of your own): test-only API address → mock that hands out credentials for the local coturn
+appendFileSync(`${ROOT}/config/.env`, `\nCF_TURN_API="http://127.0.0.1:2098"\n`);
+await admin.fill('textarea[name=calls_stun]', '');
+await admin.selectOption('select[name=calls_turn_mode]', 'cloudflare');
+await admin.fill('input[name=calls_cf_key_id]', 'cfkey12345');
+await admin.fill('input[name=calls_cf_token]', 'wrong-token');
+await admin.click('text=ذخیره تنظیمات');
+ice = await iceRun();
+check('Cloudflare: a wrong API token is reported clearly', ice.includes('دریافت رمز TURN از Cloudflare ممکن نشد') && ice.includes('rejected the API token'), ice);
+await admin.fill('input[name=calls_cf_token]', 'cf-test-token');
+await admin.click('text=ذخیره تنظیمات');
+check('Cloudflare: the API token is stored sealed (not in plain text)', !sql("SELECT GROUP_CONCAT(setting_value) FROM system_settings").includes('cf-test-token'));
+ice = await iceRun();
+check('Cloudflare: STUN and TURN work with credentials fetched from the API', ice.includes('✅ STUN کار می‌کند') && ice.includes('✅ TURN کار می‌کند'), ice);
+check('Cloudflare: port-53 addresses are not used', !ice.includes(':53'), ice);
+await admin.selectOption('select[name=calls_turn_mode]', 'none');
 await admin.fill('textarea[name=calls_stun]', 'stun:stun.l.google.com:19302'); await admin.click('text=ذخیره تنظیمات');
 const themeHref = await admin.getAttribute('link[href*="theme.css"]', 'href');
 check('admin panel uses the chosen colour', (await (await admin.request.get(new URL(themeHref, ADM).href)).text()).includes('#16a34a'));

@@ -29,6 +29,7 @@
     out.replaceChildren();
     if (!stunUrls.length) line(false, 'هیچ سرور STUN تنظیم نشده است.');
     else line(found.srflx > 0, found.srflx > 0 ? 'STUN کار می‌کند (' + stunUrls.join('، ') + ')' : 'STUN جواب نداد (' + stunUrls.join('، ') + ') — احتمالاً از این شبکه در دسترس نیست یا فیلتر است.');
+    if (cfg.turn_error) line(false, 'دریافت رمز TURN از Cloudflare ممکن نشد: ' + cfg.turn_error + ' — Key ID و API Token را بررسی کنید؛ اگر هاست به اینترنت خارج دسترسی ندارد، «پراکسی اعلان» را در بخش اعلان‌ها تنظیم کنید (Cloudflare هم از همان استفاده می‌کند).');
     if (!turnUrls.length || !cfg.has_turn) line(false, 'سرور TURN تنظیم نشده است. بدون TURN، تماس بین اینترنت همراه (مثلاً همراه اول/ایرانسل) و شبکه‌های دیگر اغلب وصل نمی‌شود.');
     else line(found.relay > 0, found.relay > 0 ? 'TURN کار می‌کند — نشانی رله گرفته شد (' + turnUrls.join('، ') + ')' : 'TURN نشانی رله نداد (' + turnUrls.join('، ') + ') — نشانی، پورت، فایروال یا راز مشترک را بررسی کنید.');
     for (const e of errors.slice(0, 6)) line(null, 'خطا از ' + (e.url || 'مرورگر') + (e.code ? ' — کد ' + e.code : '') + (e.text ? ' (' + e.text + ')' : ''));

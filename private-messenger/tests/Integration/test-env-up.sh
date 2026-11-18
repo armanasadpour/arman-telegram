@@ -18,6 +18,7 @@ if command -v turnserver >/dev/null && ! pgrep -x turnserver >/dev/null; then
   turnserver -n --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 --listening-port=3478 --use-auth-secret --static-auth-secret=pm-turn-test \
     --realm=pm.test --allow-loopback-peers --no-tls --no-dtls --no-cli --log-file=/tmp/turnserver.log --pidfile=/tmp/turnserver.pid >/dev/null 2>&1 &
 fi
+pgrep -f "127.0.0.1:2098" >/dev/null || (php -S 127.0.0.1:2098 "$(dirname "$0")/mock-cloudflare.php" > /tmp/mock-cloudflare.log 2>&1 &)
 pgrep -f "127.0.0.1:2099" >/dev/null || (php -S 127.0.0.1:2099 "$(dirname "$0")/mock-cpanel.php" > /tmp/mock-cpanel.log 2>&1 &)
 sleep 1
 mysqladmin ping && pgrep -x apache2 >/dev/null && echo "apache ok" && pgrep -f 127.0.0.1:2099 >/dev/null && echo "mock cpanel ok"

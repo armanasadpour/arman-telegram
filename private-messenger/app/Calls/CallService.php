@@ -20,8 +20,14 @@ final class CallService
 {
     private const FINAL = ['ended', 'missed', 'rejected', 'cancelled', 'failed'];
 
-    public function __construct(private readonly Database $db, private readonly Settings $settings)
+    public function __construct(private readonly Database $db, private readonly Settings $settings, private readonly ?CloudflareTurn $cloudflare = null)
     {
+    }
+
+    public static function for(\PM\App $app): self
+    {
+        return new self($app->db(), $app->settings(), new CloudflareTurn($app->settings(),
+            (string)($app->env('CF_TURN_API') ?: CloudflareTurn::DEFAULT_API), $app->env('CF_TURN_CAINFO') ?: null));
     }
 
     public function start(int $meId, string $convPublicId, bool $video = false): string
@@ -124,7 +130,7 @@ final class CallService
     }
 
     /** ICE servers for this user. TURN credentials are short-lived (coturn "use-auth-secret" / TURN REST API). */
-    public function iceConfig(string $userPublicId): array
+    public function iceConfig(string $userPublicId, bool $withError = false): array
     {
         $s = $this->settings;
         $servers = [];
@@ -141,7 +147,15 @@ final class CallService
             $servers[] = ['urls' => $turn, 'username' => (string)$s->get('calls.turn_username'), 'credential' => $s->secret('calls.turn_password')];
         }
         $hasTurn = $turn && in_array($mode, ['secret', 'static'], true);
-        return ['ice_servers' => $servers, 'relay_only' => $hasTurn && (bool)$s->get('calls.relay_only'), 'has_turn' => $hasTurn, 'ring_seconds' => 45];
+        $error = '';
+        if ($mode === 'cloudflare' && $this->cloudflare !== null) {
+            $cf = $this->cloudflare->iceServers();
+            $servers = array_merge($servers, $cf['servers']);
+            $hasTurn = array_filter($cf['servers'], fn ($x) => isset($x['username'])) !== [];
+            $error = $cf['error'];
+        }
+        return ['ice_servers' => $servers, 'relay_only' => $hasTurn && (bool)$s->get('calls.relay_only'), 'has_turn' => $hasTurn, 'ring_seconds' => 45]
+            + ($withError && $error !== '' ? ['turn_error' => $error] : []);
     }
 
     /** @return array<string, int> non-content statistics for the admin dashboard */

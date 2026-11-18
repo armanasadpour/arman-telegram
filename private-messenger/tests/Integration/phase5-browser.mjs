@@ -2,7 +2,7 @@
 //   node tests/Integration/phase5-browser.mjs https://pm.test /srv/pmhost/private-messenger DB USER PASS
 // Target: FRESH (not installed) deployment + EMPTY database.
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -108,6 +108,16 @@ check('uploaded font is served under the secret path as font/woff2', served[0] =
 check('font upload is audited', sql("SELECT COUNT(*) FROM audit_logs WHERE action = 'settings.font_upload'") === '1');
 
 // ---------------------------------------------------------------- calls
+// All calls relay-only through TURN with Cloudflare-mode credentials (test-only API address → mock → local coturn):
+// proves the app's real call path works through a relay, as on mobile networks.
+appendFileSync(`${ROOT}/config/.env`, `\nCF_TURN_API="http://127.0.0.1:2098"\n`);
+await admin.goto(ADM + 'settings');
+await admin.fill('textarea[name=calls_stun]', '');
+await admin.selectOption('select[name=calls_turn_mode]', 'cloudflare');
+await admin.fill('input[name=calls_cf_key_id]', 'cfkey12345');
+await admin.fill('input[name=calls_cf_token]', 'cf-test-token');
+await admin.check('input[name=calls_relay_only]');
+await admin.click('text=ذخیره تنظیمات');
 console.log('\n# In-app video call (WebRTC)');
 await alice.click('[aria-label="تماس تصویری"]');
 await bob.waitForSelector('.cl-overlay >> text=تماس ورودی', { timeout: T });
@@ -122,6 +132,7 @@ await bob.waitForFunction(() => document.querySelector('.cl-remote')?.videoWidth
 check('video frames flow in both directions', true);
 await alice.waitForSelector('.cl-info:has-text("DTLS-SRTP")', { timeout: T });
 check('connection info shown (DTLS-SRTP, direct or relay)', true, await alice.textContent('.cl-info'));
+check('call runs through the TURN relay (Cloudflare mode, relay-only)', (await alice.textContent('.cl-info')).includes('TURN'), await alice.textContent('.cl-info'));
 if (SHOTS) await alice.screenshot({ path: `${SHOTS}/call-connected.png` });
 // The phone silences / ends the microphone in the middle of the call: the app opens it again by itself.
 const before = await alice.evaluate(() => document.querySelector('video.cl-local').srcObject.getAudioTracks()[0].id);
