@@ -1671,6 +1671,12 @@ function makePc(cfg) {
   };
   // connectionState is newer; Safari before iOS 16 (and older browsers) may not report it, so the older
   // iceConnectionState is watched too — whichever says «connected» first.
+  const c0 = cur;
+  pc.addEventListener('iceconnectionstatechange', () => diag(c0, 'ice=' + pc.iceConnectionState));
+  pc.addEventListener('connectionstatechange', () => diag(c0, 'conn=' + pc.connectionState));
+  pc.addEventListener('icegatheringstatechange', () => diag(c0, 'gather=' + pc.iceGatheringState));
+  pc.addEventListener('icecandidateerror', (e) => diag(c0, 'candidate-error ' + (e.url || '') + ' ' + (e.errorCode || '') + ' ' + (e.errorText || '')));
+  diag(c0, (IOS ? 'iOS ' + IOS_MAJOR : navigator.userAgent.match(/(Chrome|Firefox|Version)\/\d+/)?.[0] || 'browser') + ' · servers: ' + (cfg.ice_servers || []).map((x) => [].concat(x.urls).join(',')).join(' | ') + (cfg.relay_only ? ' · relay-only' : ''));
   const changed = () => {
     if (!cur || cur.pc !== pc) return;
     const ok = pc.connectionState === 'connected' || ['connected', 'completed'].includes(pc.iceConnectionState);
@@ -1683,6 +1689,15 @@ function makePc(cfg) {
 }
 // iPhone / iPad (iPadOS reports itself as a Mac with touch).
 const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IOS_MAJOR = +((/(?:iPhone|CPU) OS (\d+)_/.exec(navigator.userAgent) || [])[1] || (/Version\/(\d+)/.exec(navigator.userAgent) || [])[1] || 0);
+const OLD_IOS = IOS && IOS_MAJOR > 0 && IOS_MAJOR < 16;
+// Newer Chrome/Android adds «a=extmap-allow-mixed» to its session description; Safari before iOS 16 can reject or
+// mishandle it. Dropping the line is harmless (it only allows mixing two RTP header-extension formats).
+const remoteSdp = (sdp) => (OLD_IOS ? String(sdp).replace(/^a=extmap-allow-mixed\r?\n/gm, '') : sdp);
+// Technical trace of a call (no content: connection states, candidate types, errors) shown when a call fails,
+// so a problem on one particular phone can be reported precisely.
+function diag(c, text) { if (c) (c.diag ||= []).push(((Date.now() - (c.t0 ||= Date.now())) / 1000).toFixed(1) + 's ' + text); }
+const candTypes = (sdp) => { const n = { host: 0, srflx: 0, relay: 0, prflx: 0 }; for (const m of String(sdp).matchAll(/ typ (host|srflx|relay|prflx)/g)) n[m[1]]++; return Object.entries(n).filter(([, v]) => v).map(([k, v]) => k + ':' + v).join(' ') || 'none'; };
 /** Starts the remote sound; if the browser blocks it, a big «tap to hear» button starts it on the next touch. */
 function playRemote(m) {
   const c = cur;
@@ -1694,6 +1709,11 @@ function playRemote(m) {
     const b = el('button', { class: 'cl-unmute', type: 'button', onclick: () => { m.play().then(() => b.remove()).catch(() => {}); } }, ico('speaker'), el('span', { text: 'برای شنیدن صدا اینجا را بزنید' }));
     c.ui.root.append(b);
   });
+}
+// Connecting for 30 s without success (no «failed» either — old Safari can stay in «checking»): give up with details.
+function connectTimeout(c) {
+  clearTimeout(c.connTimer);
+  c.connTimer = setTimeout(() => { if (cur === c && c.state === 'connecting') { diag(c, 'not connected after 30 s'); signal('hangup'); endCall('failed', 'ice_failed', 'اتصال تماس برقرار نشد.'); } }, 30000);
 }
 const gathered = (pc) => new Promise((r) => { if (pc.iceGatheringState === 'complete') return r(); const t = setTimeout(r, 3000); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); r(); } }); });
 const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
@@ -1879,6 +1899,7 @@ async function startCall(video) {
     await cur.pc.setLocalDescription(await cur.pc.createOffer());
     await gathered(cur.pc);
     if (!cur) return;
+    diag(cur, 'offer sent, my candidates: ' + candTypes(cur.pc.localDescription.sdp));
     await call('call_signal', { cid: cur.cid, peer: cur.peer, body: { call_id: cur.id, action: 'offer', sdp: cur.pc.localDescription.sdp, video } });
     cur.state = 'ringing'; renderCall(); ringback(true);
     // Keep the other phone ringing even if its app is closed (re-sends the call push) and learn about a
@@ -1893,6 +1914,7 @@ async function startCall(video) {
     }, 4000);
     cur.ringTimer = setTimeout(() => { if (cur?.state === 'ringing') { signal('cancel'); endCall('missed', 'timeout', 'پاسخی داده نشد.'); } }, ((await iceConfig()).ring_seconds || 45) * 1000);
   } catch (e) {
+    diag(cur, 'error: ' + (e?.name || '') + ' ' + (e?.message || e));
     endCall('failed', 'error', e?.name === 'NotAllowedError' ? 'اجازه دسترسی به میکروفون/دوربین داده نشد.' : 'تماس برقرار نشد: ' + errText(e));
   }
 }
@@ -1927,11 +1949,17 @@ async function onCallSignal(d) {
   if (d.action === 'answer' && cur.outgoing && cur.state === 'ringing') {
     clearTimeout(cur.ringTimer); ringback(false); clearInterval(cur.ringLoop);
     cur.state = 'connecting'; renderCall();
-    try { await cur.pc.setRemoteDescription({ type: 'answer', sdp: d.sdp }); } catch { endCall('failed', 'error', 'پاسخ تماس نامعتبر بود.'); }
+    diag(cur, 'answer received, their candidates: ' + candTypes(d.sdp));
+    connectTimeout(cur);
+    try { await cur.pc.setRemoteDescription({ type: 'answer', sdp: remoteSdp(d.sdp) }); }
+    catch (e) { diag(cur, 'setRemoteDescription(answer) failed: ' + (e?.name || '') + ' ' + (e?.message || e)); endCall('failed', 'error', 'پاسخ تماس نامعتبر بود.'); }
   } else if (d.action === 'reject') endCall(null, null, cur.name + ' تماس را رد کرد.');
   else if (d.action === 'busy') endCall('ended', 'busy', cur.name + ' در حال مکالمه دیگری است.');
   else if (d.action === 'cancel') endCall(null, null, 'تماس ازدست‌رفته از ' + cur.name);
-  else if (d.action === 'hangup') endCall(null, null, cur.state === 'incoming' ? 'تماس ازدست‌رفته از ' + cur.name : 'تماس پایان یافت.');
+  else if (d.action === 'hangup') {
+    if (cur.state === 'connecting') diag(cur, 'the other side gave up connecting');
+    endCall(null, null, cur.state === 'incoming' ? 'تماس ازدست‌رفته از ' + cur.name : cur.state === 'connecting' ? 'اتصال تماس برقرار نشد.' : 'تماس پایان یافت.');
+  }
 }
 async function acceptCall() {
   ring(false); clearTimeout(cur.ringTimer);
@@ -1944,14 +1972,18 @@ async function acceptCall() {
     cur.cams = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput').length;
     cur.pc = makePc(cfg);
     cur.stream.getTracks().forEach((t) => cur.pc.addTrack(t, cur.stream));
-    await cur.pc.setRemoteDescription({ type: 'offer', sdp: cur.offer });
+    diag(cur, 'offer received, their candidates: ' + candTypes(cur.offer));
+    await cur.pc.setRemoteDescription({ type: 'offer', sdp: remoteSdp(cur.offer) }).catch((e) => { diag(cur, 'setRemoteDescription(offer) failed: ' + e?.name + ' ' + e?.message); throw e; });
     await cur.pc.setLocalDescription(await cur.pc.createAnswer());
     await gathered(cur.pc);
     if (!cur) return;
+    diag(cur, 'answer sent, my candidates: ' + candTypes(cur.pc.localDescription.sdp));
     await call('call_status', { id: cur.id, status: 'active' });
     await signal('answer', { sdp: cur.pc.localDescription.sdp });
+    if (cur) connectTimeout(cur);
     renderCall();
   } catch (e) {
+    diag(cur, 'error: ' + (e?.name || '') + ' ' + (e?.message || e));
     signal('hangup');
     endCall('failed', 'error', e?.name === 'NotAllowedError' ? 'اجازه دسترسی به میکروفون/دوربین داده نشد.' : 'تماس برقرار نشد: ' + errText(e));
   }
@@ -2053,13 +2085,19 @@ function endCall(status, reason, message) {
   if (!cur) return;
   const c = cur; cur = null;
   c.ring?.close?.(); c.back?.close?.(); clearInterval(c.ringLoop); clearInterval(c.health);
-  clearTimeout(c.ringTimer); clearInterval(c.tick);
+  clearTimeout(c.ringTimer); clearTimeout(c.connTimer); clearInterval(c.tick);
   if (status && c.id) call('call_status', { id: c.id, status, reason });
   c.stream?.getTracks().forEach((t) => t.stop());
   try { c.pc?.close(); } catch { /* ignore */ }
   c.ui?.root.remove();
   call('call_mode', { active: false });
-  if (message) toast(message);
+  if (message && (status === 'failed' || c.state === 'connecting') && c.diag?.length) {
+    // A failed call: the message plus a technical trace the user can copy or screenshot for support.
+    const text = c.diag.join('\n');
+    dialog('تماس برقرار نشد', el('p', { text: message }),
+      el('details', { class: 'mt' }, el('summary', { text: 'جزئیات فنی (برای بررسی مشکل)' }), el('pre', { class: 'ltr c-diag', text })),
+      el('button', { class: 'btn secondary block mt', text: 'کپی جزئیات', onclick: () => navigator.clipboard?.writeText(text).then(() => toast('کپی شد')).catch(() => {}) })).showModal();
+  } else if (message) toast(message);
   if (tab === 'calls' && !subEl) renderSide();
 }
 

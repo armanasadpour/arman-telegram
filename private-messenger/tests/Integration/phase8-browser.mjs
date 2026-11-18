@@ -378,6 +378,26 @@ await iph.click('.cl-overlay [aria-label="پایان تماس"]');
 await ringing.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
 await iph.waitForTimeout(800);
 
+// A call that cannot connect (this «iPhone» is forced to relay-only, and there is no TURN): it must end with a
+// clear message and a technical trace (not hang on «connecting…»).
+await iph.context().addInitScript(() => {
+  const P = window.RTCPeerConnection;
+  window.RTCPeerConnection = class extends P { constructor(c) { super({ ...(c || {}), iceTransportPolicy: 'relay' }); } };
+});
+await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
+await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
+await iph.click('[aria-label="تماس صوتی"]');
+const ringing2 = await Promise.any([a2, alice].map((p) => p.waitForSelector('.cl-overlay [aria-label="پاسخ"]', { timeout: T }).then(() => p)));
+await ringing2.click('.cl-overlay [aria-label="پاسخ"]');
+await iph.waitForSelector('dialog:has-text("تماس برقرار نشد")', { timeout: 60000 });
+await iph.click('dialog summary');
+const trace = await iph.textContent('dialog .c-diag');
+check('failed call: a dialog with a technical trace instead of hanging on «connecting»', /iOS 15/.test(trace) && /answer received|offer received/.test(trace) && /my candidates/.test(trace), trace);
+await iph.click('dialog >> text=بستن');
+await ringing2.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
+const otherGot = await ringing2.waitForSelector('dialog:has-text("تماس برقرار نشد")', { timeout: 10000 }).then(() => true, () => false);
+check('the other phone gets the message and details too', otherGot && /candidates/.test(await ringing2.textContent('dialog .c-diag').catch(() => '')));
+if (otherGot) await ringing2.click('dialog >> text=بستن');
 check('no stray «null» text anywhere in an open chat', await a2.evaluate(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.textContent.trim() === 'null') return false; return true; }));
 console.log('\n# Delivery ticks');
 await openChat(a2, 'باب'); await a2.waitForSelector('.c-msg.out .st', { timeout: T });
