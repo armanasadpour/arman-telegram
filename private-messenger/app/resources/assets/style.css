@@ -102,6 +102,10 @@ details summary { cursor: pointer; color: var(--ink-2); }
 
 /* ================================================================ app shell */
 body:has(#app) { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: none; }
+/* the visible area above the on-screen keyboard (set from visualViewport in chat.js) */
+html:has(#app) { height: 100%; overflow: hidden; }
+html.kb-open { --safe-b: 0px; }
+body:has(#app) { position: fixed; inset-inline: 0; top: var(--app-top, 0px); height: var(--app-h, 100dvh); width: 100%; }
 body:has(#app) > .topbar { display: none; }  /* the app has its own settings screen; the form stays for logout */
 #app { flex: 1; min-height: 0; }
 .i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; }

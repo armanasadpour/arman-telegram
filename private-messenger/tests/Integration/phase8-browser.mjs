@@ -399,6 +399,35 @@ const otherGot = await ringing2.waitForSelector('dialog:has-text("تماس بر�
 check('the other phone gets the message and details too', otherGot && /candidates/.test(await ringing2.textContent('dialog .c-diag').catch(() => '')));
 if (otherGot) await ringing2.click('dialog >> text=بستن');
 check('no stray «null» text anywhere in an open chat', await a2.evaluate(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.textContent.trim() === 'null') return false; return true; }));
+console.log('\n# iPhone keyboard');
+// Emulate Safari's visual viewport: the keyboard covers the bottom 300 px (Safari does not resize the page itself).
+await iph.context().addInitScript(() => {
+  const t = new EventTarget(); let kbH = null; t.offsetTop = 0;
+  Object.defineProperty(t, 'height', { get: () => kbH ?? innerHeight });
+  Object.defineProperty(t, 'width', { get: () => innerWidth });
+  Object.defineProperty(window, 'visualViewport', { value: t, configurable: true });
+  window.__kb = (h) => { kbH = h; t.dispatchEvent(new Event('resize')); };
+});
+await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
+await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
+for (let i = 0; i < 12; i++) await send(iph, 'پیام برای پر کردن صفحه ' + i);
+await iph.waitForFunction(() => document.querySelectorAll('.c-msg.out').length >= 12, null, { timeout: T });
+await iph.click('.c-compose textarea');
+const kb = await iph.evaluate(async () => {
+  const visible = innerHeight - 300; window.__kb(visible);
+  await new Promise((r) => setTimeout(r, 300));
+  const head = document.querySelector('.c-chat-head, .c-head, header')?.getBoundingClientRect();
+  const comp = document.querySelector('.c-compose').getBoundingClientRect();
+  const m = document.querySelector('.c-msgs'), last = [...document.querySelectorAll('.c-msg')].pop().getBoundingClientRect();
+  return { visible, headTop: head?.top, comp: comp.bottom, lastBottom: last.bottom, compTop: comp.top, atEnd: m.scrollHeight - m.scrollTop - m.clientHeight < 5, kb: document.documentElement.classList.contains('kb-open') };
+});
+check('keyboard open: the chat header stays at the top of the screen', kb.headTop !== undefined && kb.headTop >= 0 && kb.headTop < 60, JSON.stringify(kb));
+check('keyboard open: the composer sits right above the keyboard', Math.abs(kb.comp - kb.visible) <= 2, JSON.stringify(kb));
+check('keyboard open: the last message is visible just above the composer', kb.atEnd && kb.lastBottom <= kb.compTop + 1, JSON.stringify(kb));
+check('keyboard open: no home-bar gap above the keyboard', kb.kb);
+const back = await iph.evaluate(async () => { window.__kb(innerHeight); await new Promise((r) => setTimeout(r, 300)); return [document.querySelector('.c-compose').getBoundingClientRect().bottom <= innerHeight, document.documentElement.classList.contains('kb-open')]; });
+check('keyboard closed: full height again', back[0] && !back[1]);
+
 console.log('\n# Delivery ticks');
 await openChat(a2, 'باب'); await a2.waitForSelector('.c-msg.out .st', { timeout: T });
 const ticks = await a2.evaluate(() => [...document.querySelectorAll('.c-msg.out .st')].map((t) => t.className + '|' + !!t.querySelector('svg')));

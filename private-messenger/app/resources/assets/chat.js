@@ -2101,6 +2101,25 @@ function endCall(status, reason, message) {
   if (tab === 'calls' && !subEl) renderSide();
 }
 
+// ------------------------------------------------------------------ keyboard (iPhone)
+// Safari on iPhone does not shrink the page when the keyboard opens: it slides the whole page up, so the
+// chat header disappears. Size the app to the area that is really visible above the keyboard and keep the
+// page itself from sliding; the newest messages stay in view (Android already does this through the
+// viewport's interactive-widget=resizes-content).
+const vv = window.visualViewport;
+let stickBottom = true;
+document.addEventListener('scroll', (e) => { if (e.target === msgsEl) stickBottom = msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 120; }, true);
+function fitViewport() {
+  if (!vv) return;
+  const de = document.documentElement;
+  de.style.setProperty('--app-h', Math.round(vv.height) + 'px');
+  de.style.setProperty('--app-top', Math.round(vv.offsetTop) + 'px');
+  de.classList.toggle('kb-open', window.innerHeight - vv.height > 120); // keyboard up: no home-bar gap above it
+  if (window.scrollY) window.scrollTo(0, 0);
+  if (msgsEl?.isConnected && stickBottom) requestAnimationFrame(() => { msgsEl.scrollTop = msgsEl.scrollHeight; });
+}
+if (vv) { vv.addEventListener('resize', fitViewport); vv.addEventListener('scroll', fitViewport); fitViewport(); }
+
 // ------------------------------------------------------------------ boot
 document.body.dataset.title = document.title;
 // Session ended on the server (signed out elsewhere, account suspended…): back to the login page.
