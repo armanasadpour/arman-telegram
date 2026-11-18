@@ -359,11 +359,12 @@ await iph.context().addInitScript(() => { if (!('audioSession' in navigator)) Ob
 await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
 await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
 await iph.click('[aria-label="تماس صوتی"]');
-await a2.waitForSelector('.cl-overlay [aria-label="پاسخ"]', { timeout: T });
+// Alice has two tabs on the same device: the call rings in whichever tab is handling the device's messages.
+const ringing = await Promise.any([a2, alice].map((p) => p.waitForSelector('.cl-overlay [aria-label="پاسخ"]', { timeout: T }).then(() => p)));
 await iph.waitForTimeout(1200);
 check('iPhone caller: the «ringing» tone plays from an <audio> file, no Web Audio started while the microphone records',
   await iph.evaluate(() => window.__wav && window.__acWhileRec === 0), JSON.stringify(await iph.evaluate(() => [window.__wav, window.__acWhileRec])));
-await a2.click('.cl-overlay [aria-label="پاسخ"]');
+await ringing.click('.cl-overlay [aria-label="پاسخ"]');
 await iph.waitForSelector('.cl-status:has-text("متصل")', { timeout: T });
 check('old Safari without connectionState: the call still connects (ICE state fallback)', await iph.evaluate(() => new RTCPeerConnection().connectionState === undefined));
 await iph.waitForTimeout(1000);
@@ -374,9 +375,10 @@ check('iPhone: the remote sound plays from the call\'s <video> element (not mute
 check('iPhone: a leftover «play-and-record» audio session is put back to the default', ios.session === 'auto', ios.session);
 check('iPhone: no loudspeaker button (Safari offers no switch)', !ios.speakerBtn);
 await iph.click('.cl-overlay [aria-label="پایان تماس"]');
-await a2.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
+await ringing.waitForFunction(() => !document.querySelector('.cl-overlay'), null, { timeout: T }).catch(() => {});
 await iph.waitForTimeout(800);
 
+check('no stray «null» text anywhere in an open chat', await a2.evaluate(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.textContent.trim() === 'null') return false; return true; }));
 console.log('\n# Delivery ticks');
 await openChat(a2, 'باب'); await a2.waitForSelector('.c-msg.out .st', { timeout: T });
 const ticks = await a2.evaluate(() => [...document.querySelectorAll('.c-msg.out .st')].map((t) => t.className + '|' + !!t.querySelector('svg')));

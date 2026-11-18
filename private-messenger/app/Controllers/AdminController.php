@@ -80,6 +80,9 @@ final class AdminController extends Controller
         $r->post('/users/{id}/retention', $this->need('users.retention.manage', fn (Request $q) => $this->userRetention($q), true));
 
         $r->get('/settings', $this->need('settings.view', fn (Request $q) => $this->settingsPage($q)));
+        // The same ICE servers (and short-lived TURN credentials) a user gets, for the admin's STUN/TURN test button.
+        $r->get('/calls/ice-test', $this->need('settings.view', fn (Request $q) => Response::json(
+            (new \PM\Calls\CallService($this->app->db(), $this->app->settings()))->iceConfig('admin-test'))));
         $r->post('/settings', $this->need('settings.edit', fn (Request $q) => $this->settingsSave($q), true));
         $r->post('/settings/sms-test', $this->need('settings.edit', fn (Request $q) => $this->smsTest($q), true));
 

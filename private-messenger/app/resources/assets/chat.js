@@ -1067,7 +1067,7 @@ async function openConversation(c, focusMid = null) {
   if (svcOff('text', c)) { composer.disabled = true; composer.placeholder = 'ارسال پیام متنی غیرفعال است'; }
   const targetBar = c.inbox ? el('div', { class: 'c-target' }, el('span', { text: 'پاسخ به:' }),
     el('select', { 'aria-label': 'پاسخ به کدام کاربر', onchange: (e) => setInboxTarget(e.target.value) },
-      ...c.cids.map((cid) => el('option', { value: cid, text: c.owners[cid]?.display_name + ' (@' + c.owners[cid]?.username + ')' })))) : null;
+      ...c.cids.map((cid) => el('option', { value: cid, text: c.owners[cid]?.display_name + ' (@' + c.owners[cid]?.username + ')' })))) : ''; // '' — replaceChildren(null) would print «null»
   mainEl.replaceChildren(chatHead, bannerEl, pinEl, findBar,
     el('div', { class: 'c-msgs-wrap' }, msgsEl),
     replyBar, emojiPanel, targetBar,
@@ -1689,7 +1689,8 @@ function playRemote(m) {
   const p = m.play?.();
   if (!p?.catch) return;
   p.then(() => c?.ui?.root.querySelector('.cl-unmute')?.remove()).catch(() => {
-    if (!c?.ui || c.ui.root.querySelector('.cl-unmute')) return;
+    // Before the call is connected there is nothing to hear yet: onConnected() tries again first.
+    if (!c?.ui || c.ui.root.querySelector('.cl-unmute') || c.state !== 'connected') return;
     const b = el('button', { class: 'cl-unmute', type: 'button', onclick: () => { m.play().then(() => b.remove()).catch(() => {}); } }, ico('speaker'), el('span', { text: 'برای شنیدن صدا اینجا را بزنید' }));
     c.ui.root.append(b);
   });
@@ -1962,6 +1963,7 @@ async function onConnected() {
   cur.tick = setInterval(renderCall, 1000);
   renderCall();
   watchAudio(cur);
+  if (cur.ui) playRemote(IOS ? cur.ui.remote : cur.ui.audio); // blocked earlier? now offer the «tap to hear» button
   try {
     const stats = await cur.pc.getStats();
     let pair = null; const cands = {};

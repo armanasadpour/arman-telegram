@@ -38,7 +38,7 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
     <?php if ($s->hasSecret('push.proxy')): ?><label class="check"><input type="checkbox" name="push_proxy_clear" value="1" <?= $dis ?>> حذف پراکسی اعلان</label><?php endif; ?>
     <p class="small muted">از پراکسی فقط برای ارسال اعلان به سرویس‌های اعلان استفاده می‌شود؛ محتوای اعلان رمزنگاری‌شده است و پراکسی هم چیزی جز «یک اعلان برای یک دستگاه» نمی‌بیند. وضعیت دسترسی را در صفحه «سیستم» بررسی کنید.</p>
     <p class="small muted">در Web Push فقط «نوع رویداد + شناسه گفتگو» به‌صورت رمزنگاری‌شده برای دستگاه فرستاده می‌شود؛ سرویس اعلان نه متن را می‌بیند و نه نام را. اما می‌فهمد که یک دستگاه در چه زمانی اعلان گرفته است. اگر سرور شما به این سرویس‌ها دسترسی نداشته باشد (مثلاً فیلتر)، اعلان فقط وقتی برنامه باز است کار می‌کند.</p>
-    <p class="small muted">متن پیام هرگز در اعلان نمایش داده نمی‌شود (اعلان روی صفحه قفل گوشی دیده می‌شود). اعلان فقط وقتی برنامه باز است (حتی در پس‌زمینه) کار می‌کند؛ اعلان در حالت بسته (Web Push) در این نسخه وجود ندارد.</p>
+    <p class="small muted">متن پیام هرگز در اعلان نمایش داده نمی‌شود (اعلان روی صفحه قفل گوشی دیده می‌شود).</p>
   </div>
   <div class="panel">
     <h2>تماس صوتی و تصویری</h2>
@@ -56,7 +56,14 @@ $v = fn (string $k) => $s->get($k); $dis = $can_edit ? '' : 'disabled'; ?>
       <label class="field"><span>رمز TURN (حالت ثابت؛ خالی = حفظ مقدار فعلی)</span><input type="password" name="calls_turn_password" class="ltr" autocomplete="off" <?= $dis ?>></label>
     </div>
     <label class="check"><input type="checkbox" name="calls_relay_only" value="1" <?= $v('calls.relay_only') ? 'checked' : '' ?> <?= $dis ?>> همه تماس‌ها فقط از طریق TURN (IP کاربران از هم پنهان می‌ماند؛ نیازمند TURN)</label>
+    <div class="mt">
+      <button type="button" class="btn secondary sm" id="ice-test" data-url="<?= e($base) ?>/calls/ice-test">آزمایش STUN / TURN از همین مرورگر</button>
+      <span class="small muted">تنظیمات ذخیره‌شده را آزمایش می‌کند؛ اگر چیزی را تغییر دادید، اول ذخیره کنید.</span>
+      <div id="ice-result" class="mt" aria-live="polite"></div>
+    </div>
+    <p class="small muted">بدون سرور TURN، تماس بین دو گوشی که یکی یا هر دو روی اینترنت همراه هستند معمولاً وصل نمی‌شود («اتصال تماس برقرار نشد»). هاست اشتراکی cPanel نمی‌تواند TURN اجرا کند؛ راهنمای راه‌اندازی روی یک سرور مجازی در docs/21-turn-server.md است.</p>
   </div>
+  <script src="<?= e($asset('admin-ice.js')) ?>" defer></script>
   <div class="panel">
     <h2>فایل‌ها و فضا</h2>
     <div class="grid2">
