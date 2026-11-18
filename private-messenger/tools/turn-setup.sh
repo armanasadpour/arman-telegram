@@ -28,8 +28,13 @@ echo "IP عمومی: $PUBLIC_IP   (IP روی کارت شبکه: ${LOCAL_IP:-?})"
 if ! command -v turnserver >/dev/null; then
   echo "نصب coturn…"
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update -q >/dev/null
-  apt-get install -y -q coturn >/dev/null
+  # Many VPS images still list the installation CD as a package source («file:/cdrom … no longer has a Release
+  # file»), which makes apt-get update fail. Switch those lines off (a backup is kept).
+  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+    [ -f "$f" ] && grep -qE '^[[:space:]]*deb .*(cdrom:|file:/cdrom)' "$f" && { cp "$f" "$f.bak.cdrom"; sed -i -E 's@^([[:space:]]*deb .*(cdrom:|file:/cdrom).*)@# \1@' "$f"; echo "منبع CD-ROM در $f غیرفعال شد."; }
+  done
+  apt-get update -q || { echo "به‌روزرسانی فهرست بسته‌ها ناموفق بود (خطا بالا). اگر سرور به مخزن Ubuntu دسترسی ندارد، از پشتیبانی شرکت میزبان «آینه (mirror) داخلی Ubuntu» بخواهید."; exit 1; }
+  apt-get install -y -q coturn || { echo "نصب coturn ناموفق بود (خطا بالا)."; exit 1; }
 fi
 
 # ---- config (a new secret every run; enter it again in the panel if you re-run)
