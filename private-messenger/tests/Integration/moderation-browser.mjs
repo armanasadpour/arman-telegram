@@ -105,8 +105,10 @@ check('timed: the switch has an end time', sql(`SELECT until_at IS NOT NULL FROM
 // per-group: no messages in this group
 await admin.goto(ADM + 'conversations/' + gid);
 await admin.check('form[action$="/services"] input[value=group_message]'); await admin.click('form[action$="/services"] button');
-await bob.click('[aria-label="بازگشت"]').catch(() => {}); await openChat(bob, 'MOD-CANARY');
-check('per-group switch: composer replaced by an explanation', (await bob.textContent('.c-compose')).includes('غیرفعال'));
+for (let i = 0; i < 50 && sql(`SELECT COUNT(*) FROM service_policies WHERE scope = 'conversation' AND service = 'group_message'`) === '0'; i++) await bob.waitForTimeout(100);
+await bob.reload(); await bob.waitForSelector('.c-side-head h1', { timeout: T }); await openChat(bob, 'MOD-CANARY');
+const cmpOk = await bob.waitForFunction(() => document.querySelector('.c-compose')?.textContent.includes('غیرفعال'), null, { timeout: T }).then(() => true, () => false);
+check('per-group switch: composer replaced by an explanation', cmpOk, await bob.textContent('.c-compose').catch(() => ''));
 await admin.uncheck('form[action$="/services"] input[value=group_message]'); await admin.click('form[action$="/services"] button');
 
 // ---------------------------------------------------------------- groups & channels admin view, ban

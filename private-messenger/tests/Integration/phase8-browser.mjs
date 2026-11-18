@@ -348,6 +348,13 @@ await iph.context().addInitScript(() => {
   const res = AC.prototype.resume; AC.prototype.resume = function () { if (window.__gum && this.state !== 'running') window.__acWhileRec++; return res.call(this); };
   const play = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { if (String(this.src).startsWith('blob:')) window.__wav = true; return play.call(this); };
 });
+// Old Safari (before iOS 16) may not report RTCPeerConnection.connectionState: emulate that on this «iPhone».
+await iph.context().addInitScript(() => {
+  Object.defineProperty(RTCPeerConnection.prototype, 'connectionState', { get() { return undefined; } });
+  const add = RTCPeerConnection.prototype.addEventListener;
+  RTCPeerConnection.prototype.addEventListener = function (t, ...a) { if (t === 'connectionstatechange') return; return add.call(this, t, ...a); };
+  Object.defineProperty(RTCPeerConnection.prototype, 'onconnectionstatechange', { set() {}, get() { return null; } });
+});
 await iph.context().addInitScript(() => { if (!('audioSession' in navigator)) Object.defineProperty(navigator, 'audioSession', { value: { type: 'play-and-record' } }); });
 await iph.reload(); await iph.waitForSelector('.c-side-head h1', { timeout: T });
 await iph.click('.c-list .c-item:has-text("آلیس")'); await iph.waitForSelector('.c-compose textarea', { timeout: T });
@@ -358,6 +365,7 @@ check('iPhone caller: the «ringing» tone plays from an <audio> file, no Web Au
   await iph.evaluate(() => window.__wav && window.__acWhileRec === 0), JSON.stringify(await iph.evaluate(() => [window.__wav, window.__acWhileRec])));
 await a2.click('.cl-overlay [aria-label="پاسخ"]');
 await iph.waitForSelector('.cl-status:has-text("متصل")', { timeout: T });
+check('old Safari without connectionState: the call still connects (ICE state fallback)', await iph.evaluate(() => new RTCPeerConnection().connectionState === undefined));
 await iph.waitForTimeout(1000);
 const ios = await iph.evaluate(() => { const v = document.querySelector('.cl-remote'), a = document.querySelector('.cl-audio');
   return { session: navigator.audioSession.type, muted: v.muted, paused: v.paused, audio: !!v.srcObject?.getAudioTracks().length, extra: !!a?.srcObject,

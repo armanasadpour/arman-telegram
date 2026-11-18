@@ -1669,11 +1669,16 @@ function makePc(cfg) {
     cur.ui.audio.srcObject = s;       // sound: one dedicated <audio> element whose output we can route
     playRemote(cur.ui.audio);
   };
-  pc.onconnectionstatechange = () => {
+  // connectionState is newer; Safari before iOS 16 (and older browsers) may not report it, so the older
+  // iceConnectionState is watched too — whichever says «connected» first.
+  const changed = () => {
     if (!cur || cur.pc !== pc) return;
-    if (pc.connectionState === 'connected' && cur.state !== 'connected') onConnected();
-    if (pc.connectionState === 'failed') endCall('failed', 'ice_failed', cfg.has_turn ? 'اتصال تماس برقرار نشد.' : 'اتصال تماس برقرار نشد. شبکه شما احتمالاً به سرور TURN نیاز دارد که روی این سامانه تنظیم نشده است.');
+    const ok = pc.connectionState === 'connected' || ['connected', 'completed'].includes(pc.iceConnectionState);
+    if (ok && cur.state !== 'connected') onConnected();
+    if (pc.connectionState === 'failed' || pc.iceConnectionState === 'failed') endCall('failed', 'ice_failed', cfg.has_turn ? 'اتصال تماس برقرار نشد.' : 'اتصال تماس برقرار نشد. شبکه شما احتمالاً به سرور TURN نیاز دارد که روی این سامانه تنظیم نشده است.');
   };
+  pc.addEventListener('connectionstatechange', changed);
+  pc.addEventListener('iceconnectionstatechange', changed);
   return pc;
 }
 // iPhone / iPad (iPadOS reports itself as a Mac with touch).
