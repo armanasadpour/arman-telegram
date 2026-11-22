@@ -161,8 +161,28 @@ check('a tap on your preview switches to the real (un-mirrored) view', !(await t
 check('the choice is remembered on this device', await alice.evaluate(() => localStorage.getItem('pm.mirror')) === '0');
 await alice.click('.cl-local'); await alice.waitForTimeout(400);
 check('tap again: mirror view back', (await tf(alice, '.cl-local')).startsWith('matrix(-1'));
+// clean view: a tap on the picture hides the name, status and buttons; another tap brings them back
+const isClean = (p) => p.evaluate(() => document.querySelector('.cl-overlay').classList.contains('clean'));
+const showCtl = (p) => p.evaluate(() => { const o = document.querySelector('.cl-overlay'); if (o?.classList.contains('clean')) o.click(); });
+await alice.waitForFunction(() => !document.querySelector('.cl-warn'), null, { timeout: T }); // a warning keeps the controls shown
+await showCtl(alice);
+await alice.waitForTimeout(400);
+if (SHOTS) await alice.screenshot({ path: `${SHOTS}/call-ui.png` });
+const vp = alice.viewportSize() || { width: 800, height: 600 };
+await alice.mouse.click(vp.width / 2, vp.height * 0.68);
+await alice.waitForTimeout(400);
+const hidden = await alice.evaluate(() => [getComputedStyle(document.querySelector('.cl-controls')).opacity, getComputedStyle(document.querySelector('.cl-top')).opacity]);
+if (SHOTS) await alice.screenshot({ path: `${SHOTS}/call-clean.png` });
+check('video call: a tap on the picture hides name, status and buttons (clean view)', await isClean(alice) && hidden[0] === '0' && hidden[1] === '0', hidden.join(','));
+await alice.mouse.click(vp.width / 2, vp.height * 0.68);
+await alice.waitForTimeout(400);
+check('… another tap brings them back', !(await isClean(alice)) && (await alice.evaluate(() => getComputedStyle(document.querySelector('.cl-controls')).opacity)) === '1');
+await alice.waitForTimeout(5600);
+check('… and they fade away by themselves after 5 s', await isClean(alice));
+await showCtl(alice);
 await alice.click('[aria-label="قطع میکروفون"]');
 check('mute toggles the microphone', !!(await alice.$('[aria-label="وصل میکروفون"]')));
+await showCtl(alice);
 await alice.click('[aria-label="خاموش کردن دوربین"]');
 check('camera can be turned off', !!(await alice.$('[aria-label="روشن کردن دوربین"]')));
 console.log('\n# Busy');
@@ -173,6 +193,7 @@ await carol.click('[aria-label="تماس صوتی"]');
 await carol.waitForSelector('.c-toast:has-text("در حال مکالمه دیگری است")', { timeout: T });
 check('a third person calling gets «busy»; the running call is not disturbed', (await bob.textContent('.cl-status')).includes('متصل'));
 await alice.waitForTimeout(2200);
+await showCtl(bob);
 await bob.click('.cl-overlay [aria-label="پایان تماس"]');
 await alice.waitForSelector('.c-toast:has-text("تماس پایان یافت")', { timeout: T });
 check('hang-up ends the call on both sides', !(await alice.$('.cl-overlay')) && !(await bob.$('.cl-overlay')));

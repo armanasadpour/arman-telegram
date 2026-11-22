@@ -1855,6 +1855,13 @@ function callUi() {
     remote, audio, local, el('div', { class: 'cl-top' }, el('div', { class: 'cl-rings' }, avatar(cur.name, cur.peer, 'user', 'cl-av')), el('b', { class: 'cl-name', text: cur.name }), status, info2), controls);
   document.body.append(root2);
   cur.ui = { root: root2, remote, audio, local, status, info: info2, controls };
+  // Video call: a tap on the picture hides the name, status and buttons for a clean view; another tap
+  // brings them back (they also fade away by themselves a few seconds after the call connects).
+  const c = cur;
+  root2.addEventListener('click', (e) => {
+    if (!c.video || c.state !== 'connected' || e.target.closest('button, .cl-local, .cl-unmute')) return;
+    setClean(c, !root2.classList.contains('clean'));
+  });
   renderCall();
 }
 function renderCall() {
@@ -1864,6 +1871,7 @@ function renderCall() {
   u.status.textContent = cur.state === 'connected' ? CALL_STATE.connected + ' · ' + dur((Date.now() - cur.started) / 1000) : CALL_STATE[cur.state] + (cur.video ? ' (تصویری)' : ' (صوتی)');
   const warn = [cur.micNote, cur.inNote].filter(Boolean).join(' · ');
   let w = u.root.querySelector('.cl-warn');
+  if (warn && u.root.classList.contains('clean')) setClean(cur, false);
   if (warn) { if (!w) { w = el('div', { class: 'cl-warn', role: 'status' }); u.status.after(w); } if (w.textContent !== warn) w.textContent = warn; } else w?.remove();
   const btn = (label, icon, fn, cls = '') => el('button', { class: 'cl-btn ' + cls, 'aria-label': label, title: label, onclick: fn }, typeof icon === 'string' && ICONS[icon] ? ico(icon) : el('span', { text: icon }));
   if (cur.state === 'incoming') {
@@ -1995,6 +2003,7 @@ async function onConnected() {
   cur.tick = setInterval(renderCall, 1000);
   renderCall();
   watchAudio(cur);
+  if (cur.video) setClean(cur, false); // visible now, fades after 5 s
   if (cur.ui) playRemote(IOS ? cur.ui.remote : cur.ui.audio); // blocked earlier? now offer the «tap to hear» button
   try {
     const stats = await cur.pc.getStats();
@@ -2053,6 +2062,12 @@ function watchAudio(c) {
     if (note !== (c.inNote || '')) { c.inNote = note; renderCall(); }
   }, 2000);
 }
+function setClean(c, on) {
+  if (!c.ui) return;
+  clearTimeout(c.cleanTimer);
+  c.ui.root.classList.toggle('clean', on);
+  if (!on) c.cleanTimer = setTimeout(() => { if (cur === c && c.video && c.state === 'connected' && !c.micNote && !c.inNote) setClean(c, true); }, 5000);
+}
 // Your own picture from the FRONT camera is shown like a mirror (as in WhatsApp/FaceTime), the back camera as it is.
 // This changes only your small preview: the other side always gets the real, un-mirrored picture.
 // A tap on the preview switches between mirror view and real view (remembered on this device).
@@ -2085,7 +2100,7 @@ function endCall(status, reason, message) {
   if (!cur) return;
   const c = cur; cur = null;
   c.ring?.close?.(); c.back?.close?.(); clearInterval(c.ringLoop); clearInterval(c.health);
-  clearTimeout(c.ringTimer); clearTimeout(c.connTimer); clearInterval(c.tick);
+  clearTimeout(c.ringTimer); clearTimeout(c.connTimer); clearTimeout(c.cleanTimer); clearInterval(c.tick);
   if (status && c.id) call('call_status', { id: c.id, status, reason });
   c.stream?.getTracks().forEach((t) => t.stop());
   try { c.pc?.close(); } catch { /* ignore */ }

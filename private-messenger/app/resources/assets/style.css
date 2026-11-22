@@ -487,6 +487,10 @@ body.offline .c-side-head h1::after { content: ' · بدون اتصال'; font-s
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .cl-audio { display: none; }
+/* video call: tap the picture to hide / show the name, status and buttons */
+.cl-overlay.video .cl-top, .cl-overlay.video .cl-controls { transition: opacity .3s ease, transform .3s ease; }
+.cl-overlay.clean .cl-top { opacity: 0; transform: translateY(-12px); pointer-events: none; }
+.cl-overlay.clean .cl-controls { opacity: 0; transform: translateY(16px); pointer-events: none; }
 .c-diag { white-space: pre-wrap; word-break: break-all; font-size: 11px; max-height: 40vh; overflow: auto; background: var(--bg-2, rgba(0,0,0,.05)); padding: 8px; border-radius: 10px; text-align: left; }
 .cl-warn { margin-top: 6px; padding: 4px 12px; border-radius: 999px; background: rgba(245, 158, 11, .92); color: #1f1300; font-size: 12.5px; font-weight: 700; }
 .cl-unmute { position: absolute; inset-inline: 24px; top: 50%; z-index: 5; display: flex; gap: 10px; align-items: center; justify-content: center; padding: 16px; border: 0; border-radius: 18px; background: #fff; color: #111; font: inherit; font-weight: 700; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); cursor: pointer; }
