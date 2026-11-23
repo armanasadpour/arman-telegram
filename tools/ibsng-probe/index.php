@@ -62,10 +62,25 @@ if (strlen($token) < 24 || str_starts_with($token, 'CHANGE_ME')) {
 if (str_starts_with((string) $cfg['admin_password'], 'CHANGE_ME')) {
     respondFatal(false, 'رمز مدیر IBSng در config.php تنظیم نشده است.');
 }
-$given = (string) ($_POST['token'] ?? $_GET['token'] ?? '');
+$given = trim((string) ($_POST['token'] ?? $_GET['token'] ?? ''));
 if (!hash_equals($token, $given)) {
-    http_response_code(403);
-    respondFatal(false, 'دسترسی مجاز نیست. آدرس را با ?token=... باز کنید.');
+    if ($given !== '') {
+        http_response_code(403);
+    }
+    $h = static fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<meta name="robots" content="noindex"><title>ورود به ابزار تست</title></head>'
+        . '<body style="font-family:IRANSans,Tahoma,sans-serif;background:#f6f7f9;margin:0;padding:16px">'
+        . '<form method="post" style="max-width:420px;margin:40px auto;background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:16px">'
+        . '<h1 style="font-size:1.1rem;margin-top:0">ابزار تست اتصال IBSng</h1>'
+        . ($given !== '' ? '<p style="color:#c4320a">توکن اشتباه است. دقیقاً همان مقدار access_token داخل config.php را وارد کنید.</p>' : '')
+        . '<label>توکن دسترسی (access_token):<br><input name="token" type="password" autocomplete="off" required '
+        . 'style="width:100%;box-sizing:border-box;padding:8px;margin:8px 0;border:1px solid #ccc;border-radius:8px;direction:ltr"></label>'
+        . '<button style="background:#2f5bea;color:#fff;border:0;border-radius:8px;padding:10px 18px;font:inherit">ورود</button>'
+        . '</form></body></html>';
+    unset($h);
+    exit;
 }
 
 $ran = false;
