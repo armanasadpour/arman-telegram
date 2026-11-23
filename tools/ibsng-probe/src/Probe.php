@@ -52,6 +52,12 @@ final class Probe
     public function runAll(bool $doWriteTest): void
     {
         $this->checkEnvironment();
+        $this->runIbs($doWriteTest);
+        $this->runMikrotik();
+    }
+
+    private function runIbs(bool $doWriteTest): void
+    {
         if (!$this->checkTcp()) {
             return; // nothing else can succeed
         }
@@ -75,6 +81,149 @@ final class Probe
             } else {
                 $this->controlledWriteTest();
             }
+        }
+    }
+
+    // ------------------------------------------------------------ MikroTik (read-only)
+
+    /**
+     * Read-only proof of the RouterOS REST connection plus an inventory of what
+     * each protocol needs: RADIUS/PPP accounting (OpenVPN, L2TP via IBSng) and
+     * WireGuard peer counters (accounting done by our system).
+     * Nothing is ever written to the router here.
+     */
+    public function runMikrotik(): void
+    {
+        $m = (array) ($this->cfg['mikrotik'] ?? []);
+        if (empty($m['enabled'])) {
+            $this->add('mt.disabled', 'MikroTik', 'skip', 'بخش mikrotik در config.php فعال نیست.');
+            return;
+        }
+        $host = (string) ($m['host'] ?? '');
+        $port = (int) ($m['port'] ?? 443);
+        $pin = trim((string) ($m['cert_pin'] ?? ''));
+
+        if ($pin === '') {
+            try {
+                $found = MikrotikRestClient::fetchPin($host, $port);
+                $this->add('mt.pin', 'اثر انگشت گواهی www-ssl میکروتیک', 'warn',
+                    "هیچ رمزی ارسال نشد. اثر انگشت دریافتی: {$found} — آن را با خروجی `/certificate print detail` در میکروتیک مقایسه کرده و در cert_pin قرار دهید، سپس دوباره اجرا کنید.",
+                    ['cert_pin' => $found]);
+            } catch (\Throwable $e) {
+                $this->add('mt.pin', 'اتصال TLS به میکروتیک', 'fail', $e->getMessage());
+            }
+            return;
+        }
+
+        try {
+            $api = new MikrotikRestClient($host, $port, (string) ($m['username'] ?? ''), (string) ($m['password'] ?? ''), $pin,
+                (float) ($this->cfg['timeout'] ?? 10));
+        } catch (\Throwable $e) {
+            $this->add('mt.config', 'تنظیمات MikroTik', 'fail', $e->getMessage());
+            return;
+        }
+        $mtPass = (string) ($m['password'] ?? '');
+
+        $call = function (string $id, string $title, string $path) use ($api, $mtPass) {
+            try {
+                $r = MikrotikRestClient::redact($api->get($path));
+                $this->add($id, $title, 'pass', 'OK');
+                return $r;
+            } catch (\Throwable $e) {
+                $msg = $mtPass !== '' ? str_replace($mtPass, '***', $e->getMessage()) : $e->getMessage();
+                $this->add($id, $title, 'fail', $msg);
+                return null;
+            }
+        };
+        $one = static fn ($r) => is_array($r) && array_is_list($r) ? ($r[0] ?? []) : (array) $r;
+
+        // 1. identity / resources
+        $res = $call('mt.resource', 'منابع روتر (system/resource)', 'system/resource');
+        if ($res === null) {
+            return; // auth or transport failed: nothing else will work
+        }
+        $res = $one($res);
+        $pick = array_intersect_key($res, array_flip(['version', 'board-name', 'architecture-name', 'cpu-count', 'cpu-load', 'free-memory', 'total-memory', 'uptime']));
+        $memWarn = isset($res['free-memory'], $res['total-memory']) && (float) $res['total-memory'] > 0
+            && ((float) $res['free-memory'] / (float) $res['total-memory']) < 0.2;
+        $this->patchLast($memWarn ? 'warn' : 'pass',
+            'RouterOS ' . ($res['version'] ?? '?') . ($memWarn ? ' — حافظه آزاد کمتر از ۲۰٪ است' : ''), $pick);
+
+        $lic = $call('mt.license', 'لایسنس RouterOS (system/license)', 'system/license');
+        if ($lic !== null) {
+            $lic = $one($lic);
+            $this->patchLast('info', 'سطح لایسنس سقف تعداد تونل‌های همزمان را تعیین می‌کند: ' . ($lic['nlevel'] ?? $lic['level'] ?? '?'),
+                array_intersect_key($lic, array_flip(['nlevel', 'level', 'features'])));
+        }
+
+        // 2. services (REST must be HTTPS only; api-ssl optional)
+        $svc = $call('mt.services', 'سرویس‌های مدیریتی (ip/service)', 'ip/service');
+        if (is_array($svc)) {
+            $rows = [];
+            foreach ($svc as $s) {
+                if (in_array($s['name'] ?? '', ['www', 'www-ssl', 'api', 'api-ssl', 'winbox', 'ssh', 'telnet', 'ftp'], true)) {
+                    $rows[$s['name']] = ['disabled' => $s['disabled'] ?? null, 'port' => $s['port'] ?? null, 'address' => $s['address'] ?? ''];
+                }
+            }
+            $open = array_keys(array_filter($rows, static fn ($r) => ($r['disabled'] ?? 'true') === 'false' && ($r['address'] ?? '') === ''));
+            $this->patchLast($open ? 'warn' : 'pass',
+                $open ? 'این سرویس‌ها بدون محدودیت IP فعال‌اند: ' . implode(', ', $open) : 'همه سرویس‌های فعال محدودیت IP دارند', $rows);
+        }
+
+        // 3. RADIUS + PPP accounting (OpenVPN and L2TP go through IBSng)
+        $rad = $call('mt.radius', 'کلاینت RADIUS (radius)', 'radius');
+        if (is_array($rad)) {
+            $brief = array_map(static fn ($r) => array_intersect_key($r, array_flip(['address', 'service', 'disabled', 'authentication-port', 'accounting-port', 'timeout', 'secret'])), $rad);
+            $hasPpp = (bool) array_filter($rad, static fn ($r) => str_contains((string) ($r['service'] ?? ''), 'ppp') && ($r['disabled'] ?? 'false') !== 'true');
+            $this->patchLast($hasPpp ? 'pass' : 'fail', $hasPpp ? 'RADIUS برای سرویس ppp تعریف شده است' : 'هیچ RADIUS فعالی برای ppp نیست', $brief);
+        }
+        $aaa = $call('mt.ppp_aaa', 'حسابداری PPP (ppp/aaa)', 'ppp/aaa');
+        if ($aaa !== null) {
+            $aaa = $one($aaa);
+            $ok = ($aaa['use-radius'] ?? '') === 'true' && ($aaa['accounting'] ?? '') === 'true' && !in_array($aaa['interim-update'] ?? '0s', ['0s', '00:00:00', ''], true);
+            $this->patchLast($ok ? 'pass' : 'fail',
+                $ok ? 'use-radius، accounting و interim-update فعال‌اند' : 'برای حسابداری دقیق باید use-radius=yes، accounting=yes و interim-update=1m باشد',
+                array_intersect_key($aaa, array_flip(['use-radius', 'accounting', 'interim-update'])));
+        }
+
+        // 4. per-protocol server settings
+        $ovpn = $call('mt.ovpn', 'سرور OpenVPN (interface/ovpn-server/server)', 'interface/ovpn-server/server');
+        if ($ovpn !== null) {
+            $ovpn = $one($ovpn);
+            $this->patchLast(($ovpn['enabled'] ?? '') === 'true' ? 'pass' : 'warn', 'enabled=' . ($ovpn['enabled'] ?? '?'),
+                array_intersect_key($ovpn, array_flip(['enabled', 'port', 'protocol', 'mode', 'auth', 'cipher', 'certificate', 'require-client-certificate', 'default-profile', 'netmask'])));
+        }
+        $l2tp = $call('mt.l2tp', 'سرور L2TP (interface/l2tp-server/server)', 'interface/l2tp-server/server');
+        if ($l2tp !== null) {
+            $l2tp = $one($l2tp);
+            $this->patchLast(($l2tp['enabled'] ?? '') === 'true' ? 'pass' : 'warn',
+                'enabled=' . ($l2tp['enabled'] ?? '?') . ' | use-ipsec=' . ($l2tp['use-ipsec'] ?? '?'),
+                array_intersect_key($l2tp, array_flip(['enabled', 'use-ipsec', 'ipsec-secret', 'authentication', 'default-profile', 'max-sessions'])));
+        }
+        $wg = $call('mt.wg', 'اینترفیس‌های WireGuard (interface/wireguard)', 'interface/wireguard');
+        if (is_array($wg)) {
+            $this->patchLast($wg ? 'pass' : 'warn', count($wg) . ' اینترفیس',
+                array_map(static fn ($r) => array_intersect_key($r, array_flip(['name', 'listen-port', 'mtu', 'disabled', 'running', 'public-key'])), $wg));
+        }
+        $peers = $call('mt.wg_peers', 'Peerهای WireGuard و شمارنده‌ها (interface/wireguard/peers)', 'interface/wireguard/peers');
+        if (is_array($peers)) {
+            $fields = ['rx', 'tx', 'last-handshake'];
+            $has = $peers ? array_values(array_filter($fields, static fn ($f) => array_key_exists($f, $peers[0]))) : [];
+            $sample = array_map(static fn ($p) => array_intersect_key($p, array_flip(['interface', 'allowed-address', 'disabled', 'rx', 'tx', 'last-handshake', 'comment'])), array_slice($peers, 0, 3));
+            if (!$peers) {
+                $this->patchLast('warn', 'هیچ Peer وجود ندارد؛ وجود شمارنده‌های rx/tx پس از ساخت اولین Peer قابل تأیید است');
+            } else {
+                $this->patchLast(count($has) === 3 ? 'pass' : 'fail',
+                    count($peers) . ' Peer | شمارنده‌های موجود: ' . ($has ? implode(', ', $has) : 'هیچ') . ' — لازم برای حسابداری WireGuard',
+                    ['sample' => $sample]);
+            }
+        }
+
+        // 5. live sessions by protocol
+        $active = $call('mt.ppp_active', 'اتصال‌های فعال PPP (ppp/active)', 'ppp/active');
+        if (is_array($active)) {
+            $by = array_count_values(array_map(static fn ($a) => (string) ($a['service'] ?? '?'), $active));
+            $this->patchLast('pass', count($active) . ' اتصال فعال', ['by_service' => $by]);
         }
     }
 

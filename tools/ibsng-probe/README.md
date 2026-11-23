@@ -21,6 +21,19 @@
 - IBSng به‌طور پیش‌فرض فقط روی `127.0.0.1` گوش می‌دهد. برای تست مستقیم از هاست، `IBS_SERVER_IP` را (از پنل IBSng → Advanced Configuration یا جدول defs) به IP شبکه تغییر دهید، IBSng را ری‌استارت کنید و در فایروال پورت 1235 را **فقط** برای IP هاست باز کنید. اگر ترجیح می‌دهید پورت باز نشود، گزینه Relay را در گزارش فاز ببینید.
 - اگر مدیر IBSng محدودیت IP دارد، IP هاست cPanel را مجاز کنید.
 
+## پیش‌نیاز سمت MikroTik (اختیاری، فقط خواندنی — RouterOS 7.7)
+در Terminal میکروتیک (IP هاست cPanel را جایگزین `CPANEL_IP` و IP روتر را جایگزین `ROUTER_IP` کنید):
+```
+/certificate add name=rest-ca common-name=rest-ca key-usage=key-cert-sign,crl-sign
+/certificate sign rest-ca
+/certificate add name=rest common-name=ROUTER_IP subject-alt-name=IP:ROUTER_IP
+/certificate sign rest ca=rest-ca
+/ip service set www-ssl certificate=rest address=CPANEL_IP/32 disabled=no
+/user group add name=panel-ro policy=read,api,rest-api
+/user add name=panel-ro group=panel-ro address=CPANEL_IP/32 password=یک-رمز-قوی
+```
+سپس بخش `mikrotik` در `config.php` را با `enabled => true` تکمیل کنید و `cert_pin` را خالی بگذارید. بار اول ابزار **بدون ارسال رمز** اثر انگشت گواهی را نشان می‌دهد؛ آن را در `cert_pin` بگذارید و دوباره اجرا کنید. ابزار هیچ تغییری روی روتر ایجاد نمی‌کند و کلیدها/Secretها را از گزارش حذف می‌کند.
+
 ## امنیت
 - صفحه بدون توکن خطای 403 می‌دهد؛ `config.php` و `src/` با `.htaccess` مسدودند.
 - رمز مدیر در خروجی و گزارش با `***` جایگزین می‌شود؛ رمز کاربران IBSng هم حذف می‌شود.

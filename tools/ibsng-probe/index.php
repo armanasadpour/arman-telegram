@@ -9,6 +9,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/src/XmlRpcClient.php';
+require __DIR__ . '/src/MikrotikRestClient.php';
 require __DIR__ . '/src/Probe.php';
 
 use IbsProbe\Probe;
