@@ -1,0 +1,63 @@
+@php($siteName = app(\App\Services\Settings::class)->get('general.site_name'))
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{ $title ?? 'پنل' }} — {{ $siteName }}</title>
+@if(is_file(public_path('fonts/IRANSansWeb.woff2')))<link rel="stylesheet" href="{{ asset('assets/fonts.css') }}?v={{ config('panel.version') }}">@endif
+<link rel="stylesheet" href="{{ asset('assets/app.css') }}?v={{ config('panel.version') }}">
+</head>
+<body>
+<div class="shell">
+  <header class="header">
+    <button id="menu-btn" class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="منو"><x-icon name="menu" width="20" height="20"/></button>
+    <div class="brand">{{ $siteName }}</div>
+    <div class="user">
+      <a href="{{ route('profile.password') }}" title="تغییر رمز">{{ auth()->user()->name }}</a>
+      <form method="post" action="{{ route('logout') }}">
+        @csrf
+        <button class="btn btn-secondary btn-sm" type="submit" title="خروج"><x-icon name="logout" width="16" height="16"/><span>خروج</span></button>
+      </form>
+    </div>
+  </header>
+
+  <nav id="sidebar" class="sidebar nav" aria-label="منوی اصلی">
+    @can('dashboard.view')
+      <a href="{{ route('dashboard') }}" @class(['active' => request()->routeIs('dashboard')])><x-icon name="home"/>داشبورد</a>
+    @endcan
+    @if(auth()->user()->can('staff.view') || auth()->user()->can('roles.view'))
+      <div class="section">مدیریت دسترسی</div>
+      @can('staff.view')
+        <a href="{{ route('staff.index') }}" @class(['active' => request()->routeIs('staff.*')])><x-icon name="users"/>کاربران پنل</a>
+      @endcan
+      @can('roles.view')
+        <a href="{{ route('roles.index') }}" @class(['active' => request()->routeIs('roles.*')])><x-icon name="shield"/>نقش‌ها و دسترسی‌ها</a>
+      @endcan
+    @endif
+    @if(auth()->user()->can('audit.view') || auth()->user()->can('settings.view') || auth()->user()->can('system.view'))
+      <div class="section">سیستم</div>
+      @can('audit.view')
+        <a href="{{ route('audit.index') }}" @class(['active' => request()->routeIs('audit.*')])><x-icon name="list"/>گزارش رویدادها</a>
+      @endcan
+      @can('settings.view')
+        <a href="{{ route('settings.edit') }}" @class(['active' => request()->routeIs('settings.*')])><x-icon name="settings"/>تنظیمات</a>
+      @endcan
+      @can('system.view')
+        <a href="{{ route('system.status') }}" @class(['active' => request()->routeIs('system.*')])><x-icon name="activity"/>وضعیت سرویس‌ها</a>
+      @endcan
+    @endif
+    <div class="section">حساب من</div>
+    <a href="{{ route('profile.password') }}" @class(['active' => request()->routeIs('profile.*')])><x-icon name="key"/>تغییر رمز عبور</a>
+  </nav>
+  <div id="backdrop" class="backdrop"></div>
+
+  <main class="main">
+    @include('partials.flash')
+    {{ $slot }}
+  </main>
+</div>
+<script src="{{ asset('assets/app.js') }}?v={{ config('panel.version') }}"></script>
+</body>
+</html>

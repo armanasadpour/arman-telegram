@@ -1,0 +1,27 @@
+# Used when the whole package is extracted directly into public_html (or a subfolder).
+# Preferred setup is to point the (sub)domain document root at the "public" folder instead;
+# then this file is not needed.
+
+Options -Indexes
+
+# Never serve secrets or source files, even if mod_rewrite is missing.
+<FilesMatch "^(\.env.*|\.git.*|composer\.(json|lock)|artisan|phpunit\.xml|.*\.sqlite)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Let cPanel AutoSSL validate the domain.
+    RewriteRule ^\.well-known/ - [L]
+
+    # Block application folders and dotfiles.
+    RewriteRule ^(app|bootstrap|config|database|deploy|lang|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+    RewriteRule (^|/)\. - [F,L]
+
+    # Already inside /public: stop here (public/.htaccess takes over).
+    RewriteRule ^public/ - [L]
+
+    # Everything else is served from /public.
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

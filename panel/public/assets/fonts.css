@@ -1,0 +1,5 @@
+/* Loaded only when public/fonts/IRANSansWeb.woff2 exists (licensed font supplied by the owner). */
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSansWeb.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSansWeb_Medium.woff2) format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSansWeb_Bold.woff2) format("woff2");font-weight:700;font-display:swap}
+
