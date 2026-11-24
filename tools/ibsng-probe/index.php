@@ -87,21 +87,19 @@ $ran = false;
 $results = [];
 $wantWrite = false;
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-    $writeTicked = ($_POST['write'] ?? '') === '1';
-    $wantWrite = $writeTicked && isConfirmWord((string) ($_POST['confirm'] ?? ''));
+    // The write test needs BOTH: allow_write_test=true in config.php AND the dedicated button.
+    $wantWrite = !empty($cfg['allow_write_test']) && ($_POST['mode'] ?? '') === 'write';
     @set_time_limit(120);
     $probe = new Probe($cfg);
-    if ($writeTicked && !$wantWrite) {
-        $probe->note('write.not_confirmed', 'تست نوشتن', 'skip', 'تیک زده شد اما کلمه تأیید درست وارد نشد؛ تست نوشتن اجرا نشد.');
-    } elseif (!$writeTicked && !empty($cfg['allow_write_test'])) {
-        $probe->note('write.not_selected', 'تست نوشتن', 'skip', 'تیک «اجرای تست نوشتن» زده نشده بود.');
+    if (($_POST['mode'] ?? '') === 'write' && !$wantWrite) {
+        $probe->note('write.disabled', 'تست نوشتن', 'skip', 'allow_write_test در config.php فعال نیست.');
     }
     $probe->runAll($wantWrite);
     $results = $probe->results();
     $ran = true;
 }
 
-if (($_POST['format'] ?? '') === 'json' && $ran) {
+if ((($_POST['format'] ?? '') === 'json' || $wantWrite) && $ran) {
     header('Content-Type: application/json; charset=utf-8');
     header('Content-Disposition: attachment; filename="ibsng-probe-report.json"');
     echo json_encode(buildReport($cfg, $results), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -128,6 +126,7 @@ main{max-width:960px;margin:0 auto;padding:16px}
 h1{font-size:1.3rem;margin:0 0 4px}p.muted{color:var(--muted);margin:0}
 form .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
 button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 18px;font:inherit;cursor:pointer}
+button.danger{background:var(--warn)}
 button.secondary{background:transparent;color:var(--accent);border:1px solid var(--accent)}
 input[type=text]{border:1px solid var(--border);border-radius:8px;padding:8px;font:inherit;background:var(--bg);color:var(--text)}
 table{width:100%;border-collapse:collapse;font-size:.92rem}
@@ -147,16 +146,17 @@ td{overflow-wrap:anywhere}
     <p class="muted">سرور هدف: <bdi><?= $e($cfg['host']) ?>:<?= $e($cfg['port'] ?? 1235) ?></bdi> — مدیر: <bdi><?= $e($cfg['admin_username']) ?></bdi></p>
     <form method="post">
       <input type="hidden" name="token" value="<?= $e($given) ?>">
+      <div class="row">
+        <button type="submit" name="format" value="html">اجرای تست‌ها (فقط خواندنی)</button>
+        <button type="submit" name="format" value="json" class="secondary">فقط خواندنی + دریافت گزارش JSON</button>
+      </div>
       <?php if (!empty($cfg['allow_write_test'])): ?>
-      <div class="warnbox" style="margin-top:12px">
-        <label><input type="checkbox" name="write" value="1"> اجرای تست نوشتن کنترل‌شده (ساخت یک کاربر <b>قفل‌شده</b> موقت در گروه «<?= $e($cfg['write_test_group'] ?? '') ?>» و حذف فوری آن)</label><br>
-        برای تأیید کلمه <b>تایید</b> را بنویسید: <input type="text" name="confirm" autocomplete="off" size="8">
+      <div class="warnbox" style="margin-top:16px">
+        <b>تست ساخت اکانت (نوشتن)</b><br>
+        یک کاربر <b>قفل‌شده</b> موقت در گروه «<?= $e($cfg['write_test_group'] ?? '') ?>» ساخته، بررسی و بلافاصله حذف می‌شود. گزارش JSON خودکار دانلود می‌شود.
+        <div class="row"><button type="submit" name="mode" value="write" class="danger">اجرای تست ساخت اکانت + دریافت JSON</button></div>
       </div>
       <?php endif; ?>
-      <div class="row">
-        <button type="submit" name="format" value="html">اجرای تست‌ها</button>
-        <button type="submit" name="format" value="json" class="secondary">اجرا و دریافت گزارش JSON</button>
-      </div>
     </form>
   </div>
 
@@ -206,13 +206,6 @@ function buildReport(array $cfg, array $results): array
         'summary' => array_count_values(array_column($results, 'status')),
         'results' => $results,
     ];
-}
-
-/** Accept تایید / تأیید / Arabic yeh, with stray spaces or ZWNJ. */
-function isConfirmWord(string $s): bool
-{
-    $s = str_replace(["\u{200C}", "\u{200F}", "\u{200E}", ' ', 'ي', 'ى', 'أ', 'ئ'], ['', '', '', '', 'ی', 'ی', 'ا', 'ی'], trim($s));
-    return in_array($s, ['تایید', 'تاييد', 'confirm', 'CONFIRM'], true);
 }
 
 /** @param list<array<string,mixed>> $results */
