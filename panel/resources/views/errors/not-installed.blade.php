@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>نصب نشده</title>
+@if(is_file(public_path('fonts/IRANSans-400.woff2')))<link rel="stylesheet" href="{{ asset('assets/fonts.css') }}">@endif
 <link rel="stylesheet" href="{{ asset('assets/app.css') }}"></head>
 <body><main class="guest"><div class="center card">
 <h1>سامانه هنوز نصب نشده است</h1>

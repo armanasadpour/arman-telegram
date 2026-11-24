@@ -13,7 +13,7 @@ class AuthTest extends TestCase
     public function test_guest_is_redirected_to_login(): void
     {
         $this->get('/')->assertRedirect('/login');
-        $this->get('/login')->assertOk()->assertSee('ورود به پنل');
+        $this->get('/login')->assertOk()->assertSee('پنل فروش')->assertSee('ورود به حساب کاربری')->assertDontSee('VPN')->assertDontSee('vpn');
     }
 
     public function test_login_success_records_audit_and_last_login(): void

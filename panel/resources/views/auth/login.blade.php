@@ -1,5 +1,6 @@
 <x-layouts.guest title="ورود">
-  <h1>ورود به پنل</h1>
+  <h1>پنل فروش</h1>
+  <p class="subtitle">ورود به حساب کاربری</p>
   <form method="post" action="{{ route('login') }}" novalidate>
     @csrf
     <div class="field">

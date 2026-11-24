@@ -51,7 +51,7 @@ $errors = [];
 $input = [
     'app_url' => rtrim(baseUrl(), '/'),
     'db_host' => 'localhost', 'db_port' => '3306', 'db_name' => '', 'db_user' => '',
-    'site_name' => 'پنل فروش VPN', 'admin_name' => '', 'admin_username' => 'admin',
+    'site_name' => 'پنل فروش', 'admin_name' => '', 'admin_username' => 'admin',
     'timezone' => 'Asia/Tehran',
 ];
 
@@ -376,7 +376,7 @@ function successHtml($in, $selfDeleted)
 function page($title, $body)
 {
     echo '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">'
-        .'<title>'.h($title).'</title><style>'
+        .'<title>'.h($title).'</title>'.(is_file(__DIR__.'/fonts/IRANSans-400.woff2') ? '<link rel="stylesheet" href="assets/fonts.css">' : '').'<style>'
         .':root{--bg:#f5f6f8;--c:#fff;--t:#1b2130;--m:#667085;--b:#e3e6eb;--p:#2f5bea;--ok:#12805c;--bad:#c4320a;--warn:#b54708}'
         .'@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--c:#171b23;--t:#e6e8ec;--m:#98a2b3;--b:#2a303c;--p:#7aa2ff;--ok:#3ccf91;--bad:#ff7a59;--warn:#fdb022}}'
         .'*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font-family:IRANSans,Vazirmatn,Tahoma,sans-serif;line-height:1.8}'

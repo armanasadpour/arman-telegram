@@ -1,5 +1,7 @@
-/* Loaded only when public/fonts/IRANSansWeb.woff2 exists (licensed font supplied by the owner). */
-@font-face{font-family:IRANSans;src:url(../fonts/IRANSansWeb.woff2) format("woff2");font-weight:400;font-display:swap}
-@font-face{font-family:IRANSans;src:url(../fonts/IRANSansWeb_Medium.woff2) format("woff2");font-weight:500;font-display:swap}
-@font-face{font-family:IRANSans;src:url(../fonts/IRANSansWeb_Bold.woff2) format("woff2");font-weight:700;font-display:swap}
-
+/* IRANSans (licensed by the owner). Bundled in the release ZIP only, never committed to the public repo. */
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSans-200.woff2) format("woff2");font-weight:200;font-style:normal;font-display:swap}
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSans-300.woff2) format("woff2");font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSans-400.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSans-500.woff2) format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSans-700.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:IRANSans;src:url(../fonts/IRANSans-900.woff2) format("woff2");font-weight:900;font-style:normal;font-display:swap}

@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>{{ $title ?? 'ورود' }} — {{ app(\App\Services\Settings::class)->get('general.site_name') }}</title>
-@if(is_file(public_path('fonts/IRANSansWeb.woff2')))<link rel="stylesheet" href="{{ asset('assets/fonts.css') }}?v={{ config('panel.version') }}">@endif
+<title>{{ $title ?? 'ورود' }} — پنل فروش</title>
+@if(is_file(public_path('fonts/IRANSans-400.woff2')))<link rel="stylesheet" href="{{ asset('assets/fonts.css') }}?v={{ config('panel.version') }}">@endif
 <link rel="stylesheet" href="{{ asset('assets/app.css') }}?v={{ config('panel.version') }}">
 </head>
 <body>

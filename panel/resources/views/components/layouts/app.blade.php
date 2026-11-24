@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>{{ $title ?? 'پنل' }} — {{ $siteName }}</title>
-@if(is_file(public_path('fonts/IRANSansWeb.woff2')))<link rel="stylesheet" href="{{ asset('assets/fonts.css') }}?v={{ config('panel.version') }}">@endif
+@if(is_file(public_path('fonts/IRANSans-400.woff2')))<link rel="stylesheet" href="{{ asset('assets/fonts.css') }}?v={{ config('panel.version') }}">@endif
 <link rel="stylesheet" href="{{ asset('assets/app.css') }}?v={{ config('panel.version') }}">
 </head>
 <body>

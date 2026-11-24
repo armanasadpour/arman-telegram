@@ -26,7 +26,6 @@ storage/framework/views/*
 storage/app/installed.lock
 bootstrap/cache/*.php
 database/database.sqlite
-public/fonts/IRANSans*
 deploy/build-release.sh
 EXC
 cp .env.example "$APP/.env.example"

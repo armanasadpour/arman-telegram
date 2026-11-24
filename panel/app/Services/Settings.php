@@ -18,7 +18,7 @@ class Settings
 
     /** Defaults for known keys (used when a key was never saved). */
     public const DEFAULTS = [
-        'general.site_name' => 'پنل فروش VPN',
+        'general.site_name' => 'پنل فروش',
         'general.support_contact' => '',
         'general.display_timezone' => 'Asia/Tehran',
     ];

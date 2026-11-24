@@ -20,16 +20,16 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.8}
 a{color:var(--primary);text-decoration:none}
 a:hover{text-decoration:underline}
-h1,h2,h3{line-height:1.4;margin:0 0 .5em}
-h1{font-size:1.3rem}h2{font-size:1.1rem}h3{font-size:1rem}
-.muted{color:var(--muted)}
+h1,h2,h3{line-height:1.4;margin:0 0 .5em;font-weight:700}
+h1{font-size:1.3rem;font-weight:900}h2{font-size:1.1rem}h3{font-size:1rem}
+.muted{color:var(--muted);font-weight:300}
 .ltr{direction:ltr;unicode-bidi:isolate;text-align:left}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
 /* ---------- shell ---------- */
 .shell{min-height:100vh}
 .header{position:sticky;top:0;z-index:20;height:var(--header-h);display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)}
-.header .brand{font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header .brand{font-weight:900;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header .user{display:flex;align-items:center;gap:8px;font-size:.9rem}
 .menu-btn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-sm);color:var(--text);cursor:pointer}
 .sidebar{position:fixed;inset-block:var(--header-h) 0;inset-inline-start:0;width:var(--sidebar-w);background:var(--surface);border-inline-end:1px solid var(--border);padding:12px;overflow-y:auto;transform:translateX(100%);transition:transform .2s;z-index:30}
@@ -39,7 +39,7 @@ h1{font-size:1.3rem}h2{font-size:1.1rem}h3{font-size:1rem}
 .nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);color:var(--text);margin-bottom:2px}
 .nav a:hover{background:var(--surface-2);text-decoration:none}
 .nav a.active{background:var(--primary-soft);color:var(--primary);font-weight:500}
-.nav .section{font-size:.78rem;color:var(--muted);margin:14px 12px 4px}
+.nav .section{font-size:.78rem;font-weight:500;color:var(--muted);margin:14px 12px 4px}
 .nav svg{width:18px;height:18px;flex-shrink:0}
 .main{padding:16px;max-width:1200px;margin:0 auto}
 @media (min-width:1024px){
@@ -60,9 +60,9 @@ h1{font-size:1.3rem}h2{font-size:1.1rem}h3{font-size:1rem}
 @media (min-width:768px){.two{grid-template-columns:1fr 1fr}}
 .stat{display:block;color:inherit}
 .stat:hover{text-decoration:none;border-color:var(--primary)}
-.stat .label{color:var(--muted);font-size:.85rem}
-.stat .value{font-size:1.5rem;font-weight:700}
-.stat .hint{font-size:.8rem;color:var(--muted)}
+.stat .label{color:var(--muted);font-size:.85rem;font-weight:500}
+.stat .value{font-size:1.9rem;font-weight:900;line-height:1.3}
+.stat .hint{font-size:.8rem;color:var(--muted);font-weight:200}
 
 /* ---------- buttons & forms ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid transparent;background:var(--primary);color:var(--primary-ink);font:inherit;font-weight:500;cursor:pointer;text-decoration:none!important;white-space:nowrap}
@@ -90,7 +90,7 @@ textarea.input{min-height:90px}
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table.table{width:100%;border-collapse:collapse;font-size:.92rem}
 .table th,.table td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:start;vertical-align:middle}
-.table th{color:var(--muted);font-weight:500;font-size:.82rem;white-space:nowrap}
+.table th{color:var(--muted);font-weight:700;font-size:.82rem;white-space:nowrap}
 .table tr:last-child td{border-bottom:0}
 @media (max-width:640px){
   .table.stack thead{display:none}
@@ -125,7 +125,8 @@ pre.code{direction:ltr;text-align:left;background:var(--surface-2);padding:10px;
 /* ---------- guest pages ---------- */
 .guest{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
 .guest .card{width:100%;max-width:400px}
-.guest h1{text-align:center}
+.guest h1{text-align:center;font-size:1.6rem;margin-bottom:0}
+.guest .subtitle{text-align:center;color:var(--muted);font-weight:200;font-size:1rem;margin:0 0 20px}
 
 .pagination{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px;padding:0;list-style:none}
 .pagination a,.pagination span{display:inline-block;min-width:36px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center;color:var(--text)}

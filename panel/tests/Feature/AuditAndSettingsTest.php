@@ -77,7 +77,7 @@ class AuditAndSettingsTest extends TestCase
         ])->assertSessionHas('success');
         $this->assertSame('پنل مونینو', app(Settings::class)->get('general.site_name'));
         $log = AuditLog::query()->where('action', 'settings.update')->firstOrFail();
-        $this->assertSame(['پنل فروش VPN', 'پنل مونینو'], $log->changes['general.site_name']);
+        $this->assertSame(['پنل فروش', 'پنل مونینو'], $log->changes['general.site_name']);
     }
 
     public function test_view_only_settings_user_cannot_update(): void
