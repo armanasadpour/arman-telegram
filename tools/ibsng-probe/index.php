@@ -87,9 +87,15 @@ $ran = false;
 $results = [];
 $wantWrite = false;
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-    $wantWrite = ($_POST['write'] ?? '') === '1' && trim((string) ($_POST['confirm'] ?? '')) === 'تایید';
+    $writeTicked = ($_POST['write'] ?? '') === '1';
+    $wantWrite = $writeTicked && isConfirmWord((string) ($_POST['confirm'] ?? ''));
     @set_time_limit(120);
     $probe = new Probe($cfg);
+    if ($writeTicked && !$wantWrite) {
+        $probe->note('write.not_confirmed', 'تست نوشتن', 'skip', 'تیک زده شد اما کلمه تأیید درست وارد نشد؛ تست نوشتن اجرا نشد.');
+    } elseif (!$writeTicked && !empty($cfg['allow_write_test'])) {
+        $probe->note('write.not_selected', 'تست نوشتن', 'skip', 'تیک «اجرای تست نوشتن» زده نشده بود.');
+    }
     $probe->runAll($wantWrite);
     $results = $probe->results();
     $ran = true;
@@ -200,6 +206,13 @@ function buildReport(array $cfg, array $results): array
         'summary' => array_count_values(array_column($results, 'status')),
         'results' => $results,
     ];
+}
+
+/** Accept تایید / تأیید / Arabic yeh, with stray spaces or ZWNJ. */
+function isConfirmWord(string $s): bool
+{
+    $s = str_replace(["\u{200C}", "\u{200F}", "\u{200E}", ' ', 'ي', 'ى', 'أ', 'ئ'], ['', '', '', '', 'ی', 'ی', 'ا', 'ی'], trim($s));
+    return in_array($s, ['تایید', 'تاييد', 'confirm', 'CONFIRM'], true);
 }
 
 /** @param list<array<string,mixed>> $results */

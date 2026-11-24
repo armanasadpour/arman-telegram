@@ -491,6 +491,12 @@ final class Probe
         }
     }
 
+    /** Record an informational row from the caller (e.g. skipped steps). */
+    public function note(string $id, string $title, string $status, string $detail): void
+    {
+        $this->results[] = ['id' => $id, 'title' => $title, 'status' => $status, 'detail' => $detail];
+    }
+
     /** @param mixed $data */
     private function add(string $id, string $title, string $status, string $detail, $data = null): void
     {
