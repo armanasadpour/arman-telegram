@@ -38,7 +38,7 @@ class AccountActions
         $this->ibs->updateAttrs($a->ibs_user_id, [], ['lock']);
         $a = $this->sync->refresh($a);
         if ($a->locked) {
-            throw new RuntimeException('IBSng قفل را برنداشت؛ وضعیت اکانت را در IBSng بررسی کنید.');
+            throw new RuntimeException('سرور قفل را برنداشت؛ وضعیت اکانت را در سرور بررسی کنید.');
         }
         $this->audit->log('accounts.unlock', $a, 'فعال‌سازی دوباره اکانت «'.$a->username.'»', ['locked' => [true, false]], $reason);
 
@@ -125,7 +125,7 @@ class AccountActions
         $a = $this->live($a);
         $this->ibs->deleteUser($a->ibs_user_id, mb_substr('panel: '.$reason, 0, 200));
         $a->forceFill(['ibs_deleted_at' => now(), 'is_online' => false])->save();
-        $this->audit->log('accounts.delete', $a, 'حذف اکانت «'.$a->username.'» از IBSng', ['ibs_user_id' => [$a->ibs_user_id, null]], $reason);
+        $this->audit->log('accounts.delete', $a, 'حذف اکانت «'.$a->username.'» از سرور', ['ibs_user_id' => [$a->ibs_user_id, null]], $reason);
         $a->delete();
     }
 
@@ -135,7 +135,7 @@ class AccountActions
         $info = $this->liveInfo($a);
         $pw = $info['attrs']['normal_password'] ?? null;
         if ($pw === null) {
-            throw new RuntimeException('IBSng رمز این اکانت را برنگرداند.');
+            throw new RuntimeException('سرور رمز این اکانت را برنگرداند.');
         }
         $this->audit->log('accounts.password_revealed', $a, 'مشاهده رمز اکانت «'.$a->username.'»');
 
@@ -146,7 +146,7 @@ class AccountActions
     {
         $a = $this->sync->refresh($a);
         if ($a->ibs_deleted_at) {
-            throw new RuntimeException('این اکانت در IBSng وجود ندارد.');
+            throw new RuntimeException('این اکانت در سرور وجود ندارد.');
         }
 
         return $a;
@@ -157,7 +157,7 @@ class AccountActions
     {
         $info = $this->ibs->usersByIds([$a->ibs_user_id])[(string) $a->ibs_user_id] ?? null;
         if (! $info) {
-            throw new RuntimeException('این اکانت در IBSng وجود ندارد.');
+            throw new RuntimeException('این اکانت در سرور وجود ندارد.');
         }
 
         return $info;

@@ -1,6 +1,6 @@
 <x-layouts.app title="ساخت اکانت">
   <div class="page-head">
-    <h1>ساخت اکانت OpenVPN در IBSng</h1>
+    <h1>ساخت اکانت OpenVPN در سرور</h1>
     <a class="btn btn-secondary" href="{{ route('accounts.index') }}">بازگشت</a>
   </div>
   @if($packages->isNotEmpty())
@@ -16,7 +16,7 @@
               <option value="{{ $row['p']->id }}" @selected((int) old('package_id') === $row['p']->id)>{{ $row['p']->name }} — {{ $row['p']->summary() }} — {{ fa_money($row['q']->finalPrice) }}</option>
             @endforeach
           </select>
-          <div class="help">گروه IBSng، مدت، حجم و تعداد اتصال از بسته گرفته می‌شود و قیمت لحظه ساخت ثبت می‌شود.</div>
+          <div class="help">گروه سرور، مدت، حجم و تعداد اتصال از بسته گرفته می‌شود و قیمت لحظه ساخت ثبت می‌شود.</div>
         </div>
         <div class="form-grid">
           <div class="field"><label for="pkg_username">نام کاربری (اختیاری)</label><input id="pkg_username" name="username" class="input ltr" maxlength="32" autocapitalize="none" spellcheck="false"></div>
@@ -28,14 +28,14 @@
     <h2>یا ساخت دستی</h2>
   @endif
   @if($groups->isEmpty())
-    <div class="alert alert-warning">هیچ گروهی از IBSng همگام نشده است. @can('ibs_groups.view')<a href="{{ route('ibs.groups') }}">گروه‌ها را همگام‌سازی کنید.</a>@endcan</div>
+    <div class="alert alert-warning">هیچ گروهی از سرور همگام نشده است. @can('ibs_groups.view')<a href="{{ route('ibs.groups') }}">گروه‌ها را همگام‌سازی کنید.</a>@endcan</div>
   @else
   <div class="card w-640">
     <form method="post" action="{{ route('accounts.store') }}">
       @csrf
       <input type="hidden" name="job_key" value="{{ old('job_key', $jobKey) }}">
       <div class="field">
-        <label for="group">گروه IBSng</label>
+        <label for="group">گروه سرور</label>
         <select id="group" name="group" class="input" required>
           @foreach($groups as $g)
             <option value="{{ $g->name }}" @selected(old('group') === $g->name)>
@@ -75,7 +75,7 @@
           <input id="comment" name="comment" class="input" value="{{ old('comment') }}" maxlength="150">
         </div>
       </div>
-      <button class="btn" type="submit">ساخت در IBSng</button>
+      <button class="btn" type="submit">ساخت در سرور</button>
     </form>
   </div>
   @endif

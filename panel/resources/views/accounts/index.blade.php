@@ -13,13 +13,13 @@
   </div>
 
   @unless($configured)
-    <div class="alert alert-warning">اتصال IBSng تنظیم نشده است. @can('settings.view')<a href="{{ route('ibs.settings') }}">تنظیم اتصال IBSng</a>@endcan</div>
+    <div class="alert alert-warning">اتصال به سرور تنظیم نشده است. @can('settings.view')<a href="{{ route('ibs.settings') }}">تنظیم اتصال به سرور</a>@endcan</div>
   @endunless
   @if($openJobs)
     <div class="alert alert-warning">{{ fa($openJobs) }} ساخت اکانت نیمه‌کاره یا نیازمند رسیدگی وجود دارد. <a href="{{ route('accounts.jobs') }}">مشاهده</a></div>
   @endif
   @if($import && ($import['running'] ?? false))
-    <div class="alert alert-warning">وارد کردن اکانت‌ها از IBSng در حال انجام است: {{ fa((int) $import['cursor']) }} از {{ $import['total'] !== null ? fa((int) $import['total']) : '…' }} بررسی شد ({{ fa((int) $import['imported']) }} اکانت جدید). با Cron ادامه پیدا می‌کند.</div>
+    <div class="alert alert-warning">وارد کردن اکانت‌ها از سرور در حال انجام است: {{ fa((int) $import['cursor']) }} از {{ $import['total'] !== null ? fa((int) $import['total']) : '…' }} بررسی شد ({{ fa((int) $import['imported']) }} اکانت جدید). با Cron ادامه پیدا می‌کند.</div>
   @endif
 
   <div class="grid stats mb-16">
@@ -35,7 +35,7 @@
       <div class="field"><label for="status">وضعیت</label>
         <select id="status" name="status" class="input">
           <option value="">همه</option>
-          @foreach(['online' => 'آنلاین', 'active' => 'فعال', 'not_started' => 'شروع‌نشده', 'expiring' => 'انقضا تا ۳ روز آینده', 'expired' => 'منقضی', 'locked' => 'غیرفعال (قفل)', 'deleted' => 'حذف‌شده در IBSng'] as $k => $v)
+          @foreach(['online' => 'آنلاین', 'active' => 'فعال', 'not_started' => 'شروع‌نشده', 'expiring' => 'انقضا تا ۳ روز آینده', 'expired' => 'منقضی', 'locked' => 'غیرفعال (قفل)', 'deleted' => 'حذف‌شده در سرور'] as $k => $v)
             <option value="{{ $k }}" @selected(($filters['status'] ?? '') === $k)>{{ $v }}</option>
           @endforeach
         </select></div>
@@ -47,7 +47,7 @@
     </form>
 
     @if($accounts->isEmpty())
-      <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانتی در پنل نیست. اکانت بسازید یا از IBSng وارد کنید.' }}</div></div>
+      <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانتی در پنل نیست. اکانت بسازید یا از سرور وارد کنید.' }}</div></div>
     @else
       <div class="table-wrap">
         <table class="table stack">
@@ -77,17 +77,17 @@
     @if($configured)
       <div class="grid two">
         <div class="card">
-          <h2>وارد کردن یک اکانت از IBSng</h2>
+          <h2>وارد کردن یک اکانت از سرور</h2>
           <form method="post" action="{{ route('accounts.import') }}" class="actions">
             @csrf
-            <input name="username" class="input ltr w-280" placeholder="نام کاربری در IBSng" required aria-label="نام کاربری">
+            <input name="username" class="input ltr w-280" placeholder="نام کاربری در سرور" required aria-label="نام کاربری">
             <button class="btn btn-secondary" type="submit">وارد کردن</button>
           </form>
         </div>
         <div class="card">
-          <h2>وارد کردن همه اکانت‌های IBSng</h2>
-          <p class="muted">اکانت‌های موجود در IBSng به پنل اضافه می‌شوند (چیزی در IBSng تغییر نمی‌کند). کار در پس‌زمینه با Cron و هر دقیقه حدود چند صد اکانت انجام می‌شود.</p>
-          <form method="post" action="{{ route('accounts.import-all') }}" data-confirm="وارد کردن همه اکانت‌های IBSng شروع شود؟">
+          <h2>وارد کردن همه اکانت‌های سرور</h2>
+          <p class="muted">اکانت‌های موجود در سرور به پنل اضافه می‌شوند (چیزی در سرور تغییر نمی‌کند). کار در پس‌زمینه با Cron و هر دقیقه حدود چند صد اکانت انجام می‌شود.</p>
+          <form method="post" action="{{ route('accounts.import-all') }}" data-confirm="وارد کردن همه اکانت‌های سرور شروع شود؟">
             @csrf
             <button class="btn btn-secondary" type="submit" @disabled($import['running'] ?? false)>شروع وارد کردن</button>
           </form>

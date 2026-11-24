@@ -33,7 +33,7 @@ class ConnectorTest extends IbsTestCase
             $this->fail('expected fault');
         } catch (IbsException $e) {
             $this->assertSame('INCORRECT_PASSWORD', $e->ibsCode);
-            $this->assertSame('رمز مدیر IBSng نادرست است.', ErrorMessages::for($e));
+            $this->assertSame('رمز مدیر سرور نادرست است.', ErrorMessages::for($e));
         }
     }
 

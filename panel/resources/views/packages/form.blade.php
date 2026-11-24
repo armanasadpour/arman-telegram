@@ -5,7 +5,7 @@
     <a class="btn btn-secondary" href="{{ route('packages.index') }}">بازگشت</a>
   </div>
   @if($groups->isEmpty())
-    <div class="alert alert-warning">هیچ گروهی از IBSng همگام نشده است؛ برای بسته «اکانت جدید» ابتدا <a href="{{ route('ibs.groups') }}">گروه‌ها را همگام‌سازی کنید</a>.</div>
+    <div class="alert alert-warning">هیچ گروهی از سرور همگام نشده است؛ برای بسته «اکانت جدید» ابتدا <a href="{{ route('ibs.groups') }}">گروه‌ها را همگام‌سازی کنید</a>.</div>
   @endif
   <div class="card w-640">
     <form method="post" action="{{ $editing ? route('packages.update', $p) : route('packages.store') }}">
@@ -22,7 +22,7 @@
           <select id="category_id" name="category_id" class="input"><option value="">بدون دسته</option>
             @foreach($categories as $c)<option value="{{ $c->id }}" @selected((int) old('category_id', $p->category_id) === $c->id)>{{ $c->name }}</option>@endforeach
           </select></div>
-        <div class="field"><label for="ibs_group_name">گروه IBSng (فقط اکانت جدید)</label>
+        <div class="field"><label for="ibs_group_name">گروه سرور (فقط اکانت جدید)</label>
           <select id="ibs_group_name" name="ibs_group_name" class="input"><option value="">—</option>
             @foreach($groups as $g)<option value="{{ $g->name }}" @selected(old('ibs_group_name', $p->ibs_group_name) === $g->name)>{{ $g->name }} — {{ $g->charge?->isVolume() ? 'تعرفه حجمی' : 'بدون محدودیت حجم' }}</option>@endforeach
           </select>
@@ -30,7 +30,7 @@
         </div>
         <div class="field"><label for="duration_days">مدت اعتبار (روز)</label><input id="duration_days" name="duration_days" type="number" min="1" max="3650" class="input ltr" value="{{ old('duration_days', $p->duration_days) }}"><div class="help">برای اکانت جدید از اولین اتصال شمرده می‌شود.</div></div>
         <div class="field"><label for="volume_gb">حجم (گیگابایت)</label><input id="volume_gb" name="volume_gb" type="number" step="0.1" min="0.1" class="input ltr" value="{{ old('volume_gb', $p->volume_gb !== null ? (float) $p->volume_gb : '') }}"><div class="help">خالی = حجم نامحدود (برای گروه‌های بدون محدودیت حجم).</div></div>
-        <div class="field"><label for="multi_login">تعداد اتصال همزمان (اختیاری)</label><input id="multi_login" name="multi_login" type="number" min="1" max="255" class="input ltr" value="{{ old('multi_login', $p->multi_login) }}"><div class="help">خالی = مقدار گروه IBSng.</div></div>
+        <div class="field"><label for="multi_login">تعداد اتصال همزمان (اختیاری)</label><input id="multi_login" name="multi_login" type="number" min="1" max="255" class="input ltr" value="{{ old('multi_login', $p->multi_login) }}"><div class="help">خالی = مقدار گروه سرور.</div></div>
         <div class="field"><label for="price_toman">قیمت (تومان)</label><input id="price_toman" name="price_toman" type="number" min="0" class="input ltr" value="{{ old('price_toman', $p->exists ? intdiv((int) $p->price_rial, 10) : '') }}" required></div>
         <div class="field"><label for="sort_order">ترتیب نمایش</label><input id="sort_order" name="sort_order" type="number" min="0" class="input ltr" value="{{ old('sort_order', $p->sort_order ?? 0) }}"></div>
       </div>

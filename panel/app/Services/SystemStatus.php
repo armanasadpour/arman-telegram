@@ -86,22 +86,22 @@ class SystemStatus
     {
         $ibs = app(IbsConnector::class);
         if (! $ibs->isConfigured()) {
-            return $this->row('ibsng', 'اتصال IBSng', 'warn', 'تنظیم نشده (تنظیمات ← اتصال IBSng)');
+            return $this->row('ibsng', 'اتصال به سرور', 'warn', 'تنظیم نشده (تنظیمات ← اتصال به سرور IBSng)');
         }
         $h = $ibs->health();
         if ($h['breaker_open']) {
-            return $this->row('ibsng', 'اتصال IBSng', 'fail', 'قطع — '.$h['error']);
+            return $this->row('ibsng', 'اتصال به سرور', 'fail', 'قطع — '.$h['error']);
         }
         $ok = $h['ok_at'] ? CarbonImmutable::parse($h['ok_at']) : null;
         $err = $h['error_at'] ? CarbonImmutable::parse($h['error_at']) : null;
         if ($err && (! $ok || $err->gt($ok))) {
-            return $this->row('ibsng', 'اتصال IBSng', 'fail', 'آخرین تماس ناموفق ('.fa_ago($err).'): '.$h['error']);
+            return $this->row('ibsng', 'اتصال به سرور', 'fail', 'آخرین تماس ناموفق ('.fa_ago($err).'): '.$h['error']);
         }
         if (! $ok) {
-            return $this->row('ibsng', 'اتصال IBSng', 'warn', 'هنوز تماسی برقرار نشده؛ «تست اتصال» را بزنید');
+            return $this->row('ibsng', 'اتصال به سرور', 'warn', 'هنوز تماسی برقرار نشده؛ «تست اتصال» را بزنید');
         }
 
-        return $this->row('ibsng', 'اتصال IBSng', $ok->lt(now()->subMinutes(10)) ? 'warn' : 'ok',
+        return $this->row('ibsng', 'اتصال به سرور', $ok->lt(now()->subMinutes(10)) ? 'warn' : 'ok',
             'آخرین تماس موفق '.fa_ago($ok).($h['latency_ms'] !== null ? ' — '.fa($h['latency_ms']).' میلی‌ثانیه' : ''));
     }
 

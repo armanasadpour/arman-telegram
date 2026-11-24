@@ -2,7 +2,7 @@
   <div class="page-head">
     <div>
       <h1>ساخت اکانت‌ها</h1>
-      <p class="muted">ساخت اکانت در IBSng دو مرحله‌ای است؛ اگر مرحله‌ای ناتمام بماند اینجا نمایش داده می‌شود. موارد نیمه‌کاره هر دقیقه خودکار دوباره تلاش می‌شوند.</p>
+      <p class="muted">ساخت اکانت در سرور دو مرحله‌ای است؛ اگر مرحله‌ای ناتمام بماند اینجا نمایش داده می‌شود. موارد نیمه‌کاره هر دقیقه خودکار دوباره تلاش می‌شوند.</p>
     </div>
     <a class="btn btn-secondary" href="{{ route('accounts.index') }}">بازگشت</a>
   </div>
@@ -16,7 +16,7 @@
           <dl class="kv">
             <dt>نام کاربری</dt><dd><bdi class="ltr">{{ $j->username }}</bdi> <span class="badge badge-warning">{{ $j->statusLabel() }}</span></dd>
             <dt>گروه</dt><dd>{{ $j->spec['group'] ?? '—' }}</dd>
-            <dt>شناسه IBSng</dt><dd>{{ $j->ibs_user_id ?? 'نامشخص' }}</dd>
+            <dt>شناسه سرور</dt><dd>{{ $j->ibs_user_id ?? 'نامشخص' }}</dd>
             <dt>تلاش‌ها</dt><dd>{{ fa($j->attempts) }}</dd>
             <dt>زمان</dt><dd>{{ jdate($j->created_at) }} — {{ $j->creator?->name ?? '—' }}</dd>
             <dt>کلید پیگیری</dt><dd class="ltr tiny">{{ $j->job_key }}</dd>

@@ -118,7 +118,7 @@ class AccountsController extends Controller
 
         return match ($job->status) {
             'completed' => redirect()->route('accounts.show', $job->vpn_account_id)
-                ->with('success', 'اکانت «'.$job->username.'» در IBSng ساخته شد.')
+                ->with('success', 'اکانت «'.$job->username.'» در سرور ساخته شد.')
                 ->with('new_password', $resubmitted ? null : $data['password']),
             'failed', 'compensated' => back()->withInput()->with('error', 'ساخت اکانت ناموفق بود: '.$job->last_error),
             default => redirect()->route('accounts.jobs')->with('error', 'ساخت «'.$job->username.'» کامل نشد و در فهرست رسیدگی قرار گرفت: '.$job->last_error),
@@ -184,7 +184,7 @@ class AccountsController extends Controller
     {
         $this->authorize('accounts.view');
 
-        return $this->attempt(fn () => $this->sync->refresh($account), 'اطلاعات از IBSng به‌روز شد.');
+        return $this->attempt(fn () => $this->sync->refresh($account), 'اطلاعات از سرور به‌روز شد.');
     }
 
     public function lock(Request $request, VpnAccount $account): RedirectResponse
@@ -226,9 +226,9 @@ class AccountsController extends Controller
     {
         $this->authorize('accounts.delete');
         $r = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:200']])['reason'];
-        $res = $this->attempt(fn () => $this->actions->delete($account, $r), 'اکانت از IBSng حذف شد.');
+        $res = $this->attempt(fn () => $this->actions->delete($account, $r), 'اکانت از سرور حذف شد.');
 
-        return session('error') ? $res : redirect()->route('accounts.index')->with('success', 'اکانت «'.$account->username.'» از IBSng حذف شد.');
+        return session('error') ? $res : redirect()->route('accounts.index')->with('success', 'اکانت «'.$account->username.'» از سرور حذف شد.');
     }
 
     public function reveal(VpnAccount $account): RedirectResponse
@@ -254,8 +254,8 @@ class AccountsController extends Controller
         }
 
         return $a
-            ? redirect()->route('accounts.show', $a)->with('success', 'اکانت «'.$a->username.'» از IBSng وارد شد.')
-            : back()->with('error', 'اکانتی با این نام کاربری در IBSng پیدا نشد.');
+            ? redirect()->route('accounts.show', $a)->with('success', 'اکانت «'.$a->username.'» از سرور وارد شد.')
+            : back()->with('error', 'اکانتی با این نام کاربری در سرور پیدا نشد.');
     }
 
     public function importAll(): RedirectResponse
@@ -265,7 +265,7 @@ class AccountsController extends Controller
             return back()->with('error', 'وارد کردن در حال انجام است.');
         }
         $this->sync->startImport();
-        app(AuditLogger::class)->log('accounts.import_all', null, 'شروع وارد کردن همه اکانت‌های IBSng');
+        app(AuditLogger::class)->log('accounts.import_all', null, 'شروع وارد کردن همه اکانت‌های سرور');
 
         return back()->with('success', 'وارد کردن همه اکانت‌ها شروع شد و در پس‌زمینه (با Cron) ادامه پیدا می‌کند.');
     }

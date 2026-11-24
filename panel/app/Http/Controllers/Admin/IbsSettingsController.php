@@ -67,7 +67,7 @@ class IbsSettingsController extends Controller
         }
         $this->ibs->resetBreaker();
         if ($diff) {
-            $this->audit->log('settings.ibs_update', null, 'تغییر تنظیمات اتصال IBSng', $diff);
+            $this->audit->log('settings.ibs_update', null, 'تغییر تنظیمات اتصال به سرور', $diff);
         }
 
         return back()->with('success', $diff ? 'تنظیمات ذخیره شد. برای اطمینان «تست اتصال» را بزنید.' : 'تغییری ایجاد نشد.');
@@ -85,7 +85,7 @@ class IbsSettingsController extends Controller
         } catch (Throwable $e) {
             $result = ['ok' => false, 'error' => ErrorMessages::for($e)];
         }
-        $this->audit->log('settings.ibs_test', null, $result['ok'] ? 'تست اتصال IBSng موفق' : 'تست اتصال IBSng ناموفق: '.$result['error']);
+        $this->audit->log('settings.ibs_test', null, $result['ok'] ? 'تست اتصال به سرور موفق' : 'تست اتصال به سرور ناموفق: '.$result['error']);
 
         return back()->with('ibs_test', $result);
     }

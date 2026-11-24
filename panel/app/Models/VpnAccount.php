@@ -117,6 +117,6 @@ class VpnAccount extends Model
 
     public const STATUS_LABELS = [
         'active' => ['فعال', 'success'], 'not_started' => ['شروع‌نشده', 'primary'], 'expired' => ['منقضی', 'danger'],
-        'depleted' => ['حجم تمام‌شده', 'danger'], 'locked' => ['غیرفعال (قفل)', 'warning'], 'deleted' => ['حذف‌شده در IBSng', 'danger'],
+        'depleted' => ['حجم تمام‌شده', 'danger'], 'locked' => ['غیرفعال (قفل)', 'warning'], 'deleted' => ['حذف‌شده در سرور', 'danger'],
     ];
 }

@@ -224,7 +224,7 @@ class IbsConnector
     private function send(string $method, array $args): mixed
     {
         if ($this->breakerOpen()) {
-            throw new IbsUnavailableException('ارتباط با IBSng موقتاً قطع است (چند خطای پیاپی). یک دقیقه دیگر دوباره تلاش می‌شود.');
+            throw new IbsUnavailableException('ارتباط با سرور موقتاً قطع است (چند خطای پیاپی). یک دقیقه دیگر دوباره تلاش می‌شود.');
         }
         $params = [
             'auth_name' => (string) $this->settings->get('ibs.username'),
@@ -260,7 +260,7 @@ class IbsConnector
             return $this->transport;
         }
         if (! $this->isConfigured()) {
-            throw new IbsNotConfiguredException('اتصال IBSng هنوز تنظیم نشده است (تنظیمات ← اتصال IBSng).');
+            throw new IbsNotConfiguredException('اتصال به سرور هنوز تنظیم نشده است (تنظیمات ← اتصال به سرور IBSng).');
         }
 
         return $this->transport = new HttpTransport(

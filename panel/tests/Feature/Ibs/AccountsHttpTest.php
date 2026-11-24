@@ -28,7 +28,7 @@ class AccountsHttpTest extends IbsTestCase
         $this->actingAs($viewer)->get('/accounts')->assertOk()->assertSee('ali')->assertDontSee('ساخت اکانت');
         $this->actingAs($viewer)->get("/accounts/{$a->id}")->assertOk()
             ->assertDontSee(route('accounts.password', $a))->assertDontSee(route('accounts.lock', $a))
-            ->assertDontSee(route('accounts.reveal', $a))->assertDontSee('حذف از IBSng');
+            ->assertDontSee(route('accounts.reveal', $a))->assertDontSee('حذف از سرور');
         $this->actingAs($viewer)->get('/accounts/create')->assertForbidden();
         $this->actingAs($viewer)->post("/accounts/{$a->id}/lock", ['reason' => 'xyz'])->assertForbidden();
         $this->actingAs($viewer)->confirmed()->post("/accounts/{$a->id}/reveal")->assertForbidden();
@@ -84,7 +84,7 @@ class AccountsHttpTest extends IbsTestCase
         }
         $this->actingAs($admin)->get('/accounts')->assertOk()->assertSee('ali');           // served from the mirror
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/refresh")
-            ->assertSessionHas('error', fn ($m) => str_contains($m, 'IBSng'));
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'سرور'));
         $this->actingAs($admin)->get("/accounts/{$a->id}")->assertOk();
     }
 
@@ -99,5 +99,17 @@ class AccountsHttpTest extends IbsTestCase
         $r->assertRedirect(route('accounts.show', $a));
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/lock", ['reason' => 'test lock'])->assertSessionHas('success');
         $this->assertTrue($a->fresh()->locked);
+    }
+
+    public function test_ui_says_server_not_ibsng_except_on_connection_page(): void
+    {
+        $a = $this->seedAccount();
+        $admin = $this->superAdmin();
+        foreach (['/', '/accounts', '/accounts/create', "/accounts/{$a->id}", '/accounts/jobs', '/ibs/groups', '/system', '/packages', '/packages/create'] as $url) {
+            $html = $this->actingAs($admin)->get($url)->assertOk()->getContent();
+            $visible = str_replace('اتصال به سرور IBSng', '', strip_tags($html));
+            $this->assertStringNotContainsString('IBSng', $visible, "IBSng visible on $url");
+        }
+        $this->actingAs($admin)->get('/settings/ibsng')->assertOk()->assertSee('اتصال به سرور IBSng');
     }
 }

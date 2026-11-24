@@ -22,11 +22,11 @@ class PackageRules
             }
             $g = IbsGroup::query()->with('charge')->where('name', $d['ibs_group_name'] ?? '')->where('present', true)->first();
             if (! $g) {
-                $e['ibs_group_name'] = 'گروه IBSng انتخاب‌شده وجود ندارد (ابتدا گروه‌ها را همگام‌سازی کنید).';
+                $e['ibs_group_name'] = 'گروه سرور انتخاب‌شده وجود ندارد (ابتدا گروه‌ها را همگام‌سازی کنید).';
             } elseif ($g->charge?->isVolume() && ! $hasVolume) {
                 $e['volume_gb'] = 'تعرفه گروه «'.$g->name.'» حجمی است؛ حجم بسته را وارد کنید.';
             } elseif (! $g->charge?->isVolume() && $hasVolume) {
-                $e['volume_gb'] = 'تعرفه گروه «'.$g->name.'» حجمی نیست؛ IBSng حجم را محدود نمی‌کند. حجم را خالی بگذارید یا گروهی با تعرفه حجمی انتخاب کنید.';
+                $e['volume_gb'] = 'تعرفه گروه «'.$g->name.'» حجمی نیست؛ سرور حجم را محدود نمی‌کند. حجم را خالی بگذارید یا گروهی با تعرفه حجمی انتخاب کنید.';
             }
         } elseif ($type === 'renewal') {
             if (empty($d['duration_days'])) {

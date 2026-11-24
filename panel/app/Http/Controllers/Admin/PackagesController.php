@@ -141,7 +141,7 @@ class PackagesController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'sort_order' => ['nullable', 'integer', 'between:0,9999'],
             'is_active' => ['nullable', 'boolean'],
-        ], [], ['name' => 'نام بسته', 'type' => 'نوع', 'ibs_group_name' => 'گروه IBSng', 'duration_days' => 'مدت', 'volume_gb' => 'حجم',
+        ], [], ['name' => 'نام بسته', 'type' => 'نوع', 'ibs_group_name' => 'گروه سرور', 'duration_days' => 'مدت', 'volume_gb' => 'حجم',
             'multi_login' => 'تعداد اتصال', 'price_toman' => 'قیمت', 'description' => 'توضیح']);
 
         if ($d['type'] !== 'new') {

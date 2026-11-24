@@ -2,7 +2,7 @@
   <div class="page-head">
     <div>
       <h1>بسته‌ها</h1>
-      <p class="muted">قیمت‌ها در پنل نگهداری می‌شوند؛ هر بسته اکانت جدید به یک گروه واقعی IBSng وصل است. «قیمت امروز» با تخفیف فعال محاسبه شده است.</p>
+      <p class="muted">قیمت‌ها در پنل نگهداری می‌شوند؛ هر بسته اکانت جدید به یک گروه واقعی سرور وصل است. «قیمت امروز» با تخفیف فعال محاسبه شده است.</p>
     </div>
     @can('packages.create')<a class="btn" href="{{ route('packages.create') }}">بسته جدید</a>@endcan
   </div>
@@ -20,17 +20,17 @@
     @else
       <div class="table-wrap">
         <table class="table stack">
-          <thead><tr><th>بسته</th><th>نوع</th><th>مشخصات</th><th>گروه IBSng</th><th>قیمت امروز</th><th>وضعیت</th><th></th></tr></thead>
+          <thead><tr><th>بسته</th><th>نوع</th><th>مشخصات</th><th>گروه سرور</th><th>قیمت امروز</th><th>وضعیت</th><th></th></tr></thead>
           <tbody>
           @foreach($packages as $p)
             <tr>
               <td data-label="بسته">{{ $p->name }} @if($p->category)<div class="muted small">{{ $p->category->name }}</div>@endif</td>
               <td data-label="نوع">{{ $p->typeLabel() }} <span class="badge">{{ $p->kindLabel() }}</span></td>
               <td data-label="مشخصات">{{ $p->summary() }}</td>
-              <td data-label="گروه IBSng">
+              <td data-label="گروه سرور">
                 @if($p->type === 'new')
                   <bdi>{{ $p->ibs_group_name }}</bdi>
-                  @if(! $p->group || ! $p->group->present)<span class="badge badge-danger">در IBSng نیست</span>@endif
+                  @if(! $p->group || ! $p->group->present)<span class="badge badge-danger">در سرور نیست</span>@endif
                 @else — @endif
               </td>
               <td data-label="قیمت امروز">@include('packages._price', ['q' => $quotes[$p->id]])</td>

@@ -1,7 +1,7 @@
-<x-layouts.app title="اتصال IBSng">
+<x-layouts.app title="اتصال به سرور IBSng">
   <div class="page-head">
     <div>
-      <h1>اتصال IBSng</h1>
+      <h1>اتصال به سرور IBSng</h1>
       <p class="muted">آخرین تماس موفق: {{ $health['ok_at'] ? jdate(\Carbon\Carbon::parse($health['ok_at'])).' ('.fa_ago(\Carbon\Carbon::parse($health['ok_at'])).')' : 'هنوز نه' }}
         @if($health['latency_ms'] !== null) — زمان پاسخ: {{ fa($health['latency_ms']) }} میلی‌ثانیه @endif</p>
     </div>
@@ -20,7 +20,7 @@
     </div>
   @endif
   @if($health['breaker_open'])
-    <div class="alert alert-warning">به‌دلیل چند خطای پیاپی، ارتباط با IBSng برای یک دقیقه متوقف شده است تا پنل کند نشود. آخرین خطا: {{ $health['error'] }}</div>
+    <div class="alert alert-warning">به‌دلیل چند خطای پیاپی، ارتباط با سرور برای یک دقیقه متوقف شده است تا پنل کند نشود. آخرین خطا: {{ $health['error'] }}</div>
   @elseif($health['error_at'] && (! $health['ok_at'] || $health['error_at'] > $health['ok_at']))
     <div class="alert alert-warning">آخرین خطا ({{ fa_ago(\Carbon\Carbon::parse($health['error_at'])) }}): {{ $health['error'] }}</div>
   @endif
@@ -32,8 +32,8 @@
       <div class="form-grid">
         <div class="field"><label for="host">میزبان (IP یا نام)</label><input id="host" name="host" class="input ltr" value="{{ old('host', $host) }}" required></div>
         <div class="field"><label for="port">پورت XML-RPC</label><input id="port" name="port" type="number" class="input ltr" value="{{ old('port', $port) }}" required></div>
-        <div class="field"><label for="username">نام کاربری مدیر IBSng</label><input id="username" name="username" class="input ltr" value="{{ old('username', $username) }}" required autocomplete="off"></div>
-        <div class="field"><label for="password">رمز مدیر IBSng</label><input id="password" name="password" type="password" class="input ltr" autocomplete="new-password" placeholder="{{ $hasPassword ? '•••••••• (ذخیره‌شده؛ برای تغییر وارد کنید)' : '' }}" @unless($hasPassword) required @endunless>
+        <div class="field"><label for="username">نام کاربری مدیر سرور</label><input id="username" name="username" class="input ltr" value="{{ old('username', $username) }}" required autocomplete="off"></div>
+        <div class="field"><label for="password">رمز مدیر سرور</label><input id="password" name="password" type="password" class="input ltr" autocomplete="new-password" placeholder="{{ $hasPassword ? '•••••••• (ذخیره‌شده؛ برای تغییر وارد کنید)' : '' }}" @unless($hasPassword) required @endunless>
           <div class="help">رمزنگاری‌شده ذخیره می‌شود و هرگز نمایش داده نمی‌شود.</div></div>
         <div class="field"><label for="timeout">مهلت پاسخ (ثانیه)</label><input id="timeout" name="timeout" type="number" class="input ltr" value="{{ old('timeout', $timeout) }}" required></div>
       </div>
@@ -59,6 +59,6 @@
   </div>
   <div class="card w-640">
     <h2>امنیت ارتباط</h2>
-    <p class="muted m0">پروتکل IBSng رمزنگاری ندارد. پورت IBSng باید در فایروال سرور IBSng فقط برای IP همین هاست باز باشد. برای سرویس دائمی، شبکه داخلی بین دو سرور یا یک واسط HTTPS روی سرور IBSng توصیه می‌شود.</p>
+    <p class="muted m0">پروتکل ارتباط با سرور رمزنگاری ندارد. پورت سرور باید در فایروال فقط برای IP همین هاست باز باشد. برای سرویس دائمی، شبکه داخلی بین هاست و سرور یا یک واسط HTTPS روی سرور توصیه می‌شود.</p>
   </div>
 </x-layouts.app>

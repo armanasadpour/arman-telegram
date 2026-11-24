@@ -3,11 +3,11 @@
     <div>
       <h1><bdi class="ltr">{{ $a->username }}</bdi></h1>
       <p class="muted">
-        آخرین به‌روزرسانی از IBSng: {{ $a->last_synced_at ? jdate($a->last_synced_at, 'Y/m/d H:i:s').' ('.fa_ago($a->last_synced_at).')' : 'هرگز' }}
+        آخرین به‌روزرسانی از سرور: {{ $a->last_synced_at ? jdate($a->last_synced_at, 'Y/m/d H:i:s').' ('.fa_ago($a->last_synced_at).')' : 'هرگز' }}
       </p>
     </div>
     <div class="actions">
-      <form method="post" action="{{ route('accounts.refresh', $a) }}">@csrf<button class="btn btn-secondary" type="submit">به‌روزرسانی از IBSng</button></form>
+      <form method="post" action="{{ route('accounts.refresh', $a) }}">@csrf<button class="btn btn-secondary" type="submit">به‌روزرسانی از سرور</button></form>
       <a class="btn btn-secondary" href="{{ route('accounts.index') }}">بازگشت</a>
     </div>
   </div>
@@ -16,10 +16,10 @@
     <div class="alert alert-success">رمز اکانت: <strong><bdi class="ltr">{{ session('new_password') }}</bdi></strong> — این رمز فقط همین یک بار نمایش داده می‌شود؛ آن را به مشتری تحویل دهید.</div>
   @endif
   @if(session('revealed_password'))
-    <div class="alert alert-warning">رمز فعلی (خوانده‌شده از IBSng): <strong><bdi class="ltr">{{ session('revealed_password') }}</bdi></strong> — مشاهده رمز در گزارش رویدادها ثبت شد.</div>
+    <div class="alert alert-warning">رمز فعلی (خوانده‌شده از سرور): <strong><bdi class="ltr">{{ session('revealed_password') }}</bdi></strong> — مشاهده رمز در گزارش رویدادها ثبت شد.</div>
   @endif
   @if($a->isStale())
-    <div class="alert alert-warning">این اطلاعات قدیمی است؛ برای دیدن وضعیت لحظه‌ای «به‌روزرسانی از IBSng» را بزنید.</div>
+    <div class="alert alert-warning">این اطلاعات قدیمی است؛ برای دیدن وضعیت لحظه‌ای «به‌روزرسانی از سرور» را بزنید.</div>
   @endif
   @if($a->sync_error)
     <div class="alert alert-danger">آخرین خطای همگام‌سازی: {{ $a->sync_error }}</div>
@@ -63,12 +63,12 @@
     <div class="card">
       <h2>اطلاعات</h2>
       <dl class="kv">
-        <dt>شناسه IBSng</dt><dd><bdi class="ltr">{{ $a->ibs_user_id }}</bdi></dd>
+        <dt>شناسه سرور</dt><dd><bdi class="ltr">{{ $a->ibs_user_id }}</bdi></dd>
         <dt>گروه</dt><dd><bdi>{{ $a->group_name }}</bdi> @if($a->group?->charge_name)<span class="muted">(تعرفه {{ $a->group->charge_name }})</span>@endif</dd>
         <dt>مدت اعتبار</dt><dd>{{ fa_duration($rel) }} @if($a->rel_exp_seconds)<span class="badge">مختص این اکانت</span>@endif</dd>
-        <dt>اولین اتصال</dt><dd>{{ $a->first_login_ibs ? fa($a->first_login_ibs).' (به ساعت سرور IBSng)' : 'هنوز وصل نشده' }}</dd>
-        <dt>ساخت در IBSng</dt><dd>{{ $a->ibs_created_at ? fa($a->ibs_created_at) : '—' }}</dd>
-        <dt>منبع</dt><dd>{{ $a->source === 'panel' ? 'ساخته‌شده در پنل'.($a->creator ? ' توسط '.$a->creator->name : '') : 'وارد‌شده از IBSng' }}</dd>
+        <dt>اولین اتصال</dt><dd>{{ $a->first_login_ibs ? fa($a->first_login_ibs).' (به ساعت سرور)' : 'هنوز وصل نشده' }}</dd>
+        <dt>ساخت در سرور</dt><dd>{{ $a->ibs_created_at ? fa($a->ibs_created_at) : '—' }}</dd>
+        <dt>منبع</dt><dd>{{ $a->source === 'panel' ? 'ساخته‌شده در پنل'.($a->creator ? ' توسط '.$a->creator->name : '') : 'وارد‌شده از سرور' }}</dd>
         <dt>توضیح</dt><dd>{{ $a->displayComment() ?? '—' }}</dd>
         @if($a->locked)<dt>دلیل قفل</dt><dd>{{ $a->lock_reason }}</dd>@endif
       </dl>
@@ -160,15 +160,15 @@
       @can('accounts.sensitive')
         <div class="card">
           <h2>مشاهده رمز فعلی</h2>
-          <p class="muted">رمز از IBSng خوانده می‌شود (پنل آن را ذخیره نمی‌کند). عملیات حساس است و ثبت می‌شود.</p>
+          <p class="muted">رمز از سرور خوانده می‌شود (پنل آن را ذخیره نمی‌کند). عملیات حساس است و ثبت می‌شود.</p>
           <form method="post" action="{{ route('accounts.reveal', $a) }}">@csrf<button class="btn btn-secondary" type="submit">نمایش رمز</button></form>
         </div>
       @endcan
       @can('accounts.delete')
         <div class="card card-danger">
-          <h2 class="text-danger">حذف از IBSng</h2>
-          <p class="muted">اکانت از IBSng حذف می‌شود؛ سوابق اتصال در IBSng باقی می‌ماند. برگشت‌پذیر نیست.</p>
-          <form method="post" action="{{ route('accounts.destroy', $a) }}" data-confirm="اکانت «{{ $a->username }}» برای همیشه از IBSng حذف شود؟">
+          <h2 class="text-danger">حذف از سرور</h2>
+          <p class="muted">اکانت از سرور حذف می‌شود؛ سوابق اتصال در سرور باقی می‌ماند. برگشت‌پذیر نیست.</p>
+          <form method="post" action="{{ route('accounts.destroy', $a) }}" data-confirm="اکانت «{{ $a->username }}» برای همیشه از سرور حذف شود؟">
             @csrf @method('delete')
             <div class="field"><label for="del_reason">دلیل</label><input id="del_reason" name="reason" class="input" required minlength="3"></div>
             <button class="btn btn-danger" type="submit">حذف اکانت</button>

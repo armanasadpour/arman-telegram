@@ -12,7 +12,7 @@ final class HttpTransport implements Transport
         private float $connectTimeout = 5.0,
     ) {
         if (! preg_match('/^[A-Za-z0-9.\-:\[\]]+$/', $host) || $port < 1 || $port > 65535) {
-            throw new IbsNotConfiguredException('آدرس یا پورت IBSng نامعتبر است.');
+            throw new IbsNotConfiguredException('آدرس یا پورت سرور نامعتبر است.');
         }
     }
 

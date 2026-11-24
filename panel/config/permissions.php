@@ -21,7 +21,7 @@ return [
         'accounts' => ['title' => 'اکانت‌ها', 'actions' => ['view', 'create', 'update', 'delete', 'sensitive']],
         'packages' => ['title' => 'بسته‌ها و دسته‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
         'discounts' => ['title' => 'تخفیف‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
-        'ibs_groups' => ['title' => 'گروه‌ها و تعرفه‌های IBSng', 'actions' => ['view', 'update']],
+        'ibs_groups' => ['title' => 'گروه‌ها و تعرفه‌های سرور', 'actions' => ['view', 'update']],
         'staff' => ['title' => 'کاربران پنل', 'actions' => ['view', 'create', 'update', 'delete', 'sensitive']],
         'roles' => ['title' => 'نقش‌ها و دسترسی‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
         'audit' => ['title' => 'گزارش رویدادها (Audit)', 'actions' => ['view']],

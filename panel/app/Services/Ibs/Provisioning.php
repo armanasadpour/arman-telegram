@@ -42,7 +42,7 @@ class Provisioning
         }
 
         $group = IbsGroup::query()->where('name', $spec['group'])->where('present', true)->first()
-            ?? throw new RuntimeException('گروه انتخاب‌شده در IBSng موجود نیست. ابتدا گروه‌ها را همگام‌سازی کنید.');
+            ?? throw new RuntimeException('گروه انتخاب‌شده در سرور موجود نیست. ابتدا گروه‌ها را همگام‌سازی کنید.');
         $charge = $group->charge;
         if ($charge?->isVolume() && empty($spec['volume_mb'])) {
             throw new RuntimeException('این گروه تعرفه حجمی دارد؛ حجم (مگابایت) را وارد کنید.');
@@ -57,7 +57,7 @@ class Provisioning
             throw new RuntimeException('این نام کاربری در پنل استفاده شده است.');
         }
         if (! $this->ibs->usernameAvailable($username)) {
-            throw new RuntimeException('این نام کاربری در IBSng وجود دارد یا کاراکتر غیرمجاز دارد.');
+            throw new RuntimeException('این نام کاربری در سرور وجود دارد یا کاراکتر غیرمجاز دارد.');
         }
 
         $password = $spec['password'] ?: self::generatePassword();

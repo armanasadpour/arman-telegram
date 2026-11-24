@@ -1,11 +1,11 @@
 <x-layouts.app title="گروه‌ها و تعرفه‌ها">
   <div class="page-head">
     <div>
-      <h1>گروه‌ها و تعرفه‌های IBSng</h1>
+      <h1>گروه‌ها و تعرفه‌های سرور</h1>
       <p class="muted">آخرین همگام‌سازی: {{ $syncedAt ? jdate(\Carbon\Carbon::parse($syncedAt)).' ('.fa_ago(\Carbon\Carbon::parse($syncedAt)).')' : 'هنوز انجام نشده' }} — خودکار هر ساعت</p>
     </div>
     @can('ibs_groups.update')
-      <form method="post" action="{{ route('ibs.groups.sync') }}">@csrf<button class="btn" type="submit">همگام‌سازی از IBSng</button></form>
+      <form method="post" action="{{ route('ibs.groups.sync') }}">@csrf<button class="btn" type="submit">همگام‌سازی از سرور</button></form>
     @endcan
   </div>
   <div class="card">
@@ -19,7 +19,7 @@
           <tbody>
           @foreach($groups as $g)
             <tr>
-              <td data-label="گروه"><bdi>{{ $g->name }}</bdi> @unless($g->present)<span class="badge badge-danger">حذف‌شده در IBSng</span>@endunless</td>
+              <td data-label="گروه"><bdi>{{ $g->name }}</bdi> @unless($g->present)<span class="badge badge-danger">حذف‌شده در سرور</span>@endunless</td>
               <td data-label="اعتبار">{{ fa_duration($g->rel_exp_seconds) }}</td>
               <td data-label="اتصال همزمان">{{ $g->multi_login !== null ? fa($g->multi_login) : '—' }}</td>
               <td data-label="تعرفه"><bdi>{{ $g->charge_name ?? '—' }}</bdi></td>
