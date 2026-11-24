@@ -22,6 +22,23 @@
         </select>
         <div class="help">همه زمان‌ها در دیتابیس به UTC ذخیره و با این منطقه زمانی نمایش داده می‌شوند.</div>
       </div>
+      <div class="field">
+        <label for="cur">{{ $fields['pricing.display_currency'][0] }}</label>
+        <select id="cur" name="{{ $f('pricing.display_currency') }}" class="input" @cannot('settings.update') disabled @endcannot>
+          <option value="toman" @selected(old($f('pricing.display_currency'), $values['pricing.display_currency']) === 'toman')>تومان</option>
+          <option value="rial" @selected(old($f('pricing.display_currency'), $values['pricing.display_currency']) === 'rial')>ریال</option>
+        </select>
+        <div class="help">قیمت‌ها همیشه به ریال ذخیره می‌شوند؛ این گزینه فقط نمایش را تغییر می‌دهد.</div>
+      </div>
+      <div class="field">
+        <label for="round">{{ $fields['pricing.rounding_rial'][0] }}</label>
+        <select id="round" name="{{ $f('pricing.rounding_rial') }}" class="input" @cannot('settings.update') disabled @endcannot>
+          @foreach(['1' => 'بدون گرد کردن', '10' => '۱ تومان', '100' => '۱۰ تومان', '1000' => '۱۰۰ تومان', '10000' => '۱٬۰۰۰ تومان'] as $k => $v)
+            <option value="{{ $k }}" @selected((string) old($f('pricing.rounding_rial'), $values['pricing.rounding_rial']) === $k)>{{ $v }}</option>
+          @endforeach
+        </select>
+        <div class="help">قیمت پس از تخفیف رو به پایین گرد می‌شود (به نفع مشتری).</div>
+      </div>
       @can('settings.update')
         <button type="submit" class="btn">ذخیره تنظیمات</button>
       @else

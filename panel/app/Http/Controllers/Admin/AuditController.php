@@ -49,6 +49,15 @@ class AuditController extends Controller
         'accounts.provision_review' => 'ساخت اکانت نیازمند رسیدگی',
         'accounts.provision_compensated' => 'لغو ساخت اکانت و پاک‌سازی',
         'accounts.provision_resolved' => 'بستن دستی ساخت اکانت',
+        'accounts.package_applied' => 'اعمال بسته روی اکانت',
+        'packages.create' => 'ایجاد بسته',
+        'packages.update' => 'ویرایش بسته',
+        'packages.delete' => 'حذف بسته',
+        'packages.category_create' => 'ایجاد دسته بسته',
+        'packages.category_delete' => 'حذف دسته بسته',
+        'discounts.create' => 'ایجاد تخفیف',
+        'discounts.update' => 'ویرایش تخفیف',
+        'discounts.delete' => 'حذف تخفیف',
     ];
 
     public function index(Request $request): View

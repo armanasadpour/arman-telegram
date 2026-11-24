@@ -3,6 +3,30 @@
     <h1>ساخت اکانت OpenVPN در IBSng</h1>
     <a class="btn btn-secondary" href="{{ route('accounts.index') }}">بازگشت</a>
   </div>
+  @if($packages->isNotEmpty())
+    <div class="card w-640">
+      <h2>ساخت از روی بسته</h2>
+      <form method="post" action="{{ route('accounts.store-package') }}">
+        @csrf
+        <input type="hidden" name="job_key" value="{{ old('job_key', $jobKey) }}">
+        <div class="field">
+          <label for="package_id">بسته</label>
+          <select id="package_id" name="package_id" class="input" required>
+            @foreach($packages as $row)
+              <option value="{{ $row['p']->id }}" @selected((int) old('package_id') === $row['p']->id)>{{ $row['p']->name }} — {{ $row['p']->summary() }} — {{ fa_money($row['q']->finalPrice) }}</option>
+            @endforeach
+          </select>
+          <div class="help">گروه IBSng، مدت، حجم و تعداد اتصال از بسته گرفته می‌شود و قیمت لحظه ساخت ثبت می‌شود.</div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label for="pkg_username">نام کاربری (اختیاری)</label><input id="pkg_username" name="username" class="input ltr" maxlength="32" autocapitalize="none" spellcheck="false"></div>
+          <div class="field"><label for="pkg_comment">توضیح (اختیاری)</label><input id="pkg_comment" name="comment" class="input" maxlength="100"></div>
+        </div>
+        <button class="btn" type="submit">ساخت اکانت از بسته</button>
+      </form>
+    </div>
+    <h2>یا ساخت دستی</h2>
+  @endif
   @if($groups->isEmpty())
     <div class="alert alert-warning">هیچ گروهی از IBSng همگام نشده است. @can('ibs_groups.view')<a href="{{ route('ibs.groups') }}">گروه‌ها را همگام‌سازی کنید.</a>@endcan</div>
   @else

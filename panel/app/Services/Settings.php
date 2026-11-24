@@ -21,6 +21,8 @@ class Settings
         'general.site_name' => 'پنل فروش',
         'general.support_contact' => '',
         'general.display_timezone' => 'Asia/Tehran',
+        'pricing.display_currency' => 'toman',
+        'pricing.rounding_rial' => '1000',
     ];
 
     public function get(string $key, ?string $default = null): ?string

@@ -74,6 +74,7 @@ class AuditAndSettingsTest extends TestCase
 
         $this->actingAs($admin)->put('/settings', [
             'general__site_name' => 'پنل مونینو', 'general__support_contact' => '@support', 'general__display_timezone' => 'Asia/Tehran',
+            'pricing__display_currency' => 'toman', 'pricing__rounding_rial' => '1000',
         ])->assertSessionHas('success');
         $this->assertSame('پنل مونینو', app(Settings::class)->get('general.site_name'));
         $log = AuditLog::query()->where('action', 'settings.update')->firstOrFail();

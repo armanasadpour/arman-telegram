@@ -16,6 +16,8 @@ class SettingsController extends Controller
         'general.site_name' => ['نام سامانه', ['required', 'string', 'max:80']],
         'general.support_contact' => ['اطلاعات تماس پشتیبانی', ['nullable', 'string', 'max:200']],
         'general.display_timezone' => ['منطقه زمانی نمایش', ['required', 'timezone:all']],
+        'pricing.display_currency' => ['واحد نمایش قیمت', ['required', 'in:toman,rial']],
+        'pricing.rounding_rial' => ['گرد کردن قیمت پس از تخفیف', ['required', 'in:1,10,100,1000,10000']],
     ];
 
     public function __construct(private Settings $settings, private AuditLogger $audit) {}

@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Settings;
 use App\Support\Jalali;
 
 if (! function_exists('jdate')) {
@@ -60,5 +61,18 @@ if (! function_exists('fa_duration')) {
         }
 
         return Jalali::digits((string) round($seconds / 3600, 1)).' ساعت';
+    }
+}
+
+if (! function_exists('fa_money')) {
+    /** Rial amount shown in the configured display currency (default تومان). */
+    function fa_money(?int $rial): string
+    {
+        if ($rial === null) {
+            return '—';
+        }
+        $unit = app(Settings::class)->get('pricing.display_currency', 'toman');
+
+        return $unit === 'rial' ? Jalali::number($rial).' ریال' : Jalali::number(intdiv($rial, 10)).' تومان';
     }
 }

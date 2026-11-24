@@ -99,8 +99,22 @@
   @unless($a->ibs_deleted_at)
     @can('accounts.update')
       <div class="grid two">
+        @if($applicable->isNotEmpty())
+          <div class="card">
+            <h2>اعمال بسته</h2>
+            <form method="post" action="{{ route('accounts.apply-package', $a) }}" data-confirm="بسته روی این اکانت اعمال شود؟">
+              @csrf
+              <div class="field"><label for="apply_pkg">بسته تمدید / افزایش حجم</label>
+                <select id="apply_pkg" name="package_id" class="input" required>
+                  @foreach($applicable as $row)<option value="{{ $row['p']->id }}">{{ $row['p']->name }} — {{ $row['p']->summary() }} — {{ fa_money($row['q']->finalPrice) }}</option>@endforeach
+                </select></div>
+              <div class="field"><label for="apply_reason">دلیل / شماره سفارش</label><input id="apply_reason" name="reason" class="input" required minlength="3"></div>
+              <button class="btn" type="submit">اعمال بسته</button>
+            </form>
+          </div>
+        @endif
         <div class="card">
-          <h2>تمدید</h2>
+          <h2>تمدید دستی</h2>
           <p class="muted">سیاست فعلی: {{ $renewalMode === 'smart' ? 'اگر فعال است از انقضای فعلی، اگر منقضی شده از الان' : 'همیشه از تاریخ انقضای فعلی' }}.</p>
           <form method="post" action="{{ route('accounts.renew', $a) }}" data-confirm="اکانت تمدید شود؟">
             @csrf
@@ -113,7 +127,7 @@
         </div>
         @if($a->isVolumeLimited())
           <div class="card">
-            <h2>افزایش حجم</h2>
+            <h2>افزایش حجم دستی</h2>
             <form method="post" action="{{ route('accounts.volume', $a) }}" data-confirm="حجم اضافه شود؟">
               @csrf
               <div class="form-grid">

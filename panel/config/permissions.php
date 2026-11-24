@@ -19,6 +19,8 @@ return [
     'modules' => [
         'dashboard' => ['title' => 'داشبورد', 'actions' => ['view']],
         'accounts' => ['title' => 'اکانت‌ها', 'actions' => ['view', 'create', 'update', 'delete', 'sensitive']],
+        'packages' => ['title' => 'بسته‌ها و دسته‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
+        'discounts' => ['title' => 'تخفیف‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
         'ibs_groups' => ['title' => 'گروه‌ها و تعرفه‌های IBSng', 'actions' => ['view', 'update']],
         'staff' => ['title' => 'کاربران پنل', 'actions' => ['view', 'create', 'update', 'delete', 'sensitive']],
         'roles' => ['title' => 'نقش‌ها و دسترسی‌ها', 'actions' => ['view', 'create', 'update', 'delete']],

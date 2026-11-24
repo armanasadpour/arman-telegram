@@ -36,6 +36,15 @@
         <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups')])><x-icon name="layers"/>گروه‌ها و تعرفه‌ها</a>
       @endcan
     @endif
+    @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view'))
+      <div class="section">فروش</div>
+      @can('packages.view')
+        <a href="{{ route('packages.index') }}" @class(['active' => request()->routeIs('packages.*')])><x-icon name="box"/>بسته‌ها</a>
+      @endcan
+      @can('discounts.view')
+        <a href="{{ route('discounts.index') }}" @class(['active' => request()->routeIs('discounts.*')])><x-icon name="tag"/>تخفیف‌ها</a>
+      @endcan
+    @endif
     @if(auth()->user()->can('staff.view') || auth()->user()->can('roles.view'))
       <div class="section">مدیریت دسترسی</div>
       @can('staff.view')

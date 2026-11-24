@@ -9,12 +9,16 @@ use App\Ibs\IbsException;
 use App\Ibs\IbsNotConfiguredException;
 use App\Ibs\IbsUnavailableException;
 use App\Models\IbsGroup;
+use App\Models\Package;
 use App\Models\ProvisioningJob;
 use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Ibs\AccountActions;
 use App\Services\Ibs\AccountSync;
 use App\Services\Ibs\Provisioning;
+use App\Services\Pricing\PackageApplier;
+use App\Services\Pricing\PackageRules;
+use App\Services\Pricing\PricingEngine;
 use App\Services\Settings;
 use Closure;
 use Illuminate\Http\RedirectResponse;
@@ -77,7 +81,11 @@ class AccountsController extends Controller
     {
         $this->authorize('accounts.create');
 
+        $pricing = app(PricingEngine::class);
+
         return view('accounts.create', [
+            'packages' => Package::query()->where('type', 'new')->where('is_active', true)->orderBy('sort_order')->orderBy('price_rial')->get()
+                ->map(fn ($p) => ['p' => $p, 'q' => $pricing->quote($p)]),
             'groups' => IbsGroup::query()->with('charge')->where('present', true)->orderBy('name')->get(),
             'jobKey' => (string) Str::uuid(),
         ]);
@@ -117,12 +125,56 @@ class AccountsController extends Controller
         };
     }
 
+    /** Create an account from a "new" package (price snapshot stored with the provisioning job). */
+    public function storeFromPackage(Request $request, PackageApplier $applier): RedirectResponse
+    {
+        $this->authorize('accounts.create');
+        $d = $request->validate([
+            'job_key' => ['required', 'uuid'],
+            'package_id' => ['required', 'integer', 'exists:packages,id'],
+            'username' => ['nullable', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9_.-]*$/'],
+            'comment' => ['nullable', 'string', 'max:100'],
+        ], [], ['package_id' => 'بسته', 'username' => 'نام کاربری', 'comment' => 'توضیح']);
+        $package = Package::query()->findOrFail($d['package_id']);
+        $d['password'] = Provisioning::generatePassword();
+        $resubmitted = ProvisioningJob::query()->where('job_key', $d['job_key'])->exists();
+        try {
+            $job = $applier->createAccount($package, $d['job_key'], $d, $request->user()->id);
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('error', $this->message($e));
+        }
+
+        return match ($job->status) {
+            'completed' => redirect()->route('accounts.show', $job->vpn_account_id)
+                ->with('success', 'اکانت «'.$job->username.'» با بسته «'.$package->name.'» ساخته شد.')
+                ->with('new_password', $resubmitted ? null : $d['password']),
+            'failed', 'compensated' => back()->withInput()->with('error', 'ساخت اکانت ناموفق بود: '.$job->last_error),
+            default => redirect()->route('accounts.jobs')->with('error', 'ساخت «'.$job->username.'» کامل نشد و در فهرست رسیدگی قرار گرفت: '.$job->last_error),
+        };
+    }
+
+    public function applyPackage(Request $request, VpnAccount $account, PackageApplier $applier): RedirectResponse
+    {
+        $this->authorize('accounts.update');
+        $d = $request->validate(['package_id' => ['required', 'integer', 'exists:packages,id'], 'reason' => ['required', 'string', 'min:3', 'max:200']],
+            [], ['package_id' => 'بسته', 'reason' => 'دلیل']);
+        $package = Package::query()->findOrFail($d['package_id']);
+
+        return $this->attempt(fn () => $applier->applyToAccount($package, $account, $d['reason']), 'بسته «'.$package->name.'» اعمال شد.');
+    }
+
     public function show(VpnAccount $account): View
     {
         $this->authorize('accounts.view');
 
+        $account->load('group.charge', 'creator');
+        $pricing = app(PricingEngine::class);
+
         return view('accounts.show', [
-            'a' => $account->load('group.charge', 'creator'),
+            'a' => $account,
+            'applicable' => Package::query()->where('is_active', true)->whereIn('type', ['renewal', 'topup'])->orderBy('type')->orderBy('sort_order')->get()
+                ->filter(fn ($p) => PackageRules::applicability($p, $account) === null)
+                ->map(fn ($p) => ['p' => $p, 'q' => $pricing->quote($p)]),
             'renewalMode' => $this->settings->get('accounts.renewal_mode', 'smart'),
             'job' => ProvisioningJob::query()->where('vpn_account_id', $account->id)->latest()->first(),
         ]);

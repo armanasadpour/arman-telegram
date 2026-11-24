@@ -72,6 +72,7 @@ class Provisioning
                 'volume_mb' => $spec['volume_mb'] ?? null,
                 'credit' => $charge?->isVolume() ? round(((int) $spec['volume_mb']) * 1024 * (float) $charge->cpk, 6) : 0.0,
                 'comment' => $spec['comment'] ?? null,
+                'package' => $spec['package'] ?? null, // price snapshot when created from a package
             ],
             'password_encrypted' => Crypt::encryptString($password),
             'created_by' => $actorId,

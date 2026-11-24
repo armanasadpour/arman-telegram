@@ -3,8 +3,10 @@
 use App\Http\Controllers\Admin\AccountsController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DiscountsController;
 use App\Http\Controllers\Admin\IbsGroupsController;
 use App\Http\Controllers\Admin\IbsSettingsController;
+use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Admin\ProvisioningJobsController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -70,6 +72,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts/{account}/password', [AccountsController::class, 'password'])->name('accounts.password');
     Route::post('/accounts/{account}/renew', [AccountsController::class, 'renew'])->name('accounts.renew');
     Route::post('/accounts/{account}/volume', [AccountsController::class, 'volume'])->name('accounts.volume');
+    Route::post('/accounts/{account}/apply-package', [AccountsController::class, 'applyPackage'])->name('accounts.apply-package');
+    Route::post('/accounts/from-package', [AccountsController::class, 'storeFromPackage'])->name('accounts.store-package')->middleware('throttle:30,1');
+
+    // Packages, categories, discounts
+    Route::get('/packages', [PackagesController::class, 'index'])->name('packages.index');
+    Route::get('/packages/create', [PackagesController::class, 'create'])->name('packages.create');
+    Route::post('/packages', [PackagesController::class, 'store'])->name('packages.store');
+    Route::get('/packages/{package}/edit', [PackagesController::class, 'edit'])->name('packages.edit');
+    Route::put('/packages/{package}', [PackagesController::class, 'update'])->name('packages.update');
+    Route::delete('/packages/{package}', [PackagesController::class, 'destroy'])->name('packages.destroy');
+    Route::post('/package-categories', [PackagesController::class, 'storeCategory'])->name('packages.categories.store');
+    Route::delete('/package-categories/{category}', [PackagesController::class, 'destroyCategory'])->name('packages.categories.destroy');
+    Route::get('/discounts', [DiscountsController::class, 'index'])->name('discounts.index');
+    Route::get('/discounts/create', [DiscountsController::class, 'create'])->name('discounts.create');
+    Route::post('/discounts', [DiscountsController::class, 'store'])->name('discounts.store');
+    Route::get('/discounts/{discount}/edit', [DiscountsController::class, 'edit'])->name('discounts.edit');
+    Route::put('/discounts/{discount}', [DiscountsController::class, 'update'])->name('discounts.update');
+    Route::delete('/discounts/{discount}', [DiscountsController::class, 'destroy'])->name('discounts.destroy');
 
     // Roles
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
