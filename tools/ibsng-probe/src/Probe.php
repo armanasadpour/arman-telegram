@@ -495,7 +495,7 @@ final class Probe
     private function add(string $id, string $title, string $status, string $detail, $data = null): void
     {
         $row = ['id' => $id, 'title' => $title, 'status' => $status, 'detail' => $this->scrub($detail)];
-        if ($this->client->lastMeta !== null && str_contains($id, '.') && !str_starts_with($id, 'env.') && !str_starts_with($id, 'net.')) {
+        if ($this->client->lastMeta !== null && str_contains($id, '.') && !str_starts_with($id, 'env.') && !str_starts_with($id, 'net.') && !str_starts_with($id, 'mt.')) {
             $row['meta'] = $this->client->lastMeta;
         }
         if ($data !== null) {
