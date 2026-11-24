@@ -32,6 +32,10 @@
       <p class="muted">{{ fa($pending) }} تغییر دیتابیس اجرا نشده است. پیش از اجرا از دیتابیس نسخه پشتیبان بگیرید (cPanel ← Backup).</p>
       <form method="post" action="{{ route('system.upgrade') }}" data-confirm="از دیتابیس پشتیبان گرفته‌اید؟ به‌روزرسانی اجرا شود؟">
         @csrf
+        <div class="field w-280">
+          <label for="upgrade_password">رمز عبور خودتان (برای تأیید)</label>
+          <input id="upgrade_password" name="password" type="password" class="input ltr" autocomplete="current-password" required>
+        </div>
         <button class="btn" type="submit">اجرای به‌روزرسانی</button>
       </form>
     </div>

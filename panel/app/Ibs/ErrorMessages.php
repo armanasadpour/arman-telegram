@@ -33,7 +33,7 @@ final class ErrorMessages
         if ($e instanceof IbsUnavailableException) {
             $m = $e->getMessage();
 
-            return str_contains($m, 'موقتاً') ? $m : 'ارتباط با IBSng برقرار نشد ('.mb_substr($m, 0, 80).'). وضعیت سرور IBSng و فایروال را بررسی کنید.';
+            return str_contains($m, 'موقتاً') ? $m : 'ارتباط با IBSng برقرار نشد: '.mb_substr($m, 0, 160);
         }
 
         return 'خطای غیرمنتظره در ارتباط با IBSng.';

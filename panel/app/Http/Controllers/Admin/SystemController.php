@@ -27,6 +27,8 @@ class SystemController extends Controller
     public function upgrade(AuditLogger $audit): RedirectResponse
     {
         abort_unless(request()->user()->isSuperAdmin(), 403, 'فقط مدیرکل می‌تواند به‌روزرسانی را اجرا کند.');
+        // Re-authentication happens in the same form (no redirect round-trip).
+        request()->validate(['password' => ['required', 'current_password']], [], ['password' => 'رمز عبور']);
         @set_time_limit(300);
         $before = SystemStatus::pendingMigrations();
         $code = Artisan::call('migrate', ['--force' => true]);
@@ -34,8 +36,10 @@ class SystemController extends Controller
         Cache::forget('system.pending_migrations');
         if ($code !== 0) {
             $audit->log('system.upgrade_failed', null, 'اجرای به‌روزرسانی دیتابیس ناموفق بود', null, mb_substr($out, 0, 450));
+            // Show the database error to the super admin (paths/credentials are not part of migrate output).
+            $detail = mb_substr(preg_replace('/\s+/', ' ', $out), 0, 400);
 
-            return back()->with('error', 'به‌روزرسانی دیتابیس ناموفق بود. جزئیات در storage/logs ثبت شد.');
+            return back()->with('error', 'به‌روزرسانی دیتابیس ناموفق بود: '.$detail);
         }
         Artisan::call('permissions:sync');
         Artisan::call('view:clear');

@@ -36,7 +36,12 @@ final class HttpTransport implements Transport
         curl_close($ch);
 
         if ($resp === false) {
-            throw new IbsUnavailableException($errno === CURLE_OPERATION_TIMEDOUT ? 'timeout' : "network error ($errno)");
+            throw new IbsUnavailableException(match ($errno) {
+                CURLE_OPERATION_TIMEDOUT => 'مهلت پاسخ تمام شد (timeout)',
+                CURLE_COULDNT_CONNECT => "اتصال به {$this->host}:{$this->port} ممکن نشد؛ IP و پورت را بررسی کنید یا پورت در فایروال بسته است",
+                CURLE_COULDNT_RESOLVE_HOST => "نام میزبان {$this->host} پیدا نشد",
+                default => "network error ($errno)",
+            });
         }
         if ($status !== 200) {
             throw new IbsUnavailableException("HTTP $status from IBSng");

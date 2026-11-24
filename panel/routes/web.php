@@ -45,7 +45,6 @@ Route::middleware('auth')->group(function () {
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
         Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
         Route::put('/settings/ibsng', [IbsSettingsController::class, 'update'])->name('ibs.settings.update');
-        Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade');
         Route::delete('/accounts/{account}', [AccountsController::class, 'destroy'])->name('accounts.destroy');
         Route::post('/accounts/{account}/reveal', [AccountsController::class, 'reveal'])->name('accounts.reveal')->middleware('throttle:20,1');
         Route::post('/accounts/jobs/{job}/resolve', [ProvisioningJobsController::class, 'resolve'])->name('accounts.jobs.resolve');
@@ -86,4 +85,5 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::get('/system', [SystemController::class, 'status'])->name('system.status');
+    Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade')->middleware('throttle:10,1');
 });

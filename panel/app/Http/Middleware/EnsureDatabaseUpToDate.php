@@ -14,15 +14,15 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsureDatabaseUpToDate
 {
-    private const ALLOWED = ['system.status', 'system.upgrade', 'logout', 'login', 'password.confirm', 'cron'];
+    /** Paths (any HTTP method) that must keep working before the upgrade: login/logout and the upgrade page itself. */
+    private const ALLOWED_PATHS = ['login', 'logout', 'confirm-password', 'system', 'system/*', 'cron/*', 'up'];
 
     public function handle(Request $request, Closure $next): Response
     {
         if (app()->runningUnitTests() && ! config('panel.check_upgrade_in_tests')) {
             return $next($request);
         }
-        $route = $request->route()?->getName();
-        if (in_array($route, self::ALLOWED, true) || $request->is('confirm-password') || SystemStatus::pendingMigrations() === 0) {
+        if ($request->is(...self::ALLOWED_PATHS) || SystemStatus::pendingMigrations() === 0) {
             return $next($request);
         }
         $user = $request->user();
