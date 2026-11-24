@@ -1,0 +1,98 @@
+<x-layouts.app title="اکانت‌ها">
+  <div class="page-head">
+    <div>
+      <h1>اکانت‌ها</h1>
+      <p class="muted">
+        آنلاین‌ها: {{ $syncedAt['onlines'] ? fa_ago(\Carbon\Carbon::parse($syncedAt['onlines'])) : 'هنوز همگام نشده' }}
+        — اکانت‌ها: {{ $syncedAt['accounts'] ? fa_ago(\Carbon\Carbon::parse($syncedAt['accounts'])) : 'هنوز همگام نشده' }}
+      </p>
+    </div>
+    @can('accounts.create')
+      @if($configured)<a class="btn" href="{{ route('accounts.create') }}">ساخت اکانت</a>@endif
+    @endcan
+  </div>
+
+  @unless($configured)
+    <div class="alert alert-warning">اتصال IBSng تنظیم نشده است. @can('settings.view')<a href="{{ route('ibs.settings') }}">تنظیم اتصال IBSng</a>@endcan</div>
+  @endunless
+  @if($openJobs)
+    <div class="alert alert-warning">{{ fa($openJobs) }} ساخت اکانت نیمه‌کاره یا نیازمند رسیدگی وجود دارد. <a href="{{ route('accounts.jobs') }}">مشاهده</a></div>
+  @endif
+  @if($import && ($import['running'] ?? false))
+    <div class="alert alert-warning">وارد کردن اکانت‌ها از IBSng در حال انجام است: {{ fa((int) $import['cursor']) }} از {{ $import['total'] !== null ? fa((int) $import['total']) : '…' }} بررسی شد ({{ fa((int) $import['imported']) }} اکانت جدید). با Cron ادامه پیدا می‌کند.</div>
+  @endif
+
+  <div class="grid stats mb-16">
+    <a class="card stat" href="{{ route('accounts.index') }}"><div class="label">اکانت‌ها در پنل</div><div class="value">{{ fa($counts['total']) }}</div></a>
+    <a class="card stat" href="{{ route('accounts.index', ['status' => 'online']) }}"><div class="label">آنلاین</div><div class="value">{{ fa($counts['online']) }}</div></a>
+    <a class="card stat" href="{{ route('accounts.index', ['status' => 'expired']) }}"><div class="label">منقضی</div><div class="value">{{ fa($counts['expired']) }}</div></a>
+    <a class="card stat" href="{{ route('accounts.index', ['status' => 'locked']) }}"><div class="label">غیرفعال (قفل)</div><div class="value">{{ fa($counts['locked']) }}</div></a>
+  </div>
+
+  <div class="card">
+    <form method="get" class="form-grid mb-8">
+      <div class="field"><label for="q">جستجو</label><input id="q" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="نام کاربری یا توضیح"></div>
+      <div class="field"><label for="status">وضعیت</label>
+        <select id="status" name="status" class="input">
+          <option value="">همه</option>
+          @foreach(['online' => 'آنلاین', 'active' => 'فعال', 'not_started' => 'شروع‌نشده', 'expiring' => 'انقضا تا ۳ روز آینده', 'expired' => 'منقضی', 'locked' => 'غیرفعال (قفل)', 'deleted' => 'حذف‌شده در IBSng'] as $k => $v)
+            <option value="{{ $k }}" @selected(($filters['status'] ?? '') === $k)>{{ $v }}</option>
+          @endforeach
+        </select></div>
+      <div class="field"><label for="group">گروه</label>
+        <select id="group" name="group" class="input"><option value="">همه</option>
+          @foreach($groups as $g)<option value="{{ $g }}" @selected(($filters['group'] ?? '') === $g)>{{ $g }}</option>@endforeach
+        </select></div>
+      <div class="actions"><button class="btn" type="submit">اعمال</button>@if(array_filter($filters))<a class="btn btn-secondary" href="{{ route('accounts.index') }}">حذف فیلتر</a>@endif</div>
+    </form>
+
+    @if($accounts->isEmpty())
+      <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانتی در پنل نیست. اکانت بسازید یا از IBSng وارد کنید.' }}</div></div>
+    @else
+      <div class="table-wrap">
+        <table class="table stack">
+          <thead><tr><th>نام کاربری</th><th>گروه</th><th>وضعیت</th><th>انقضا</th><th>حجم باقی‌مانده</th><th>به‌روزرسانی</th></tr></thead>
+          <tbody>
+          @foreach($accounts as $a)
+            <tr>
+              <td data-label="نام کاربری"><a href="{{ route('accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a></td>
+              <td data-label="گروه"><bdi>{{ $a->group_name }}</bdi></td>
+              <td data-label="وضعیت">@include('accounts._status', ['a' => $a])</td>
+              <td data-label="انقضا">{{ $a->expires_at ? jdate($a->expires_at, 'Y/m/d').' ('.fa_ago($a->expires_at).')' : ($a->first_login_ibs ? '—' : 'پس از اولین اتصال') }}</td>
+              <td data-label="حجم">{{ $a->isVolumeLimited() ? fa_bytes($a->remainingBytes()) : 'بدون محدودیت' }}</td>
+              <td data-label="به‌روزرسانی">
+                @if($a->isStale())<span class="badge badge-warning">{{ $a->last_synced_at ? fa_ago($a->last_synced_at) : 'هرگز' }}</span>
+                @else<span class="muted small">{{ fa_ago($a->last_synced_at) }}</span>@endif
+              </td>
+            </tr>
+          @endforeach
+          </tbody>
+        </table>
+      </div>
+      {{ $accounts->links() }}
+    @endif
+  </div>
+
+  @can('accounts.create')
+    @if($configured)
+      <div class="grid two">
+        <div class="card">
+          <h2>وارد کردن یک اکانت از IBSng</h2>
+          <form method="post" action="{{ route('accounts.import') }}" class="actions">
+            @csrf
+            <input name="username" class="input ltr w-280" placeholder="نام کاربری در IBSng" required aria-label="نام کاربری">
+            <button class="btn btn-secondary" type="submit">وارد کردن</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2>وارد کردن همه اکانت‌های IBSng</h2>
+          <p class="muted">اکانت‌های موجود در IBSng به پنل اضافه می‌شوند (چیزی در IBSng تغییر نمی‌کند). کار در پس‌زمینه با Cron و هر دقیقه حدود چند صد اکانت انجام می‌شود.</p>
+          <form method="post" action="{{ route('accounts.import-all') }}" data-confirm="وارد کردن همه اکانت‌های IBSng شروع شود؟">
+            @csrf
+            <button class="btn btn-secondary" type="submit" @disabled($import['running'] ?? false)>شروع وارد کردن</button>
+          </form>
+        </div>
+      </div>
+    @endif
+  @endcan
+</x-layouts.app>

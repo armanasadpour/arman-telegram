@@ -140,3 +140,4 @@ pre.code{direction:ltr;text-align:left;background:var(--surface-2);padding:10px;
 .mb-8{margin-bottom:8px}.mb-12{margin-bottom:12px}.mb-16{margin-bottom:16px}
 .legend{font-weight:500;margin-bottom:6px}.fieldset{border:0;padding:0;margin:0 0 14px}
 .text-danger{color:var(--danger)}.card-danger{border-color:var(--danger)}
+.stat .value.small{font-size:1.15rem;font-weight:700;line-height:1.6}

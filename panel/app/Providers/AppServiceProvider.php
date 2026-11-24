@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Ibs\IbsConnector;
+use App\Ibs\Transport;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Settings;
@@ -16,6 +18,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(Settings::class);
         $this->app->singleton(AuditLogger::class);
+        // Tests bind \App\Ibs\Transport to a fake; production builds an HttpTransport from settings.
+        $this->app->singleton(IbsConnector::class, fn ($app) => new IbsConnector(
+            $app->make(Settings::class),
+            $app->bound(Transport::class) ? $app->make(Transport::class) : null,
+        ));
     }
 
     public function boot(): void

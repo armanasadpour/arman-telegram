@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\ApplyDisplaySettings;
+use App\Http\Middleware\EnsureDatabaseUpToDate;
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\SecurityHeaders;
@@ -16,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(prepend: [EnsureInstalled::class], append: [ApplyDisplaySettings::class, EnsureUserIsActive::class, SecurityHeaders::class]);
+        $middleware->web(prepend: [EnsureInstalled::class], append: [ApplyDisplaySettings::class, EnsureUserIsActive::class, EnsureDatabaseUpToDate::class, SecurityHeaders::class]);
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));
     })

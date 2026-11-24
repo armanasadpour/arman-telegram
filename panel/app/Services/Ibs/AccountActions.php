@@ -1,0 +1,165 @@
+<?php
+
+namespace App\Services\Ibs;
+
+use App\Ibs\IbsConnector;
+use App\Models\VpnAccount;
+use App\Services\AuditLogger;
+use App\Services\Settings;
+use RuntimeException;
+
+/**
+ * Write operations on existing accounts. Each one refreshes from IBSng first (so decisions use
+ * live data), performs exactly one IBSng write, refreshes again, and writes an audit record.
+ * Writes are never retried automatically.
+ */
+class AccountActions
+{
+    public function __construct(
+        private IbsConnector $ibs,
+        private AccountSync $sync,
+        private AuditLogger $audit,
+        private Settings $settings,
+    ) {}
+
+    public function lock(VpnAccount $a, string $reason): VpnAccount
+    {
+        $a = $this->live($a);
+        $this->ibs->updateAttrs($a->ibs_user_id, ['lock' => mb_substr($reason, 0, 200)]);
+        $a = $this->sync->refresh($a);
+        $this->audit->log('accounts.lock', $a, 'غیرفعال‌سازی (قفل) اکانت «'.$a->username.'»', ['locked' => [false, true]], $reason);
+
+        return $a;
+    }
+
+    public function unlock(VpnAccount $a, string $reason): VpnAccount
+    {
+        $a = $this->live($a);
+        $this->ibs->updateAttrs($a->ibs_user_id, [], ['lock']);
+        $a = $this->sync->refresh($a);
+        if ($a->locked) {
+            throw new RuntimeException('IBSng قفل را برنداشت؛ وضعیت اکانت را در IBSng بررسی کنید.');
+        }
+        $this->audit->log('accounts.unlock', $a, 'فعال‌سازی دوباره اکانت «'.$a->username.'»', ['locked' => [true, false]], $reason);
+
+        return $a;
+    }
+
+    public function changePassword(VpnAccount $a, string $password): VpnAccount
+    {
+        $a = $this->live($a);
+        $this->ibs->updateAttrs($a->ibs_user_id, IbsConnector::credentialAttrs($a->username, $password));
+        $a = $this->sync->refresh($a);
+        $this->audit->log('accounts.password', $a, 'تغییر رمز اکانت «'.$a->username.'»', ['password' => ['***', '***']]);
+
+        return $a;
+    }
+
+    /**
+     * Extend validity by $days. Validity in IBSng is relative to first login (rel_exp_date).
+     * Policy (setting accounts.renewal_mode):
+     *  - smart (default): active -> add to current expiry; expired -> new period starts now.
+     *  - from_expiry: always add to the current expiry (an expired account may stay expired).
+     *
+     * @return array{0:VpnAccount,1:int} [account, new rel_exp seconds]
+     */
+    public function renew(VpnAccount $a, int $days, string $reason): array
+    {
+        if ($days < 1 || $days > 3650) {
+            throw new RuntimeException('تعداد روز نامعتبر است.');
+        }
+        $info = $this->liveInfo($a);
+        if (isset($info['attrs']['abs_exp_date'])) {
+            throw new RuntimeException('این اکانت تاریخ انقضای مطلق دارد؛ تمدید از پنل فقط برای انقضای نسبی (از اولین اتصال) پشتیبانی می‌شود.');
+        }
+        $a = $this->sync->apply($info) ?? $a;
+        $current = $a->effectiveRelExpSeconds();
+        if ($current === null) {
+            throw new RuntimeException('برای این اکانت و گروهش مدت اعتبار تعریف نشده است؛ ابتدا گروه‌ها را همگام‌سازی کنید.');
+        }
+
+        $ext = $days * 86400;
+        $new = $current + $ext;
+        $mode = $this->settings->get('accounts.renewal_mode', 'smart');
+        $remaining = isset($info['attrs']['time_to_nearest_exp_date']) ? (int) round((float) $info['attrs']['time_to_nearest_exp_date']) : null;
+        if ($mode === 'smart' && $remaining !== null && $remaining < 0) {
+            $new += -$remaining; // expired: skip the dead time so the new period starts now
+        }
+
+        $hours = (int) ceil($new / 3600);
+        $this->ibs->updateAttrs($a->ibs_user_id, ['rel_exp_date' => $hours, 'rel_exp_date_unit' => 'Hours']);
+        $a = $this->sync->refresh($a);
+        $this->audit->log('accounts.renew', $a, 'تمدید «'.$a->username.'» به مدت '.$days.' روز', [
+            'rel_exp_seconds' => [$current, $hours * 3600], 'mode' => [null, $mode],
+        ], $reason);
+
+        return [$a, $hours * 3600];
+    }
+
+    public function addVolume(VpnAccount $a, int $megabytes, string $reason): VpnAccount
+    {
+        if ($megabytes < 1 || $megabytes > 10_000_000) {
+            throw new RuntimeException('مقدار حجم نامعتبر است.');
+        }
+        $a = $this->live($a);
+        $charge = $a->charge();
+        if (! $charge?->isVolume()) {
+            throw new RuntimeException('تعرفه این اکانت حجمی نیست؛ افزایش حجم معنا ندارد.');
+        }
+        $credit = round($megabytes * 1024 * (float) $charge->cpk, 6);
+        $before = (float) $a->credit;
+        $this->ibs->changeCredit($a->ibs_user_id, $credit, 'panel:+'.$megabytes.'MB');
+        $a = $this->sync->refresh($a);
+        if ($a->volume_total_bytes !== null) {
+            $a->forceFill(['volume_total_bytes' => $a->volume_total_bytes + $megabytes * 1048576])->save();
+        }
+        $this->audit->log('accounts.add_volume', $a, 'افزایش حجم «'.$a->username.'» به میزان '.$megabytes.' مگابایت', [
+            'credit' => [$before, (float) $a->credit],
+        ], $reason);
+
+        return $a;
+    }
+
+    public function delete(VpnAccount $a, string $reason): void
+    {
+        $a = $this->live($a);
+        $this->ibs->deleteUser($a->ibs_user_id, mb_substr('panel: '.$reason, 0, 200));
+        $a->forceFill(['ibs_deleted_at' => now(), 'is_online' => false])->save();
+        $this->audit->log('accounts.delete', $a, 'حذف اکانت «'.$a->username.'» از IBSng', ['ibs_user_id' => [$a->ibs_user_id, null]], $reason);
+        $a->delete();
+    }
+
+    /** Sensitive: read the current password from IBSng (never stored by the panel). */
+    public function revealPassword(VpnAccount $a): string
+    {
+        $info = $this->liveInfo($a);
+        $pw = $info['attrs']['normal_password'] ?? null;
+        if ($pw === null) {
+            throw new RuntimeException('IBSng رمز این اکانت را برنگرداند.');
+        }
+        $this->audit->log('accounts.password_revealed', $a, 'مشاهده رمز اکانت «'.$a->username.'»');
+
+        return (string) $pw;
+    }
+
+    private function live(VpnAccount $a): VpnAccount
+    {
+        $a = $this->sync->refresh($a);
+        if ($a->ibs_deleted_at) {
+            throw new RuntimeException('این اکانت در IBSng وجود ندارد.');
+        }
+
+        return $a;
+    }
+
+    /** @return array<string,mixed> */
+    private function liveInfo(VpnAccount $a): array
+    {
+        $info = $this->ibs->usersByIds([$a->ibs_user_id])[(string) $a->ibs_user_id] ?? null;
+        if (! $info) {
+            throw new RuntimeException('این اکانت در IBSng وجود ندارد.');
+        }
+
+        return $info;
+    }
+}

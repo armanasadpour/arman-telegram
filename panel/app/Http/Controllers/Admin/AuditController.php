@@ -32,7 +32,23 @@ class AuditController extends Controller
         'roles.delete' => 'حذف نقش',
         'settings.update' => 'تغییر تنظیمات',
         'system.installed' => 'نصب سامانه',
+        'system.upgraded' => 'به‌روزرسانی نسخه',
+        'system.upgrade_failed' => 'به‌روزرسانی ناموفق',
         'audit.verified' => 'بررسی یکپارچگی گزارش',
+        'settings.ibs_update' => 'تغییر تنظیمات اتصال IBSng',
+        'settings.ibs_test' => 'تست اتصال IBSng',
+        'accounts.create' => 'ساخت اکانت',
+        'accounts.lock' => 'قفل اکانت',
+        'accounts.unlock' => 'رفع قفل اکانت',
+        'accounts.password' => 'تغییر رمز اکانت',
+        'accounts.password_revealed' => 'مشاهده رمز اکانت',
+        'accounts.renew' => 'تمدید اکانت',
+        'accounts.add_volume' => 'افزایش حجم اکانت',
+        'accounts.delete' => 'حذف اکانت',
+        'accounts.import_all' => 'وارد کردن همه اکانت‌ها',
+        'accounts.provision_review' => 'ساخت اکانت نیازمند رسیدگی',
+        'accounts.provision_compensated' => 'لغو ساخت اکانت و پاک‌سازی',
+        'accounts.provision_resolved' => 'بستن دستی ساخت اکانت',
     ];
 
     public function index(Request $request): View

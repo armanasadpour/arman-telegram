@@ -26,6 +26,16 @@
       </table>
     </div>
   </div>
+  @if($pending > 0 && auth()->user()->isSuperAdmin())
+    <div class="card card-danger">
+      <h2>به‌روزرسانی دیتابیس به نسخه {{ config('panel.version') }}</h2>
+      <p class="muted">{{ fa($pending) }} تغییر دیتابیس اجرا نشده است. پیش از اجرا از دیتابیس نسخه پشتیبان بگیرید (cPanel ← Backup).</p>
+      <form method="post" action="{{ route('system.upgrade') }}" data-confirm="از دیتابیس پشتیبان گرفته‌اید؟ به‌روزرسانی اجرا شود؟">
+        @csrf
+        <button class="btn" type="submit">اجرای به‌روزرسانی</button>
+      </form>
+    </div>
+  @endif
   <div class="card">
     <h2>تنظیم Cron در cPanel</h2>
     <p class="muted">در cPanel ← Cron Jobs، یک کار «Once Per Minute» با دستور زیر بسازید (اگر هاست بازه یک‌دقیقه‌ای اجازه نمی‌دهد، کوتاه‌ترین بازه مجاز را انتخاب کنید):</p>

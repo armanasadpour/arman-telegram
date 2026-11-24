@@ -27,6 +27,15 @@
     @can('dashboard.view')
       <a href="{{ route('dashboard') }}" @class(['active' => request()->routeIs('dashboard')])><x-icon name="home"/>داشبورد</a>
     @endcan
+    @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view'))
+      <div class="section">IBSng</div>
+      @can('accounts.view')
+        <a href="{{ route('accounts.index') }}" @class(['active' => request()->routeIs('accounts.*')])><x-icon name="user"/>اکانت‌ها</a>
+      @endcan
+      @can('ibs_groups.view')
+        <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups')])><x-icon name="layers"/>گروه‌ها و تعرفه‌ها</a>
+      @endcan
+    @endif
     @if(auth()->user()->can('staff.view') || auth()->user()->can('roles.view'))
       <div class="section">مدیریت دسترسی</div>
       @can('staff.view')
@@ -43,6 +52,7 @@
       @endcan
       @can('settings.view')
         <a href="{{ route('settings.edit') }}" @class(['active' => request()->routeIs('settings.*')])><x-icon name="settings"/>تنظیمات</a>
+        <a href="{{ route('ibs.settings') }}" @class(['active' => request()->routeIs('ibs.settings*')])><x-icon name="link"/>اتصال IBSng</a>
       @endcan
       @can('system.view')
         <a href="{{ route('system.status') }}" @class(['active' => request()->routeIs('system.*')])><x-icon name="activity"/>وضعیت سرویس‌ها</a>
@@ -54,6 +64,9 @@
   <div id="backdrop" class="backdrop"></div>
 
   <main class="main">
+    @if(auth()->user()->isSuperAdmin() && \App\Services\SystemStatus::pendingMigrations() > 0)
+      <div class="alert alert-warning">نسخه جدید نصب شده و دیتابیس باید به‌روزرسانی شود. <a href="{{ route('system.status') }}">اجرای به‌روزرسانی</a></div>
+    @endif
     @include('partials.flash')
     {{ $slot }}
   </main>

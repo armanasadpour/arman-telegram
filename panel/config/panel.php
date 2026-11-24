@@ -2,7 +2,7 @@
 
 return [
     // Release version; bumped by the release script. Also used for cache-busting static assets.
-    'version' => '0.2.1',
+    'version' => '0.3.0',
 
     // Path of the lock file written by the web installer. While it exists, install.php refuses to run.
     'install_lock' => storage_path('app/installed.lock'),

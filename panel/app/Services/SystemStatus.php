@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Ibs\IbsConnector;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -21,6 +23,7 @@ class SystemStatus
             $this->php(),
             $this->database(),
             $this->migrations(),
+            $this->ibsng(),
             $this->cron(),
             $this->queue(),
             $this->storage(),
@@ -51,6 +54,20 @@ class SystemStatus
         }
     }
 
+    /** Number of migration files not yet applied (cached briefly; used for the upgrade banner). */
+    public static function pendingMigrations(): int
+    {
+        return (int) Cache::remember('system.pending_migrations', 60, function () {
+            try {
+                $files = collect(glob(database_path('migrations/*.php')))->map(fn ($f) => basename($f, '.php'));
+
+                return $files->diff(DB::table('migrations')->pluck('migration'))->count();
+            } catch (Throwable) {
+                return 0;
+            }
+        });
+    }
+
     private function migrations(): array
     {
         try {
@@ -63,6 +80,29 @@ class SystemStatus
         } catch (Throwable) {
             return $this->row('migrations', 'Migrationها', 'fail', 'جدول migrations در دسترس نیست');
         }
+    }
+
+    private function ibsng(): array
+    {
+        $ibs = app(IbsConnector::class);
+        if (! $ibs->isConfigured()) {
+            return $this->row('ibsng', 'اتصال IBSng', 'warn', 'تنظیم نشده (تنظیمات ← اتصال IBSng)');
+        }
+        $h = $ibs->health();
+        if ($h['breaker_open']) {
+            return $this->row('ibsng', 'اتصال IBSng', 'fail', 'قطع — '.$h['error']);
+        }
+        $ok = $h['ok_at'] ? CarbonImmutable::parse($h['ok_at']) : null;
+        $err = $h['error_at'] ? CarbonImmutable::parse($h['error_at']) : null;
+        if ($err && (! $ok || $err->gt($ok))) {
+            return $this->row('ibsng', 'اتصال IBSng', 'fail', 'آخرین تماس ناموفق ('.fa_ago($err).'): '.$h['error']);
+        }
+        if (! $ok) {
+            return $this->row('ibsng', 'اتصال IBSng', 'warn', 'هنوز تماسی برقرار نشده؛ «تست اتصال» را بزنید');
+        }
+
+        return $this->row('ibsng', 'اتصال IBSng', $ok->lt(now()->subMinutes(10)) ? 'warn' : 'ok',
+            'آخرین تماس موفق '.fa_ago($ok).($h['latency_ms'] !== null ? ' — '.fa($h['latency_ms']).' میلی‌ثانیه' : ''));
     }
 
     private function cron(): array

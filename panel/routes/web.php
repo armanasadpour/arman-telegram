@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Controllers\Admin\AccountsController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\IbsGroupsController;
+use App\Http\Controllers\Admin\IbsSettingsController;
+use App\Http\Controllers\Admin\ProvisioningJobsController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StaffController;
@@ -40,7 +44,33 @@ Route::middleware('auth')->group(function () {
         Route::post('/staff/{staff}/reset-password', [StaffController::class, 'resetPassword'])->name('staff.reset-password');
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
         Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+        Route::put('/settings/ibsng', [IbsSettingsController::class, 'update'])->name('ibs.settings.update');
+        Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade');
+        Route::delete('/accounts/{account}', [AccountsController::class, 'destroy'])->name('accounts.destroy');
+        Route::post('/accounts/{account}/reveal', [AccountsController::class, 'reveal'])->name('accounts.reveal')->middleware('throttle:20,1');
+        Route::post('/accounts/jobs/{job}/resolve', [ProvisioningJobsController::class, 'resolve'])->name('accounts.jobs.resolve');
     });
+
+    // IBSng connection, groups
+    Route::get('/settings/ibsng', [IbsSettingsController::class, 'edit'])->name('ibs.settings');
+    Route::post('/settings/ibsng/test', [IbsSettingsController::class, 'test'])->name('ibs.settings.test')->middleware('throttle:10,1');
+    Route::post('/ibs/groups/sync', [IbsSettingsController::class, 'syncCatalog'])->name('ibs.groups.sync')->middleware('throttle:10,1');
+    Route::get('/ibs/groups', [IbsGroupsController::class, 'index'])->name('ibs.groups');
+
+    // Accounts
+    Route::get('/accounts', [AccountsController::class, 'index'])->name('accounts.index');
+    Route::get('/accounts/create', [AccountsController::class, 'create'])->name('accounts.create');
+    Route::post('/accounts', [AccountsController::class, 'store'])->name('accounts.store')->middleware('throttle:30,1');
+    Route::post('/accounts/import', [AccountsController::class, 'importOne'])->name('accounts.import')->middleware('throttle:30,1');
+    Route::post('/accounts/import-all', [AccountsController::class, 'importAll'])->name('accounts.import-all');
+    Route::get('/accounts/jobs', [ProvisioningJobsController::class, 'index'])->name('accounts.jobs');
+    Route::post('/accounts/jobs/{job}/retry', [ProvisioningJobsController::class, 'retry'])->name('accounts.jobs.retry')->middleware('throttle:20,1');
+    Route::get('/accounts/{account}', [AccountsController::class, 'show'])->name('accounts.show')->whereNumber('account');
+    Route::post('/accounts/{account}/refresh', [AccountsController::class, 'refresh'])->name('accounts.refresh')->middleware('throttle:30,1');
+    Route::post('/accounts/{account}/lock', [AccountsController::class, 'lock'])->name('accounts.lock');
+    Route::post('/accounts/{account}/password', [AccountsController::class, 'password'])->name('accounts.password');
+    Route::post('/accounts/{account}/renew', [AccountsController::class, 'renew'])->name('accounts.renew');
+    Route::post('/accounts/{account}/volume', [AccountsController::class, 'volume'])->name('accounts.volume');
 
     // Roles
     Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');

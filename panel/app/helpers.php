@@ -28,3 +28,37 @@ if (! function_exists('fa_ago')) {
         return Jalali::ago($date);
     }
 }
+
+if (! function_exists('fa_bytes')) {
+    /** 1536 -> "۱٫۵ کیلوبایت" (binary units, Persian digits). */
+    function fa_bytes(?int $bytes): string
+    {
+        if ($bytes === null) {
+            return '—';
+        }
+        $units = ['بایت', 'کیلوبایت', 'مگابایت', 'گیگابایت', 'ترابایت'];
+        $i = 0;
+        $v = (float) $bytes;
+        while ($v >= 1024 && $i < count($units) - 1) {
+            $v /= 1024;
+            $i++;
+        }
+
+        return Jalali::digits(rtrim(rtrim(number_format($v, $i >= 3 ? 2 : 1, '٫', ''), '0'), '٫')).' '.$units[$i];
+    }
+}
+
+if (! function_exists('fa_duration')) {
+    /** Seconds -> "۳۰ روز" / "۵ ساعت". */
+    function fa_duration(?int $seconds): string
+    {
+        if ($seconds === null) {
+            return '—';
+        }
+        if ($seconds % 86400 === 0 || $seconds >= 86400 * 3) {
+            return Jalali::digits((string) round($seconds / 86400, 1)).' روز';
+        }
+
+        return Jalali::digits((string) round($seconds / 3600, 1)).' ساعت';
+    }
+}
