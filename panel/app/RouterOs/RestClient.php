@@ -40,7 +40,7 @@ class RestClient implements Client
         return match (true) {
             str_contains($m, 'timed out') || str_contains($m, 'error 28') => 'روتر در زمان مقرر پاسخ نداد (فایروال، IP یا پورت را بررسی کنید).',
             str_contains($m, 'refused') || str_contains($m, 'error 7') => 'اتصال رد شد: سرویس روی این پورت فعال نیست یا فایروال اجازه نمی‌دهد.',
-            str_contains($m, 'resolve') || str_contains($m, 'error 6') => 'نام میزبان روتر پیدا نشد.',
+            $m === 'error 0' || str_contains($m, 'getaddrinfo') || str_contains($m, 'resolve') || str_contains($m, 'error 6 ') => 'آدرس روتر پیدا نشد: نام دامنه را بررسی کنید و فقط دامنه یا IP بنویسید (بدون :پورت).',
             default => 'اتصال به روتر برقرار نشد: '.mb_substr($m, 0, 160),
         };
     }

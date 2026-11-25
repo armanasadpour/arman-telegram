@@ -143,15 +143,25 @@ class RoutersController extends Controller
 
     private function validated(Request $request, ?Router $r): array
     {
+        // Forgive the common paste "https://host:port/..." or "host:port": keep the bare host and move the port to its field.
+        $host = trim((string) $request->input('host'));
+        $host = (string) preg_replace('#^[a-z]+://#i', '', $host);
+        $host = (string) preg_replace('#[/?].*$#', '', $host);
+        if (preg_match('/^([^:\[\]]+):(\d{1,5})$/', $host, $m)) {
+            $host = $m[1];
+            $request->merge(['port' => (int) $m[2]]);
+        }
+        $request->merge(['host' => $host]);
+
         return $request->validate([
             'name' => ['required', 'string', 'max:80'],
-            'host' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9.\-:\[\]]+$/'],
+            'host' => ['required', 'string', 'max:255', 'regex:/^([A-Za-z0-9.\-]+|\[[0-9A-Fa-f:.]+\])$/'],
             'transport' => ['required', Rule::in(array_keys(Router::TRANSPORTS))],
             'port' => ['required', 'integer', 'between:1,65535'],
             'username' => ['required', 'string', 'max:100'],
             'password' => [$r ? 'nullable' : 'required', 'string', 'max:200'],
             'is_active' => ['nullable', 'boolean'],
-        ], ['host.regex' => 'آدرس فقط IP یا نام دامنه باشد (بدون http:// و مسیر).'], ['name' => 'نام', 'host' => 'آدرس', 'port' => 'پورت', 'username' => 'نام کاربری', 'password' => 'رمز']);
+        ], ['host.regex' => 'آدرس فقط IP یا نام دامنه باشد (بدون http://، مسیر یا :پورت — پورت را در فیلد پورت بنویسید).'], ['name' => 'نام', 'host' => 'آدرس', 'port' => 'پورت', 'username' => 'نام کاربری', 'password' => 'رمز']);
     }
 
     private function fill(Router $r, array $d): void

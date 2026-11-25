@@ -140,6 +140,11 @@ class RouterConnectionTest extends RouterTestCase
         $this->actingAs($admin)->confirmed()->put('/routers/'.$r->id, ['name' => 'تهران ۱', 'host' => '127.0.0.2', 'transport' => 'api-ssl', 'port' => $port, 'username' => 'panel', 'is_active' => 1]);
         $this->assertNull($r->fresh()->cert_pin);
         $this->assertSame('S3cret!pw', $r->fresh()->password, 'empty password field keeps the old one');
+
+        // "host:port" pasted into the address field is split, not stored as "host:port" + port
+        $this->actingAs($admin)->confirmed()->put('/routers/'.$r->id, ['name' => 'تهران ۱', 'host' => 'https://ir11.example.com:8443/', 'transport' => 'rest', 'port' => 443, 'username' => 'panel', 'is_active' => 1])->assertRedirect();
+        $this->assertSame(['ir11.example.com', 8443], [$r->fresh()->host, (int) $r->fresh()->port]);
+        $this->actingAs($admin)->confirmed()->from('/routers/'.$r->id.'/edit')->put('/routers/'.$r->id, ['name' => 'x', 'host' => 'a.com:1:2', 'transport' => 'rest', 'port' => 443, 'username' => 'panel'])->assertSessionHasErrors('host');
     }
 
     public function test_permissions(): void
