@@ -72,12 +72,12 @@ class AuthTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'auth.logout']);
     }
 
-    public function test_change_password_requires_current_and_strong_password(): void
+    public function test_change_password_requires_current_and_minimum_length(): void
     {
         $u = $this->superAdmin();
         $this->actingAs($u)->put('/profile/password', ['current_password' => 'wrong', 'password' => 'NewPassword123', 'password_confirmation' => 'NewPassword123'])
             ->assertSessionHasErrors('current_password');
-        $this->actingAs($u)->put('/profile/password', ['current_password' => 'Password12345', 'password' => 'short', 'password_confirmation' => 'short'])
+        $this->actingAs($u)->put('/profile/password', ['current_password' => 'Password12345', 'password' => 'abc', 'password_confirmation' => 'abc'])
             ->assertSessionHasErrors('password');
         $this->actingAs($u)->put('/profile/password', ['current_password' => 'Password12345', 'password' => 'NewPassword123', 'password_confirmation' => 'NewPassword123'])
             ->assertSessionHasNoErrors();

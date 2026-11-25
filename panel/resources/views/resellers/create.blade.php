@@ -10,7 +10,7 @@
         <div class="field"><label for="global_discount_percent">تخفیف سراسری (٪)</label><input id="global_discount_percent" name="global_discount_percent" type="number" step="0.01" min="0" max="100" class="input ltr" value="{{ old('global_discount_percent', 0) }}"><div class="help">روی قیمت پایه همه بسته‌ها؛ تخفیف دسته‌ای و قیمت اختصاصی بعداً در صفحه همکار.</div></div>
         <div class="field"><label for="username">نام کاربری ورود</label><input id="username" name="username" class="input ltr" value="{{ old('username') }}" required maxlength="60" autocapitalize="none"></div>
         <div></div>
-        <div class="field"><label for="password">رمز ورود</label><input id="password" name="password" type="password" class="input ltr" autocomplete="new-password" required><div class="help">حداقل ۱۰ کاراکتر، شامل حرف و عدد.</div></div>
+        <div class="field"><label for="password">رمز ورود</label><input id="password" name="password" type="password" class="input ltr" autocomplete="new-password" required><div class="help">حداقل ۴ کاراکتر.</div></div>
         <div class="field"><label for="password_confirmation">تکرار رمز</label><input id="password_confirmation" name="password_confirmation" type="password" class="input ltr" autocomplete="new-password" required></div>
       </div>
       <button class="btn" type="submit">ایجاد همکار</button>

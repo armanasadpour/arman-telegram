@@ -10,7 +10,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
 class StaffController extends Controller
@@ -43,7 +42,7 @@ class StaffController extends Controller
         $this->authorize('staff.create');
         $data = $request->validate($this->rules(null) + [
             'username' => ['required', 'string', 'min:3', 'max:60', 'regex:/^[a-zA-Z0-9_.-]+$/', 'unique:users,username'],
-            'password' => ['required', 'confirmed', Password::min(10)->letters()->numbers()],
+            'password' => ['required', 'confirmed', 'min:4', 'max:200'],
         ]);
         $roleIds = $this->validatedRoleIds($request);
 
@@ -130,7 +129,7 @@ class StaffController extends Controller
         $this->authorize('staff.sensitive');
         $this->guardSuperTarget($staff);
         $data = $request->validate([
-            'password' => ['required', 'confirmed', Password::min(10)->letters()->numbers()],
+            'password' => ['required', 'confirmed', 'min:4', 'max:200'],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
         $staff->password = $data['password'];

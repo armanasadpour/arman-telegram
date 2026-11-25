@@ -40,7 +40,7 @@
           <div class="field">
             <label for="password">رمز عبور</label>
             <input id="password" name="password" type="password" class="input ltr @error('password') is-invalid @enderror" autocomplete="new-password" required>
-            <div class="help">حداقل ۱۰ کاراکتر، شامل حرف و عدد.</div>
+            <div class="help">حداقل ۴ کاراکتر.</div>
           </div>
           <div class="field">
             <label for="password_confirmation">تکرار رمز عبور</label>

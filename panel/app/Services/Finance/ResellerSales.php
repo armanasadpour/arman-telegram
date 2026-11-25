@@ -105,7 +105,7 @@ class ResellerSales
         // 2. Act on the server.
         $password = null;
         if ($package->type === 'new') {
-            $password = Provisioning::generatePassword();
+            $password = ($opts['password'] ?? null) ?: Provisioning::generatePassword();
             try {
                 $job = $this->provisioning->create($saleKey, [
                     'username' => $opts['username'] ?? null,

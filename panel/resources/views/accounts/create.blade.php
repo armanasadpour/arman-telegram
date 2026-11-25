@@ -20,6 +20,7 @@
         </div>
         <div class="form-grid">
           <div class="field"><label for="pkg_username">نام کاربری (اختیاری)</label><input id="pkg_username" name="username" class="input ltr" maxlength="32" autocapitalize="none" spellcheck="false"></div>
+          <div class="field"><label for="pkg_password">رمز (اختیاری)</label><input id="pkg_password" name="password" class="input ltr" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help">هر رمزی بخواهید؛ خالی = تصادفی.</div></div>
           <div class="field"><label for="pkg_comment">توضیح (اختیاری)</label><input id="pkg_comment" name="comment" class="input" maxlength="100"></div>
         </div>
         <button class="btn" type="submit">ساخت اکانت از بسته</button>
@@ -53,8 +54,8 @@
         </div>
         <div class="field">
           <label for="password">رمز (اختیاری)</label>
-          <input id="password" name="password" class="input ltr" value="{{ old('password') }}" maxlength="32" autocomplete="off">
-          <div class="help">خالی بگذارید تا رمز ۱۰ کاراکتری امن ساخته شود. رمز فقط یک بار نمایش داده می‌شود.</div>
+          <input id="password" name="password" class="input ltr" value="{{ old('password') }}" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false">
+          <div class="help">هر رمزی بخواهید؛ خالی بگذارید تا رمز تصادفی ساخته شود. رمز فقط یک بار نمایش داده می‌شود.</div>
         </div>
         <div class="field">
           <label for="days">مدت اعتبار (روز، اختیاری)</label>

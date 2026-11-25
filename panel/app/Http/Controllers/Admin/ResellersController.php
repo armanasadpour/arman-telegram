@@ -20,7 +20,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -57,7 +56,7 @@ class ResellersController extends Controller
             'phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s۰-۹]+$/u'],
             'telegram' => ['nullable', 'string', 'max:64'],
             'username' => ['required', 'string', 'min:3', 'max:60', 'regex:/^[a-zA-Z0-9_.-]+$/', 'unique:users,username'],
-            'password' => ['required', 'confirmed', Password::min(10)->letters()->numbers()],
+            'password' => ['required', 'confirmed', 'min:4', 'max:200'],
             'global_discount_percent' => ['nullable', 'numeric', 'between:0,100'],
         ], [], ['name' => 'نام', 'phone' => 'تلفن', 'username' => 'نام کاربری', 'password' => 'رمز', 'global_discount_percent' => 'تخفیف سراسری']);
 

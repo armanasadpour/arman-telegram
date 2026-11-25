@@ -150,7 +150,7 @@
           <h2>تغییر رمز</h2>
           <form method="post" action="{{ route('accounts.password', $a) }}" data-confirm="رمز اکانت تغییر کند؟">
             @csrf
-            <div class="field"><label for="new_pw">رمز جدید (خالی = تولید خودکار)</label><input id="new_pw" name="password" class="input ltr" maxlength="32" autocomplete="off"></div>
+            <div class="field"><label for="new_pw">رمز جدید (خالی = تولید خودکار)</label><input id="new_pw" name="password" class="input ltr" maxlength="64" autocomplete="off"></div>
             <button class="btn btn-secondary" type="submit">تغییر رمز</button>
           </form>
         </div>

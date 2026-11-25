@@ -8,7 +8,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
 class PasswordController extends Controller
@@ -24,7 +23,7 @@ class PasswordController extends Controller
     {
         $data = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', Password::min(10)->letters()->numbers(), 'different:current_password'],
+            'password' => ['required', 'confirmed', 'min:4', 'max:200', 'different:current_password'],
         ], [], ['current_password' => 'رمز فعلی', 'password' => 'رمز جدید']);
 
         $user = $request->user();

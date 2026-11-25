@@ -134,8 +134,8 @@ function validate($in, $pass, $pass2)
     if (! preg_match('/^[a-zA-Z0-9_.-]{3,60}$/', $in['admin_username'])) {
         $e[] = 'نام کاربری مدیرکل باید ۳ تا ۶۰ کاراکتر از حروف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد.';
     }
-    if (mb_strlen($pass) < 10 || ! preg_match('/[A-Za-z]/', $pass) || ! preg_match('/[0-9]/', $pass)) {
-        $e[] = 'رمز مدیرکل باید حداقل ۱۰ کاراکتر و شامل حرف و عدد باشد.';
+    if (mb_strlen($pass) < 4) {
+        $e[] = 'رمز مدیرکل باید حداقل ۴ کاراکتر باشد.';
     }
     if ($pass !== $pass2) {
         $e[] = 'تکرار رمز مدیرکل مطابقت ندارد.';
@@ -351,7 +351,7 @@ function formHtml($checks, $blocking, $errors, $in)
         .'<h2>۴. مدیرکل</h2>'
         .field('admin_name', 'نام و نام خانوادگی', $in['admin_name'])
         .field('admin_username', 'نام کاربری', $in['admin_username'], 'text', 'حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط', true)
-        .'<div class="f"><label for="admin_pass">رمز عبور</label><input id="admin_pass" name="admin_pass" type="password" class="ltr" autocomplete="new-password" required><div class="m">حداقل ۱۰ کاراکتر، شامل حرف و عدد.</div></div>'
+        .'<div class="f"><label for="admin_pass">رمز عبور</label><input id="admin_pass" name="admin_pass" type="password" class="ltr" autocomplete="new-password" required><div class="m">حداقل ۴ کاراکتر.</div></div>'
         .'<div class="f"><label for="admin_pass2">تکرار رمز عبور</label><input id="admin_pass2" name="admin_pass2" type="password" class="ltr" autocomplete="new-password" required></div>'
         .'<button class="btn" type="submit"'.$disabled.'>نصب</button></form>';
 }

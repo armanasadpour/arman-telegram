@@ -20,6 +20,7 @@
         <div class="field"><label for="sale_price_toman">قیمت فروش به مشتری (تومان)</label><input id="sale_price_toman" name="sale_price_toman" type="number" min="0" class="input ltr" value="{{ old('sale_price_toman') }}" required><div class="help">سود شما = این مبلغ − قیمت خرید.</div></div>
         @unless($target)
           <div class="field"><label for="username">نام کاربری (اختیاری)</label><input id="username" name="username" class="input ltr" value="{{ old('username') }}" maxlength="32" autocapitalize="none"></div>
+          <div class="field"><label for="password">رمز اکانت (اختیاری)</label><input id="password" name="password" class="input ltr" value="" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false"><div class="help">هر رمزی بخواهید؛ خالی بگذارید تا رمز تصادفی ساخته شود.</div></div>
         @endunless
         <div class="field"><label for="customer_name">نام مشتری (اختیاری)</label><input id="customer_name" name="customer_name" class="input" value="{{ old('customer_name') }}" maxlength="120"></div>
         <div class="field"><label for="customer_phone">تلفن مشتری (اختیاری)</label><input id="customer_phone" name="customer_phone" class="input ltr" value="{{ old('customer_phone') }}" maxlength="20" inputmode="tel"></div>

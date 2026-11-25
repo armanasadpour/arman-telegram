@@ -98,7 +98,7 @@ class AccountsController extends Controller
         $data = $request->validate([
             'job_key' => ['required', 'uuid'],
             'username' => ['nullable', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9_.-]*$/'],
-            'password' => ['nullable', 'string', 'min:6', 'max:32', 'regex:/^[A-Za-z0-9_.@#!-]+$/'],
+            'password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/'],
             'group' => ['required', 'string', 'max:100'],
             'days' => ['nullable', 'integer', 'between:1,3650'],
             'multi_login' => ['nullable', 'integer', 'between:1,255'],
@@ -134,10 +134,11 @@ class AccountsController extends Controller
             'job_key' => ['required', 'uuid'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
             'username' => ['nullable', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9_.-]*$/'],
+            'password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/'],
             'comment' => ['nullable', 'string', 'max:100'],
-        ], [], ['package_id' => 'بسته', 'username' => 'نام کاربری', 'comment' => 'توضیح']);
+        ], [], ['package_id' => 'بسته', 'username' => 'نام کاربری', 'password' => 'رمز', 'comment' => 'توضیح']);
         $package = Package::query()->findOrFail($d['package_id']);
-        $d['password'] = Provisioning::generatePassword();
+        $d['password'] = ($d['password'] ?? null) ?: Provisioning::generatePassword();
         $resubmitted = ProvisioningJob::query()->where('job_key', $d['job_key'])->exists();
         try {
             $job = $applier->createAccount($package, $d['job_key'], $d, $request->user()->id);
@@ -200,7 +201,7 @@ class AccountsController extends Controller
     public function password(Request $request, VpnAccount $account): RedirectResponse
     {
         $this->authorize('accounts.update');
-        $pw = $request->validate(['password' => ['nullable', 'string', 'min:6', 'max:32', 'regex:/^[A-Za-z0-9_.@#!-]+$/']])['password']
+        $pw = $request->validate(['password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/']])['password']
             ?: Provisioning::generatePassword();
 
         return $this->attempt(fn () => $this->actions->changePassword($account, $pw), 'رمز اکانت تغییر کرد.', ['new_password' => $pw]);
