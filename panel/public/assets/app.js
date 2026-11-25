@@ -73,6 +73,21 @@
       if (port && (port.value === '' || defaults.indexOf(port.value) !== -1)) port.value = r.getAttribute('data-port');
     });
   });
+  // Technical one-line fields (tokens, URLs, keys, usernames): a paste replaces the field instead of
+  // being added to what is there, so pasting again after a slow phone paste does not double the value.
+  document.querySelectorAll('input.input.ltr:not([type=number]):not([type=password]):not([type=file]), input[data-paste-replace]').forEach(function (inp) {
+    inp.addEventListener('paste', function (e) {
+      var t = (e.clipboardData || window.clipboardData);
+      t = t ? t.getData('text') : null;
+      if (t === null || t === undefined) return;
+      e.preventDefault();
+      var keepSpaces = /password|comment/.test(inp.name);
+      inp.value = keepSpaces ? t.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '').trim()
+        : t.replace(/[\s\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]+/g, '');
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+      try { inp.setSelectionRange(inp.value.length, inp.value.length); inp.scrollLeft = inp.scrollWidth; } catch (x) {}
+    });
+  });
   // "Select all" checkboxes.
   document.querySelectorAll('[data-check-all]').forEach(function (all) {
     all.addEventListener('change', function () {

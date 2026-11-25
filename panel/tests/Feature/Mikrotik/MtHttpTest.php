@@ -53,7 +53,7 @@ class MtHttpTest extends MikrotikTestCase
 
     public function test_separate_l2tp_and_wireguard_menus(): void
     {
-        $prov = app(\App\Services\Mikrotik\MtProvisioning::class);
+        $prov = app(MtProvisioning::class);
         $prov->create($this->l2tp, (string) Str::uuid(), ['username' => 'onlyl2tp'], null);
         $prov->create($this->wg, (string) Str::uuid(), ['username' => 'onlywg'], null);
         $admin = $this->superAdmin();

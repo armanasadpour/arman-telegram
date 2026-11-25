@@ -11,6 +11,7 @@ use App\Models\BotOutbox;
 use App\Models\BotUser;
 use App\Services\AuditLogger;
 use App\Services\Settings;
+use App\Support\Paste;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -44,6 +45,11 @@ class BotsController extends Controller
     {
         $this->authorize('bots.sensitive');
         $bot = $this->bot($platform);
+        // Pasting on phones sometimes adds the text twice or brings hidden characters: keep the clean value.
+        $request->merge([
+            'token' => Paste::clean((string) $request->input('token', '')),
+            'relay_url' => Paste::url((string) $request->input('relay_url', '')),
+        ]);
         $d = $request->validate([
             'token' => ['nullable', 'string', 'max:200', 'regex:/^[A-Za-z0-9:_\-]+$/'],
             'is_active' => ['nullable', 'boolean'],

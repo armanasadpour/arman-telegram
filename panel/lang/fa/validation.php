@@ -34,6 +34,18 @@ return [
     'string' => ':attribute باید متن باشد.',
     'timezone' => ':attribute باید یک منطقه زمانی معتبر باشد.',
     'unique' => 'این :attribute قبلاً استفاده شده است.',
+    'url' => ':attribute باید یک آدرس کامل و معتبر باشد (مثلاً https://…).',
+    'uuid' => ':attribute معتبر نیست.',
+    'numeric' => ':attribute باید عدد باشد.',
+    'file' => ':attribute باید فایل باشد.',
+    'mimes' => ':attribute باید از نوع :values باشد.',
+    'between' => [
+        'numeric' => ':attribute باید بین :min و :max باشد.',
+        'string' => ':attribute باید بین :min و :max کاراکتر باشد.',
+    ],
+    'required_if' => ':attribute الزامی است.',
+    'required_without' => ':attribute الزامی است.',
+    'date' => ':attribute تاریخ معتبر نیست.',
     'alpha_dash' => ':attribute فقط می‌تواند حروف انگلیسی، عدد، خط تیره و زیرخط داشته باشد.',
     'attributes' => [
         'name' => 'نام',

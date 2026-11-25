@@ -31,6 +31,20 @@ class BotAdminTest extends BotTestCase
         $this->assertSame('panel_bale_bot', $bale->fresh()->bot_username);
     }
 
+    public function test_doubled_or_messy_paste_is_cleaned(): void
+    {
+        $this->bot('telegram');
+        $admin = $this->superAdmin();
+        $url = 'https://nubatyar.example.workers.dev';
+        $this->actingAs($admin)->confirmed()->from('/bots')->put('/bots/telegram', ['token' => " 123456:ABCdef_-xyz123456:ABCdef_-xyz\u{200F}", 'relay_mode' => 'cloudflare',
+            'relay_url' => $url.$url.' ', 'is_active' => 1])->assertSessionHasNoErrors();
+        $b = Bot::for('telegram');
+        $this->assertSame($url, $b->relay_url);
+        $this->assertSame('123456:ABCdef_-xyz', $b->token);
+        $this->actingAs($admin)->confirmed()->from('/bots')->put('/bots/telegram', ['relay_mode' => 'cloudflare', 'relay_url' => 'not a url'])
+            ->assertSessionHasErrors(['relay_url' => 'آدرس واسط باید یک آدرس کامل و معتبر باشد (مثلاً https://…).']);
+    }
+
     public function test_viewer_cannot_change_or_see_relay_code(): void
     {
         $u = $this->userWith(['bots.view']);
