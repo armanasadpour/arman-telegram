@@ -26,6 +26,14 @@
         @csrf
         <input type="hidden" name="job_key" value="{{ old('job_key', $jobKey) }}">
         <section class="card step">
+          <div class="field">
+            <label for="pkg_customer">👤 نام کاربر <span class="text-danger">*</span></label>
+            <input id="pkg_customer" name="comment" class="input" required maxlength="100" value="{{ ! $manualFirst ? old('comment') : '' }}" placeholder="مثلاً علی رضایی" autocomplete="off">
+            @error('comment')<div class="error">{{ $message }}</div>@enderror
+          </div>
+        </section>
+
+        <section class="card step">
           <header class="step-head"><span class="step-no">۱</span><div><h2>انتخاب بسته</h2><p class="muted small">گروه سرور، مدت، حجم و تعداد اتصال از بسته گرفته و قیمت لحظه ساخت ثبت می‌شود.</p></div></header>
           <div class="picks">
             @foreach($packages as $i => $row)
@@ -54,7 +62,6 @@
           <header class="step-head"><span class="step-no">۲</span><div><h2>نام کاربری و رمز</h2><p class="muted small">هر دو اختیاری‌اند؛ خالی بمانند خودکار ساخته می‌شوند.</p></div></header>
           <div class="form-grid">
             @include('accounts._credentials', ['prefix' => 'pkg_', 'withOld' => ! $manualFirst])
-            <div class="field"><label for="pkg_comment">توضیح (اختیاری)</label><input id="pkg_comment" name="comment" class="input" maxlength="100" placeholder="مثلاً نام مشتری یا شماره سفارش" value="{{ ! $manualFirst ? old('comment') : '' }}"></div>
           </div>
         </section>
 
@@ -74,6 +81,14 @@
       <form method="post" action="{{ route('accounts.store') }}" class="create-form">
         @csrf
         <input type="hidden" name="job_key" value="{{ old('job_key', $jobKey) }}">
+        <section class="card step">
+          <div class="field">
+            <label for="customer">👤 نام کاربر <span class="text-danger">*</span></label>
+            <input id="customer" name="comment" class="input" required maxlength="100" value="{{ $manualFirst ? old('comment') : '' }}" placeholder="مثلاً علی رضایی" autocomplete="off">
+            @error('comment')<div class="error">{{ $message }}</div>@enderror
+          </div>
+        </section>
+
         <section class="card step">
           <header class="step-head"><span class="step-no">۱</span><div><h2>گروه سرور</h2><p class="muted small">مدت اعتبار، تعداد اتصال و تعرفه از گروه گرفته می‌شود.</p></div></header>
           <div class="picks picks-sm">
@@ -98,7 +113,6 @@
           <header class="step-head"><span class="step-no">۲</span><div><h2>نام کاربری و رمز</h2><p class="muted small">نام کاربری: حروف کوچک انگلیسی، عدد، نقطه، خط تیره، زیرخط. رمز: هر چیزی.</p></div></header>
           <div class="form-grid">
             @include('accounts._credentials', ['prefix' => '', 'withOld' => $manualFirst])
-            <div class="field"><label for="comment">توضیح (اختیاری)</label><input id="comment" name="comment" class="input" value="{{ $manualFirst ? old('comment') : '' }}" maxlength="150" placeholder="مثلاً نام مشتری یا شماره سفارش"></div>
           </div>
         </section>
 

@@ -91,7 +91,7 @@ class MtDevicesTest extends MikrotikTestCase
     public function test_pages_and_bot_message_show_every_device(): void
     {
         $admin = $this->superAdmin();
-        $this->actingAs($admin)->post('/mt/accounts', ['job_key' => (string) Str::uuid(), 'mt_group_id' => $this->wg->id, 'username' => 'two', 'multi_login' => 2]);
+        $this->actingAs($admin)->post('/mt/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'mt_group_id' => $this->wg->id, 'username' => 'two', 'multi_login' => 2]);
         $a = MtAccount::query()->firstOrFail();
         $this->actingAs($admin)->confirmed()->get(route('mt.accounts.connect', $a))->assertOk()->assertSee('دستگاه ۲ از ۲')->assertSee('two-2.conf');
         $this->assertSame(2, substr_count(CustomerOrders::mtCredentials($a), 'PrivateKey'));

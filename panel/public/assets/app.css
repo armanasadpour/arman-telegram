@@ -502,3 +502,4 @@ details.card.adv>summary{cursor:pointer;list-style:none}
 details.card.adv>summary::-webkit-details-marker{display:none}
 h2.inline{display:inline}
 @media (max-width:640px){.connect-grid{grid-template-columns:1fr}.qr-box{max-width:280px;margin:0 auto}}
+.acc-customer{font-size:.9rem;font-weight:700;color:var(--text);line-height:1.6}

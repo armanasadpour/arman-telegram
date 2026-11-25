@@ -29,6 +29,14 @@
         @csrf
         <input type="hidden" name="job_key" value="{{ old('job_key', $jobKey) }}">
         <section class="card step">
+          <div class="field">
+            <label for="pkg_customer">👤 نام کاربر <span class="text-danger">*</span></label>
+            <input id="pkg_customer" name="comment" class="input" required maxlength="100" value="{{ ! $manualFirst ? old('comment') : '' }}" placeholder="مثلاً علی رضایی" autocomplete="off">
+            @error('comment')<div class="error">{{ $message }}</div>@enderror
+          </div>
+        </section>
+
+        <section class="card step">
           <header class="step-head"><span class="step-no">۱</span><div><h2>انتخاب بسته</h2></div></header>
           <div class="picks">
             @foreach($packages as $i => $row)
@@ -53,7 +61,6 @@
           <header class="step-head"><span class="step-no">۲</span><div><h2>نام کاربری و رمز</h2><p class="muted small">اختیاری؛ رمز فقط برای L2TP است (WireGuard کلید می‌گیرد).</p></div></header>
           <div class="form-grid">
             @include('accounts._credentials', ['prefix' => 'pkg_', 'withOld' => ! $manualFirst])
-            <div class="field"><label for="pkg_comment">توضیح (اختیاری)</label><input id="pkg_comment" name="comment" class="input" maxlength="100" value="{{ ! $manualFirst ? old('comment') : '' }}" placeholder="نام مشتری یا شماره سفارش"></div>
           </div>
         </section>
         <div class="submit-bar"><div class="muted small"><x-icon name="key"/> بعد از ساخت، اطلاعات اتصال (و QR برای WireGuard) نمایش داده می‌شود.</div><button class="btn btn-lg" type="submit"><x-icon name="box"/>ساخت از بسته</button></div>
@@ -65,6 +72,14 @@
       <form method="post" action="{{ route('mt.accounts.store') }}" class="create-form">
         @csrf
         <input type="hidden" name="job_key" value="{{ old('job_key', $jobKey) }}">
+        <section class="card step">
+          <div class="field">
+            <label for="customer">👤 نام کاربر <span class="text-danger">*</span></label>
+            <input id="customer" name="comment" class="input" required maxlength="100" value="{{ $manualFirst ? old('comment') : '' }}" placeholder="مثلاً علی رضایی" autocomplete="off">
+            @error('comment')<div class="error">{{ $message }}</div>@enderror
+          </div>
+        </section>
+
         <section class="card step">
           <header class="step-head"><span class="step-no">۱</span><div><h2>گروه و پروتکل</h2></div></header>
           <div class="picks picks-sm">
@@ -113,7 +128,6 @@
           <header class="step-head"><span class="step-no">۳</span><div><h2>نام کاربری و رمز</h2><p class="muted small">اختیاری؛ خالی = خودکار.</p></div></header>
           <div class="form-grid">
             @include('accounts._credentials', ['prefix' => '', 'withOld' => $manualFirst])
-            <div class="field"><label for="comment">توضیح (اختیاری)</label><input id="comment" name="comment" class="input" maxlength="150" value="{{ $manualFirst ? old('comment') : '' }}" placeholder="نام مشتری یا شماره سفارش"></div>
           </div>
         </section>
         <div class="submit-bar"><div class="muted small"><x-icon name="key"/> بعد از ساخت، اطلاعات اتصال نمایش داده می‌شود.</div><button class="btn btn-lg" type="submit"><x-icon name="user"/>ساخت اکانت روی روتر</button></div>

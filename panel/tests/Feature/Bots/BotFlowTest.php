@@ -136,8 +136,9 @@ class BotFlowTest extends BotTestCase
         $this->assertCount(0, $this->fake->users);
 
         $this->tg(Engine::PARTNER_LOGIN, chat: '999');
-        $this->tg($code, chat: '999');
-        $this->assertStringContainsString('معتبر نیست', $this->lastText());
+        $this->tg($code, chat: '999');   // a used code is no longer a code: treated as a username
+        $this->tg('anything', chat: '999');
+        $this->assertStringContainsString('درست نیست', $this->lastText());
         $this->assertNull(BotUser::query()->where('chat_id', '999')->value('user_id'));
     }
 

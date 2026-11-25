@@ -52,7 +52,7 @@
 
   <div class="card">
     <form method="get" class="form-grid mb-8">
-      <div class="field"><label for="q">جستجو</label><input id="q" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="نام کاربری یا توضیح"></div>
+      <div class="field"><label for="q">جستجو</label><input id="q" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="نام کاربری یا نام کاربر"></div>
       <div class="field"><label for="status">وضعیت</label>
         <select id="status" name="status" class="input">
           <option value="">همه</option>
@@ -91,7 +91,7 @@
           <tbody>
           @foreach($accounts as $a)
             <tr>
-              <td data-label="نام کاربری"><a href="{{ route('accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a></td>
+              <td data-label="نام کاربری"><a href="{{ route('accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a>@if($a->displayComment())<div class="small">👤 {{ $a->displayComment() }}</div>@endif</td>
               <td data-label="گروه"><bdi>{{ $a->group_name }}</bdi></td>
               <td data-label="سازنده" class="small">{{ $a->creatorLabel() }}</td>
               <td data-label="وضعیت">@include('accounts._status', ['a' => $a])</td>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Bots\BotApiException;
 use App\Bots\Platforms;
 use App\Bots\RelayCode;
+use App\Bots\TelegramLike;
 use App\Http\Controllers\Controller;
 use App\Models\Bot;
 use App\Models\BotOutbox;
@@ -54,6 +55,7 @@ class BotsController extends Controller
             'token' => ['nullable', 'string', 'max:200', 'regex:/^[A-Za-z0-9:_\-]+$/'],
             'is_active' => ['nullable', 'boolean'],
             'relay_mode' => ['nullable', 'in:direct,cloudflare,gas'],
+            'receive' => ['nullable', 'in:webhook,poll'],
             'relay_url' => ['nullable', 'url:https', 'max:500'],
         ], ['token.regex' => 'توکن فقط حروف انگلیسی، عدد و «:_-» دارد.'], ['token' => 'توکن', 'relay_url' => 'آدرس واسط']);
         $before = ['active' => $bot->is_active, 'relay_mode' => $bot->relay_mode, 'relay_url' => $bot->relay_url];
@@ -65,6 +67,7 @@ class BotsController extends Controller
         $bot->is_active = (bool) ($d['is_active'] ?? false);
         if ($platform === 'telegram') {
             $bot->relay_mode = $d['relay_mode'] ?? 'direct';
+            $this->settings->set('bots.telegram_receive', $d['receive'] ?? 'webhook');
             $bot->relay_url = $bot->relay_mode === 'direct' ? null : ($d['relay_url'] ?? null);
             if ($bot->relay_mode !== 'direct' && ! $bot->relay_url) {
                 return back()->withInput()->withErrors(['relay_url' => 'برای حالت واسط، آدرس واسط لازم است.']);
@@ -107,11 +110,22 @@ class BotsController extends Controller
             return back()->with('error', $e->getMessage())->with('probe', [$platform => ['raw' => null]]);
         }
         $bot->forceFill(['bot_username' => $me['username'], 'webhook_set_at' => now(), 'last_error' => null, 'last_error_at' => null])->save();
+        $warn = null;
+        if ($url !== 'polling' && $api instanceof TelegramLike) {
+            try {
+                $info = $api->webhookInfo();
+                if (! empty($info['last_error_message'])) {
+                    $warn = 'تلگرام نتوانسته پیام را به هاست برساند: '.mb_substr((string) $info['last_error_message'], 0, 150).'. اگر ادامه داشت، «دریافت پیام» را روی «دوره‌ای» بگذارید.';
+                }
+            } catch (BotApiException) {
+            }
+        }
         $this->audit->log('bots.connect', $bot, 'اتصال وبهوک ربات '.$bot->label());
 
         return back()->with('success', 'ربات '.$bot->label().($me['username'] ? ' (@'.$me['username'].')' : '').' وصل شد. '
             .($url === 'polling' ? 'پیام‌ها از مسیر واسط هر چند ثانیه توسط پنل دریافت می‌شود (Cron هر دقیقه لازم است).' : 'آدرس دریافت پیام‌ها ثبت شد.'))
-            ->with('probe', [$platform => ['raw' => $me['raw'], 'url' => preg_replace('#/hook/([a-z]+)/[A-Za-z0-9]+#', '/hook/$1/…', $url)]]);
+            ->with('probe', [$platform => ['raw' => $me['raw'], 'url' => preg_replace('#/hook/([a-z]+)/[A-Za-z0-9]+#', '/hook/$1/…', $url)]])
+            ->with('warning', $warn);
     }
 
     /** Can this host reach each platform's API at all? (no token is sent) */

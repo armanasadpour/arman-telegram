@@ -49,7 +49,7 @@ abstract class BotTestCase extends ResellerTestCase
         $bot ??= Bot::for('telegram');
         $payload = ['update_id' => $updateId ?? ++$this->updateId, 'message' => ['message_id' => $this->updateId, 'chat' => ['id' => (int) $chat, 'type' => 'private'],
             'from' => ['id' => (int) $chat, 'first_name' => 'Ali', 'username' => 'ali'], 'text' => $text]];
-        $headers = $bot->platform === 'telegram' ? [$bot->relay_mode === 'direct' ? 'X-Telegram-Bot-Api-Secret-Token' : 'X-Relay-Secret' => $bot->relaySecret()] : [];
+        $headers = $bot->platform === 'telegram' ? ['X-Telegram-Bot-Api-Secret-Token' => $bot->relaySecret()] : [];
 
         return $this->withHeaders($headers)->postJson('/hook/'.$bot->platform.'/'.$bot->hook_secret, $payload);
     }

@@ -11,8 +11,8 @@ class PasswordRulesTest extends ResellerTestCase
     public function test_any_password_for_new_account_manual_and_from_package(): void
     {
         $admin = $this->superAdmin();
-        $this->actingAs($admin)->post('/accounts', ['job_key' => (string) Str::uuid(), 'username' => 'free1', 'password' => '1', 'group' => 'test'])->assertSessionHasNoErrors();
-        $this->actingAs($admin)->post('/accounts/from-package', ['job_key' => (string) Str::uuid(), 'package_id' => $this->newPkg->id, 'username' => 'free2', 'password' => 'رمز ساده 12!'])->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post('/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'username' => 'free1', 'password' => '1', 'group' => 'test'])->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post('/accounts/from-package', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'package_id' => $this->newPkg->id, 'username' => 'free2', 'password' => 'رمز ساده 12!'])->assertSessionHasNoErrors();
         $pw = array_column($this->fake->users, 'password', 'username');
         $this->assertSame('1', $pw['free1']);
         $this->assertSame('رمز ساده 12!', $pw['free2']);

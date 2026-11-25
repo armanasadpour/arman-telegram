@@ -54,6 +54,11 @@ class Rubika implements Platform
         $this->call('sendMessage', $params);
     }
 
+    public function sendPhoto(string $chatId, string $png, string $caption = ''): bool
+    {
+        return false;   // Rubika file upload is a separate flow: the config text is sent instead
+    }
+
     public function getMe(): array
     {
         $d = $this->call('getMe', []);

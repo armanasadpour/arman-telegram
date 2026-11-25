@@ -3,6 +3,7 @@
 namespace App\Bots;
 
 use App\Models\Bot;
+use App\Services\Settings;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -37,6 +38,26 @@ class TelegramLike implements Platform
         $this->call('sendMessage', $params);
     }
 
+    public function sendPhoto(string $chatId, string $png, string $caption = ''): bool
+    {
+        if ($this->mode() === 'gas') {
+            return false;   // Apps Script relay forwards form fields only
+        }
+        $token = (string) $this->bot->token;
+        $url = match ($this->mode()) {
+            'cloudflare' => rtrim((string) $this->bot->relay_url, '/').'/bot'.$token.'/sendPhoto',
+            default => $this->base().$token.'/sendPhoto',
+        };
+        try {
+            $res = Http::timeout(30)->connectTimeout(10)->attach('photo', $png, 'qr.png', ['Content-Type' => 'image/png'])
+                ->post($url, ['chat_id' => $chatId, 'caption' => mb_substr($caption, 0, 1000)]);
+        } catch (ConnectionException) {
+            return false;
+        }
+
+        return (bool) (json_decode((string) $res->body(), true)['ok'] ?? false);
+    }
+
     public function getMe(): array
     {
         $r = $this->call('getMe', []);
@@ -47,7 +68,15 @@ class TelegramLike implements Platform
     /** True when Telegram goes through a relay: updates are then fetched by the panel (getUpdates), no webhook. */
     public function polls(): bool
     {
-        return $this->mode() !== 'direct';
+        return $this->mode() !== 'direct' && app(Settings::class)->get('bots.telegram_receive', 'webhook') === 'poll';
+    }
+
+    /** Telegram's view of the webhook (pending updates, last delivery error). */
+    public function webhookInfo(): array
+    {
+        $r = $this->call('getWebhookInfo', []);
+
+        return is_array($r) ? $r : [];
     }
 
     /** @return list<array> raw updates */
@@ -66,14 +95,11 @@ class TelegramLike implements Platform
 
             return 'polling';
         }
-        $url = match ($this->mode()) {
-            'cloudflare' => rtrim((string) $this->bot->relay_url, '/').'/hook',
-            'gas' => (string) $this->bot->relay_url.'?s='.$this->bot->relaySecret(),
-            default => $this->bot->hookUrl(),
-        };
-        $params = ['url' => $url, 'allowed_updates' => ['message']];
-        if ($this->bot->platform === 'telegram' && $this->mode() !== 'gas') {
-            $params['secret_token'] = $this->bot->relaySecret();   // checked by the worker, or by the panel when direct
+        // Telegram delivers straight to the panel (even when sending goes through a relay).
+        $url = $this->bot->hookUrl();
+        $params = ['url' => $url, 'allowed_updates' => ['message'], 'drop_pending_updates' => false];
+        if ($this->bot->platform === 'telegram') {
+            $params['secret_token'] = $this->bot->relaySecret();   // checked by the panel
         }
         $this->call('setWebhook', $params);
 

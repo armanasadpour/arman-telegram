@@ -248,7 +248,7 @@ Artisan::command('bots:poll', function () {
         return 0;
     }
     $bot = Bot::for('telegram');
-    if (! $bot->is_active || ! $bot->isConfigured() || $bot->relay_mode === 'direct') {
+    if (! $bot->is_active || ! $bot->isConfigured() || $bot->relay_mode === 'direct' || app(Settings::class)->get('bots.telegram_receive', 'webhook') !== 'poll') {
         return 0;
     }
     $lock = Cache::lock('bots:poll', 70);
@@ -259,12 +259,12 @@ Artisan::command('bots:poll', function () {
         $api = app(Platforms::class)->for($bot);
         $handler = app(UpdateHandler::class);
         $settings = app(Settings::class);
-        $deadline = microtime(true) + (int) config('panel.bot_poll_seconds', 50);
+        $deadline = microtime(true) + (int) config('panel.bot_poll_seconds', 56);
         $n = 0;
         do {
             $offset = (int) $settings->get('bots.telegram_offset', '0');
             $left = (int) ($deadline - microtime(true));
-            $updates = $api->getUpdates($offset, max(0, min(20, $left - 2)));
+            $updates = $api->getUpdates($offset, max(0, min(25, $left - 2)));
             foreach ($updates as $u) {
                 $settings->set('bots.telegram_offset', (string) ((int) ($u['update_id'] ?? 0) + 1));
                 $n += (int) ($handler->handle($bot, $u) === 'handled');

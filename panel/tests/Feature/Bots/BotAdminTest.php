@@ -59,6 +59,7 @@ class BotAdminTest extends BotTestCase
     public function test_cloudflare_relay_is_transparent_and_messages_are_polled(): void
     {
         $bot = $this->bot('telegram', ['relay_mode' => 'cloudflare', 'relay_url' => 'https://relay.example.workers.dev/']);
+        app(Settings::class)->set('bots.telegram_receive', 'poll');
         $admin = $this->superAdmin();
         $code = $this->actingAs($admin)->confirmed()->get('/bots/relay/cloudflare')->assertOk()->viewData('code');
         $this->assertStringContainsString('"https://api.telegram.org" + url.pathname', $code, 'same worker as the news plugin');
@@ -93,9 +94,25 @@ class BotAdminTest extends BotTestCase
         $this->assertSame(1, \DB::table('bot_updates')->count(), 'each update handled once');
     }
 
+    public function test_relay_for_sending_and_fast_direct_webhook_for_receiving(): void
+    {
+        $bot = $this->bot('telegram', ['relay_mode' => 'cloudflare', 'relay_url' => 'https://relay.example.workers.dev']);
+        $this->actingAs($this->superAdmin())->from('/bots')->post('/bots/telegram/connect')->assertSessionHas('success');
+        $req = $this->request('relay.example.workers.dev/bot123456:SECRET-TOKEN_abc/setWebhook');
+        $this->assertNotNull($req, 'webhook registered through the relay');
+        $this->assertSame($bot->hookUrl(), $req->data()['url']);
+        $this->assertSame($bot->relaySecret(), $req->data()['secret_token']);
+        $this->withHeaders(['X-Telegram-Bot-Api-Secret-Token' => 'wrong'])->postJson('/hook/telegram/'.$bot->hook_secret, ['update_id' => 5])->assertForbidden();
+        $this->tg('/start')->assertOk();   // Telegram's own header
+        $this->assertNotNull($this->request('relay.example.workers.dev/bot123456:SECRET-TOKEN_abc/sendMessage'), 'answer goes out through the relay');
+        $this->artisan('bots:poll')->assertSuccessful();
+        $this->assertNull($this->request('/getUpdates'), 'no polling in webhook mode');
+    }
+
     public function test_apps_script_relay_payload(): void
     {
         $bot = $this->bot('telegram', ['relay_mode' => 'gas', 'relay_url' => 'https://script.google.com/macros/s/ABC/exec']);
+        app(Settings::class)->set('bots.telegram_receive', 'poll');
         $this->freshHttpFake();
         Http::fake(['script.google.com/*' => Http::response('{"ok":true,"result":{"username":"panel_bot"}}', 200, ['Content-Type' => 'text/plain'])]);
         $this->actingAs($this->superAdmin())->from('/bots')->post('/bots/telegram/connect')->assertSessionHas('success');

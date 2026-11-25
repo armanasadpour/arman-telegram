@@ -23,7 +23,7 @@
 
   <div class="card">
     <form method="get" class="form-grid mb-8">
-      <div class="field"><label for="q">جستجو</label><input id="q" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="نام کاربری، توضیح یا IP"></div>
+      <div class="field"><label for="q">جستجو</label><input id="q" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="نام کاربری، نام کاربر یا IP"></div>
       <div class="field"><label for="status">وضعیت</label>
         <select id="status" name="status" class="input"><option value="">همه</option>
           @foreach(['online' => 'آنلاین', 'active' => 'فعال', 'not_started' => 'شروع‌نشده', 'expiring' => 'انقضا تا ۳ روز آینده', 'expired' => 'منقضی', 'depleted' => 'حجم تمام‌شده', 'disabled' => 'غیرفعال', 'pending' => 'در حال ساخت', 'failed' => 'ناموفق', 'deleted' => 'حذف‌شده'] as $k => $v)
@@ -58,7 +58,7 @@
           @foreach($accounts as $a)
             @php($lbl = $a->statusLabel())
             <tr>
-              <td><a href="{{ route('mt.accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a>@if($a->is_online) <span class="badge badge-success">آنلاین</span>@endif
+              <td><a href="{{ route('mt.accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a>@if($a->is_online) <span class="badge badge-success">آنلاین</span>@endif @if($a->comment)<div class="small">👤 {{ $a->comment }}</div>@endif
 </td>
               <td>{{ $a->protocolLabel() }}<div class="muted small">{{ $a->group?->name }}</div></td>
               <td class="small">{{ $a->creatorLabel() }}</td>

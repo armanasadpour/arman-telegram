@@ -7,7 +7,8 @@
     <span @class(['acc-avatar', 'is-online' => $a->is_online])>{{ mb_strtoupper(mb_substr($a->username, 0, 1)) }}</span>
     <div class="acc-id">
       <bdi class="acc-name ltr">{{ $a->username }}</bdi>
-      <span class="acc-group"><bdi>{{ $a->group_name ?? "—" }}</bdi>@if(! request()->routeIs("portal.*")) · 👤 {{ $a->creatorLabel() }}@endif</span>
+      @if($a->displayComment())<span class="acc-customer">👤 {{ $a->displayComment() }}</span>@endif
+      <span class="acc-group"><bdi>{{ $a->group_name ?? "—" }}</bdi>@if(! request()->routeIs("portal.*")) · 🛠 {{ $a->creatorLabel() }}@endif</span>
     </div>
     <span class="acc-chevron" aria-hidden="true">‹</span>
   </div>

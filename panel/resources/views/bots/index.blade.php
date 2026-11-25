@@ -73,10 +73,19 @@
                 </select>
                 <div class="help">هاست ایران معمولاً به تلگرام دسترسی ندارد؛ یکی از دو واسط را بسازید.</div>
               </div>
+              @php($receive = app(\App\Services\Settings::class)->get('bots.telegram_receive', 'webhook'))
+              <div class="field">
+                <label for="receive">دریافت پیام کاربران (وقتی واسط دارید)</label>
+                <select class="input" id="receive" name="receive">
+                  <option value="webhook" @selected(old('receive', $receive) === 'webhook')>سریع — تلگرام مستقیم به هاست می‌فرستد (پیشنهادی)</option>
+                  <option value="poll" @selected(old('receive', $receive) === 'poll')>دوره‌ای — پنل از مسیر واسط می‌گیرد (کندتر، با Cron)</option>
+                </select>
+                <div class="help">فقط ارسال به تلگرام از هاست ایران بسته است؛ رسیدن پیام از تلگرام به هاست معمولاً باز است. اگر بعد از «اتصال» خطای دریافت دیدید، «دوره‌ای» را انتخاب کنید.</div>
+              </div>
               <div class="field">
                 <label for="relay_url">آدرس واسط</label>
                 <input class="input ltr" id="relay_url" name="relay_url" value="{{ old('relay_url', $bot->relay_url) }}" placeholder="https://xxx.workers.dev یا https://script.google.com/macros/s/…/exec">
-                <div class="help">همان آدرس Worker یا Apps Script افزونه خبر (بستک‌نیوز) هم کار می‌کند. پیام‌ها را پنل هر چند ثانیه خودش می‌گیرد.<br><a href="{{ route('bots.relay', 'cloudflare') }}">کد و راهنمای Cloudflare Worker</a> — <a href="{{ route('bots.relay', 'gas') }}">کد و راهنمای Google Apps Script</a></div>
+                <div class="help">همان آدرس Worker یا Apps Script افزونه خبر (بستک‌نیوز) هم کار می‌کند.<br><a href="{{ route('bots.relay', 'cloudflare') }}">کد و راهنمای Cloudflare Worker</a> — <a href="{{ route('bots.relay', 'gas') }}">کد و راهنمای Google Apps Script</a></div>
               </div>
             @endif
             <div class="field">

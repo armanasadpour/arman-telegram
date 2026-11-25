@@ -54,7 +54,7 @@
         <dt>ساخت</dt><dd>{{ jdate($a->created_at) }}{{ $a->creator ? ' توسط '.$a->creator->name : '' }}</dd>
         @if($a->package)<dt>بسته</dt><dd>{{ $a->package->name }}</dd>@endif
         @if($a->reseller)<dt>همکار</dt><dd>{{ $a->reseller->name }} ({{ $a->reseller->code }})</dd>@endif
-        <dt>توضیح</dt><dd>{{ $a->comment ?: '—' }}</dd>
+        <dt>👤 نام کاربر</dt><dd>{{ $a->comment ?: '—' }}</dd>
       </dl>
     </div>
     <div class="card">

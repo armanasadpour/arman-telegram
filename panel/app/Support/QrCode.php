@@ -104,6 +104,34 @@ final class QrCode
         return $qr->modules;
     }
 
+    /** PNG bytes (needs ext-gd), or null when GD is missing. */
+    public static function png(string $data, int $scale = 8, string $ecl = 'M'): ?string
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            return null;
+        }
+        $m = self::matrix($data, $ecl);
+        $n = count($m);
+        $border = 4;
+        $size = ($n + 2 * $border) * $scale;
+        $img = imagecreatetruecolor($size, $size);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefill($img, 0, 0, $white);
+        foreach ($m as $y => $row) {
+            foreach ($row as $x => $dark) {
+                if ($dark) {
+                    imagefilledrectangle($img, ($x + $border) * $scale, ($y + $border) * $scale, ($x + $border + 1) * $scale - 1, ($y + $border + 1) * $scale - 1, $black);
+                }
+            }
+        }
+        ob_start();
+        imagepng($img);
+        imagedestroy($img);
+
+        return (string) ob_get_clean();
+    }
+
     public static function svg(string $data, int $scale = 6, string $ecl = 'M'): string
     {
         $m = self::matrix($data, $ecl);

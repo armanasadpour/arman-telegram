@@ -111,13 +111,13 @@ class AccountsHttpTest extends IbsTestCase
         $admin = $this->superAdmin();
         $id = $this->ibsUser('hamid');
         $this->actingAs($admin)->get('/accounts?q=hamid')->assertOk()->assertSee('جستجوی «hamid» در سرور');
-        $this->actingAs($admin)->from('/accounts/create')->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'hamid'])
+        $this->actingAs($admin)->from('/accounts/create')->post('/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'hamid'])
             ->assertSessionHas('error', fn ($m) => str_contains($m, 'وارد کردن یک اکانت از سرور'));
         $this->actingAs($admin)->post('/accounts/import', ['username' => 'hamid']);
         $a = VpnAccount::query()->where('username', 'hamid')->firstOrFail();
         app(AccountActions::class)->delete($a, 'test');
 
-        $this->actingAs($admin)->from('/accounts/create')->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'hamid']);
+        $this->actingAs($admin)->from('/accounts/create')->post('/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'hamid']);
         $new = VpnAccount::query()->where('username', 'hamid')->first();
         $this->assertNotNull($new, 'the name of a deleted account is free again');
         $this->assertNotSame($a->id, $new->id);
@@ -131,8 +131,8 @@ class AccountsHttpTest extends IbsTestCase
         $other = $this->userWith(['accounts.view', 'accounts.create'], ['name' => 'سارا']);
         $this->ibsUser('fromsrv');
         app(AccountSync::class)->importByUsername('fromsrv');
-        $this->actingAs($other)->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'bysara']);
-        $this->actingAs($boss)->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'byboss']);
+        $this->actingAs($other)->post('/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'bysara']);
+        $this->actingAs($boss)->post('/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'byboss']);
         $this->actingAs($boss)->get('/accounts')->assertOk()->assertSee('سارا')->assertSee('وارد‌شده از سرور');
         $this->actingAs($boss)->get('/accounts?creator='.$other->id)->assertSee('bysara')->assertDontSee('byboss')->assertDontSee('fromsrv');
         $this->actingAs($boss)->get('/accounts?creator=imported')->assertSee('fromsrv')->assertDontSee('bysara');

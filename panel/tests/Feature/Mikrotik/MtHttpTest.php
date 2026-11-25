@@ -38,7 +38,7 @@ class MtHttpTest extends MikrotikTestCase
     {
         $admin = $this->superAdmin();
         $this->actingAs($admin)->get('/mt/accounts/create')->assertOk()->assertSee('L2TP ایران')->assertSee('حجم و روز دلخواه');
-        $res = $this->actingAs($admin)->post('/mt/accounts', ['job_key' => (string) Str::uuid(), 'mt_group_id' => $this->wg->id, 'username' => 'shop.ali', 'days' => 45, 'volume_gb' => 15]);
+        $res = $this->actingAs($admin)->post('/mt/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'mt_group_id' => $this->wg->id, 'username' => 'shop.ali', 'days' => 45, 'volume_gb' => 15]);
         $a = MtAccount::query()->firstOrFail();
         $res->assertRedirect(route('mt.accounts.show', $a));
         $this->followRedirects($res)->assertSee('PrivateKey')->assertSee('<svg', false)->assertSee('۴۵ روز');
@@ -111,7 +111,7 @@ class MtHttpTest extends MikrotikTestCase
         $this->assertSame(['mikrotik', $this->wg->id, null], [$p->protocol, $p->mt_group_id, $p->ibs_group_name]);
         $this->actingAs($admin)->get('/packages')->assertOk()->assertSee('WireGuard');
         $this->actingAs($admin)->get('/mt/accounts/create')->assertOk()->assertSee('WG ۳۰ روز');
-        $res = $this->actingAs($admin)->post('/mt/accounts/from-package', ['job_key' => (string) Str::uuid(), 'package_id' => $p->id]);
+        $res = $this->actingAs($admin)->post('/mt/accounts/from-package', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'package_id' => $p->id]);
         $a = MtAccount::query()->firstOrFail();
         $this->assertSame([$p->id, 30, null], [$a->package_id, $a->duration_days, $a->volume_limit_bytes]);
         $res->assertRedirect(route('mt.accounts.show', $a));

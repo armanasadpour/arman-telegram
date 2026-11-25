@@ -50,7 +50,7 @@
         <dt>اولین اتصال</dt><dd>{{ $a->first_login_ibs ? jdate_local($a->first_login_ibs).' (به ساعت سرور)' : 'هنوز وصل نشده' }}</dd>
         <dt>ساخت در سرور</dt><dd>{{ $a->ibs_created_at ? jdate_local($a->ibs_created_at).' (به ساعت سرور)' : '—' }}</dd>
         <dt>منبع</dt><dd>{{ $a->source === 'panel' ? 'ساخته‌شده در پنل'.($a->creator ? ' توسط '.$a->creator->name : '') : 'وارد‌شده از سرور' }}</dd>
-        <dt>توضیح</dt><dd>{{ $a->displayComment() ?? '—' }}</dd>
+        <dt>👤 نام کاربر</dt><dd>{{ $a->displayComment() ?? "—" }}</dd>
         @if($a->locked)<dt>دلیل قفل</dt><dd>{{ $a->lock_reason }}</dd>@endif
       </dl>
     </div>

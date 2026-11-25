@@ -38,7 +38,7 @@ class PackageApplier
             'days' => $package->duration_days,
             'multi_login' => $package->multi_login,
             'volume_mb' => $package->volumeMb(),
-            'comment' => trim($package->name.' '.($opts['comment'] ?? '')),
+            'comment' => trim((string) ($opts['comment'] ?? '')) ?: $package->name,
             'package' => $quote->snapshot(),
         ], $actorId);
     }

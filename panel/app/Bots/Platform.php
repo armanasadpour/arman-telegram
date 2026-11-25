@@ -12,6 +12,9 @@ interface Platform
      */
     public function send(string $chatId, string $text, ?array $keyboard = null): void;
 
+    /** Send an image (e.g. a WireGuard QR). Returns false when this platform/route cannot send files. */
+    public function sendPhoto(string $chatId, string $png, string $caption = ''): bool;
+
     /** @return array{username: ?string, raw: mixed} */
     public function getMe(): array;
 

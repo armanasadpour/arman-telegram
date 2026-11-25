@@ -179,12 +179,12 @@ class ProvisioningTest extends IbsTestCase
     {
         $admin = $this->superAdmin();
         $key = (string) Str::uuid();
-        $r = $this->actingAs($admin)->post('/accounts', ['job_key' => $key, 'group' => 'test', 'username' => 'webuser']);
+        $r = $this->actingAs($admin)->post('/accounts', ['comment' => 'مشتری تست', 'job_key' => $key, 'group' => 'test', 'username' => 'webuser']);
         $a = VpnAccount::query()->where('username', 'webuser')->firstOrFail();
         $r->assertRedirect(route('accounts.show', $a))->assertSessionHas('new_password');
         $this->assertSame(session('new_password'), $this->fake->users[$a->ibs_user_id]['password']);
 
-        $r2 = $this->actingAs($admin)->post('/accounts', ['job_key' => $key, 'group' => 'test', 'username' => 'webuser']);
+        $r2 = $this->actingAs($admin)->post('/accounts', ['comment' => 'مشتری تست', 'job_key' => $key, 'group' => 'test', 'username' => 'webuser']);
         $r2->assertRedirect(route('accounts.show', $a))->assertSessionMissing('new_password');
         $this->assertCount(1, $this->fake->users);
         $this->assertFalse(AuditLog::query()->where('action', 'accounts.create')->get()->toJson() === '[]');

@@ -24,8 +24,9 @@ class WebhookController extends Controller
             return response()->json(['ok' => false], 404);
         }
         if ($bot->platform === 'telegram') {
-            $header = $bot->relay_mode === 'direct' ? 'X-Telegram-Bot-Api-Secret-Token' : 'X-Relay-Secret';
-            if (! hash_equals($bot->relaySecret(), (string) $request->header($header))) {
+            // Telegram's own header (direct webhook); X-Relay-Secret from relays deployed with older panel versions.
+            $given = (string) ($request->header('X-Telegram-Bot-Api-Secret-Token') ?? $request->header('X-Relay-Secret'));
+            if (! hash_equals($bot->relaySecret(), $given)) {
                 return response()->json(['ok' => false], 403);
             }
         }

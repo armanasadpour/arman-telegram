@@ -92,8 +92,8 @@ class MtAccountsController extends Controller
             'days' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'volume_gb' => ['nullable', 'numeric', 'min:0.1', 'max:100000'],
             'multi_login' => ['nullable', 'integer', 'min:1', 'max:50'],
-            'comment' => ['nullable', 'string', 'max:150'],
-        ], [], ['mt_group_id' => 'گروه', 'days' => 'مدت', 'volume_gb' => 'حجم']);
+            'comment' => ['required', 'string', 'max:100'],
+        ], [], ['mt_group_id' => 'گروه', 'days' => 'مدت', 'volume_gb' => 'حجم', 'comment' => 'نام کاربر']);
         $group = MtGroup::query()->findOrFail($d['mt_group_id']);
 
         return $this->created(fn () => $this->prov->create($group, $d['job_key'], $d, $request->user()->id));
@@ -107,8 +107,8 @@ class MtAccountsController extends Controller
             'package_id' => ['required', 'integer'],
             'username' => ['nullable', 'string', 'max:32'],
             'password' => ['nullable', 'string', 'max:64'],
-            'comment' => ['nullable', 'string', 'max:100'],
-        ]);
+            'comment' => ['required', 'string', 'max:100'],
+        ], [], ['comment' => 'نام کاربر']);
         $p = Package::query()->where('protocol', 'mikrotik')->where('type', 'new')->where('is_active', true)->findOrFail($d['package_id']);
         if (! $p->mtGroup) {
             return back()->withInput()->with('error', 'گروه این بسته وجود ندارد.');
@@ -116,7 +116,7 @@ class MtAccountsController extends Controller
 
         return $this->created(fn () => $this->prov->create($p->mtGroup, $d['job_key'], [
             'username' => $d['username'] ?? null, 'password' => $d['password'] ?? null, 'days' => $p->duration_days, 'volume_gb' => $p->volume_gb,
-            'multi_login' => $p->multi_login, 'comment' => trim($p->name.' '.($d['comment'] ?? '')), 'package_id' => $p->id,
+            'multi_login' => $p->multi_login, 'comment' => trim((string) $d['comment']), 'package_id' => $p->id,
         ], $request->user()->id));
     }
 

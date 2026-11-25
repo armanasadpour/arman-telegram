@@ -112,8 +112,8 @@ class AccountsController extends Controller
             'days' => ['nullable', 'integer', 'between:1,3650'],
             'multi_login' => ['nullable', 'integer', 'between:1,255'],
             'volume_mb' => ['nullable', 'integer', 'between:1,10000000'],
-            'comment' => ['nullable', 'string', 'max:150'],
-        ], [], ['username' => 'نام کاربری', 'password' => 'رمز', 'group' => 'گروه', 'days' => 'مدت (روز)', 'multi_login' => 'تعداد اتصال', 'volume_mb' => 'حجم', 'comment' => 'توضیح']);
+            'comment' => ['required', 'string', 'max:100'],
+        ], [], ['username' => 'نام کاربری', 'password' => 'رمز', 'group' => 'گروه', 'days' => 'مدت (روز)', 'multi_login' => 'تعداد اتصال', 'volume_mb' => 'حجم', 'comment' => 'نام کاربر']);
 
         // Generate here so the password can be shown once to the operator; the panel never stores it.
         $data['password'] = ($data['password'] ?? null) ?: Provisioning::generatePassword();
@@ -144,8 +144,8 @@ class AccountsController extends Controller
             'package_id' => ['required', 'integer', 'exists:packages,id'],
             'username' => ['nullable', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9_.-]*$/'],
             'password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/'],
-            'comment' => ['nullable', 'string', 'max:100'],
-        ], [], ['package_id' => 'بسته', 'username' => 'نام کاربری', 'password' => 'رمز', 'comment' => 'توضیح']);
+            'comment' => ['required', 'string', 'max:100'],
+        ], [], ['package_id' => 'بسته', 'username' => 'نام کاربری', 'password' => 'رمز', 'comment' => 'نام کاربر']);
         $package = Package::query()->findOrFail($d['package_id']);
         $d['password'] = ($d['password'] ?? null) ?: Provisioning::generatePassword();
         $resubmitted = ProvisioningJob::query()->where('job_key', $d['job_key'])->exists();

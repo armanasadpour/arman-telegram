@@ -2,6 +2,7 @@
 
 namespace App\Bots;
 
+use App\Ibs\ErrorMessages;
 use App\Ibs\IbsConnector;
 use App\Ibs\IbsException;
 use App\Ibs\IbsNotConfiguredException;
@@ -10,13 +11,17 @@ use App\Models\Bot;
 use App\Models\BotLinkCode;
 use App\Models\BotUser;
 use App\Models\CustomerOrder;
+use App\Models\IbsGroup;
 use App\Models\LedgerEntry;
 use App\Models\MtAccount;
+use App\Models\MtDevice;
+use App\Models\MtGroup;
 use App\Models\Package;
 use App\Models\Payment;
 use App\Models\ProvisioningJob;
 use App\Models\Reseller;
 use App\Models\ResellerSale;
+use App\Models\User;
 use App\Models\VpnAccount;
 use App\Payments\Payments;
 use App\Services\AuditLogger;
@@ -26,12 +31,19 @@ use App\Services\Finance\ResellerPricing;
 use App\Services\Finance\ResellerSales;
 use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
+use App\Services\Ibs\Provisioning;
+use App\Services\Mikrotik\MtProvisioning;
+use App\Services\Mikrotik\WgConfig;
+use App\Services\Pricing\PackageApplier;
 use App\Services\Pricing\PricingEngine;
 use App\Services\Settings;
+use App\Support\QrCode;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
 /**
@@ -62,6 +74,10 @@ class Engine
     public const STATUS = '📊 وضعیت سیستم';
 
     public const LOGOUT = '🚪 خروج از حساب پنل';
+
+    public const CREATE = '➕ ساخت اکانت';
+
+    public const UNLIMITED = '♾ نامحدود';
 
     public const HOME = '🏠 منوی اصلی';
 
@@ -169,6 +185,9 @@ class Engine
         }
         $rows[] = [self::PRICES, self::SUPPORT];
         if ($user && $user->is_active) {
+            if (! $isReseller && ($user->hasPermission('accounts.create') || $user->hasPermission('mt_accounts.create'))) {
+                array_unshift($rows, [self::CREATE]);
+            }
             if (! $isReseller && $user->hasPermission('dashboard.view')) {
                 $rows[] = [self::STATUS];
             }
@@ -202,7 +221,8 @@ class Engine
             self::LINK => $this->ask($u, 'link_user', [], 'نام کاربری اکانت خود را بفرستید:'),
             self::PRICES => $this->prices($u),
             self::SUPPORT => $this->menu($u, $this->settings->get('bots.support_text') ?: 'برای پشتیبانی با فروشنده یا مدیر تماس بگیرید.'),
-            self::PARTNER_LOGIN => $this->ask($u, 'link_code', [], 'کد اتصال را از پنل (بخش «اتصال به ربات») دریافت کنید و اینجا بفرستید:'),
+            self::PARTNER_LOGIN => $this->ask($u, 'login_user', [], 'نام کاربری پنل را بفرستید (یا کد اتصال از بخش «اتصال به ربات»):'),
+            self::CREATE => $this->mkStart($u),
             self::WALLET => $this->wallet($u),
             self::SELL => $this->sellStart($u),
             self::RENEW => $this->ask($u, 'renew_acc', [], 'نام کاربری اکانتی را که می‌خواهید تمدید یا حجمش را افزایش دهید بفرستید:'),
@@ -228,6 +248,15 @@ class Engine
             'link_user' => $this->ask($u, 'link_pass', ['username' => mb_substr($text, 0, 64)], 'رمز عبور اکانت را بفرستید:'),
             'link_pass' => $this->linkAccount($u, (string) ($d['username'] ?? ''), $text, $in),
             'link_code' => $this->tryLinkCode($u, $text),
+            'login_user' => BotLinkCode::query()->where('code_hash', BotLinkCode::hash(preg_replace('/\s+/', '', $text)))->whereNull('used_at')->exists()
+                ? $this->tryLinkCode($u, $text)
+                : $this->ask($u, 'login_pass', ['username' => mb_substr($text, 0, 64)], 'رمز عبور پنل را بفرستید (پیام رمز بلافاصله پاک می‌شود):'),
+            'login_pass' => $this->panelLogin($u, (string) ($d['username'] ?? ''), $text, $in),
+            'mk_proto' => $this->mkProto($u, $text),
+            'mk_plan' => $this->mkPlan($u, $text),
+            'mk_days' => $this->mkDays($u, $text),
+            'mk_vol' => $this->mkVol($u, $text),
+            'mk_name' => $this->mkCreate($u, $text),
             'sell_pkg' => $this->sellPicked($u, $text),
             'sell_user' => $this->sellUsername($u, $text),
             'sell_pass' => $this->sellPassword($u, $text, $in),
@@ -412,6 +441,234 @@ class Engine
         $u->setRelation('user', $user);
         $this->audit->log('bots.linked', $user, 'اتصال '.$this->bot->label().' به حساب «'.$user->username.'»', [], null);
         $this->menu($u, '✅ این گفتگو به حساب «'.$user->name.'» در پنل وصل شد.');
+    }
+
+    // ------------------------------------------------------------------ panel login (username + password)
+
+    private function panelLogin(BotUser $u, string $username, string $password, Incoming $in): void
+    {
+        $u->setState(null);
+        if ($in->messageId) {
+            $this->api->deleteMessage($u->chat_id, $in->messageId);
+        }
+        if ($u->login_blocked_until && $u->login_blocked_until->isFuture()) {
+            $this->menu($u, 'به دلیل تلاش‌های ناموفق، کمی بعد دوباره تلاش کنید.');
+
+            return;
+        }
+        $user = User::query()->where('username', $username)->first();
+        $ok = $user && $user->is_active && Hash::check($password, $user->password);
+        if (! $ok) {
+            $fails = $u->failed_logins + 1;
+            $u->forceFill($fails >= self::MAX_FAILED ? ['failed_logins' => 0, 'login_blocked_until' => now()->addMinutes(30)] : ['failed_logins' => $fails])->save();
+            $this->menu($u, 'نام کاربری یا رمز عبور پنل درست نیست.');
+
+            return;
+        }
+        $u->forceFill(['user_id' => $user->id, 'failed_logins' => 0])->save();
+        $u->setRelation('user', $user);
+        $this->audit->log('bots.linked', $user, 'ورود به '.$this->bot->label().' با نام کاربری و رمز', [], null);
+        $this->menu($u, '✅ خوش آمدید '.$user->name.'. این گفتگو به حساب پنل شما وصل شد.');
+    }
+
+    // ------------------------------------------------------------------ staff: create an account (OpenVPN / L2TP / WireGuard)
+
+    private const PROTOS = ['🔐 OpenVPN' => 'openvpn', '📡 L2TP' => 'l2tp', '🛡 WireGuard' => 'wireguard'];
+
+    private function staff(BotUser $u): ?User
+    {
+        $user = $u->user;
+
+        return $user && $user->is_active && ! $user->isReseller() ? $user : null;
+    }
+
+    private function mkStart(BotUser $u): void
+    {
+        $user = $this->staff($u);
+        if (! $user) {
+            $this->menu($u, 'این بخش برای مدیران است.');
+
+            return;
+        }
+        $opts = [];
+        if ($user->hasPermission('accounts.create') && $this->ibs->isConfigured()) {
+            $opts['🔐 OpenVPN'] = 'openvpn';
+        }
+        if ($user->hasPermission('mt_accounts.create')) {
+            foreach (['l2tp' => '📡 L2TP', 'wireguard' => '🛡 WireGuard'] as $p => $label) {
+                if (MtGroup::query()->where('protocol', $p)->where('is_active', true)->exists()) {
+                    $opts[$label] = $p;
+                }
+            }
+        }
+        if (! $opts) {
+            $this->menu($u, 'گروهی برای ساخت اکانت تعریف نشده یا دسترسی ندارید.');
+
+            return;
+        }
+        $this->ask($u, 'mk_proto', ['opts' => $opts], 'نوع اکانت را انتخاب کنید:', array_map(fn ($l) => [$l], array_keys($opts)));
+    }
+
+    private function mkProto(BotUser $u, string $text): void
+    {
+        $proto = ($u->state_data['opts'] ?? [])[$text] ?? null;
+        if (! $proto || ! $this->staff($u)) {
+            $this->mkStart($u);
+
+            return;
+        }
+        $opts = [];
+        $pkgs = Package::query()->with('mtGroup')->where('is_active', true)->where('type', 'new')
+            ->where('protocol', $proto === 'openvpn' ? 'openvpn' : 'mikrotik')->orderBy('sort_order')->orderBy('price_rial')->limit(15)->get();
+        foreach ($pkgs as $p) {
+            if ($proto !== 'openvpn' && $p->mtGroup?->protocol !== $proto) {
+                continue;
+            }
+            $opts['📦 '.$p->name.' — '.$p->summary()] = 'p:'.$p->id;
+        }
+        $groups = $proto === 'openvpn'
+            ? IbsGroup::query()->with('charge')->where('present', true)->orderBy('name')->limit(10)->get()->mapWithKeys(fn ($g) => ['⚙️ گروه '.$g->name.' (روز و حجم دلخواه)' => 'g:'.$g->name])
+            : MtGroup::query()->where('protocol', $proto)->where('is_active', true)->orderBy('name')->limit(10)->get()->mapWithKeys(fn ($g) => ['⚙️ گروه '.$g->name.' (روز و حجم دلخواه)' => 'g:'.$g->id]);
+        $opts += $groups->all();
+        if (! $opts) {
+            $this->menu($u, 'برای این نوع، بسته یا گروه فعالی نیست.');
+
+            return;
+        }
+        $this->ask($u, 'mk_plan', ['proto' => $proto, 'opts' => $opts], 'بسته یا گروه را انتخاب کنید:', array_map(fn ($l) => [$l], array_keys($opts)));
+    }
+
+    private function mkPlan(BotUser $u, string $text): void
+    {
+        $d = $u->state_data ?? [];
+        $pick = ($d['opts'] ?? [])[$text] ?? null;
+        if (! $pick) {
+            $this->ask($u, 'mk_plan', $d, 'یکی از گزینه‌ها را انتخاب کنید.', array_map(fn ($l) => [$l], array_keys($d['opts'] ?? [])));
+
+            return;
+        }
+        $d = ['proto' => $d['proto'], 'pick' => $pick];
+        if (str_starts_with($pick, 'p:')) {
+            $this->ask($u, 'mk_name', $d, '👤 نام کاربر (مشتری) را بفرستید:');
+
+            return;
+        }
+        $this->ask($u, 'mk_days', $d, 'مدت اعتبار (روز) را انتخاب کنید یا عدد بفرستید:', [['30', '60', '90'], $d['proto'] === 'openvpn' ? ['180', '365'] : ['180', '365', self::UNLIMITED]]);
+    }
+
+    private static function num(string $t): ?float
+    {
+        $t = strtr(trim($t), ['۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9', '٫' => '.']);
+
+        return is_numeric($t) && (float) $t > 0 ? (float) $t : null;
+    }
+
+    private function mkDays(BotUser $u, string $text): void
+    {
+        $d = $u->state_data ?? [];
+        $days = $text === self::UNLIMITED && $d['proto'] !== 'openvpn' ? 0 : (int) self::num($text);
+        if ($days === 0 && $text !== self::UNLIMITED || $days > 3650) {
+            $this->ask($u, 'mk_days', $d, 'تعداد روز را به عدد بفرستید (مثلاً 30):');
+
+            return;
+        }
+        $d['days'] = $days ?: null;
+        $volumeAsk = true;
+        if ($d['proto'] === 'openvpn') {
+            $g = IbsGroup::query()->with('charge')->where('name', substr($d['pick'], 2))->first();
+            $volumeAsk = (bool) $g?->charge?->isVolume();
+        }
+        if (! $volumeAsk) {
+            $this->ask($u, 'mk_name', $d, '👤 نام کاربر (مشتری) را بفرستید:');
+
+            return;
+        }
+        $this->ask($u, 'mk_vol', $d, 'حجم (گیگابایت) را انتخاب کنید یا عدد بفرستید:', [['10', '20', '30', '50'], $d['proto'] === 'openvpn' ? ['100'] : ['100', self::UNLIMITED]]);
+    }
+
+    private function mkVol(BotUser $u, string $text): void
+    {
+        $d = $u->state_data ?? [];
+        $gb = $text === self::UNLIMITED && $d['proto'] !== 'openvpn' ? 0.0 : (float) self::num($text);
+        if (($gb <= 0 && $text !== self::UNLIMITED) || $gb > 100000) {
+            $this->ask($u, 'mk_vol', $d, 'حجم را به گیگابایت و به عدد بفرستید (مثلاً 20):');
+
+            return;
+        }
+        $d['gb'] = $gb ?: null;
+        $this->ask($u, 'mk_name', $d, '👤 نام کاربر (مشتری) را بفرستید:');
+    }
+
+    private function mkCreate(BotUser $u, string $text): void
+    {
+        $d = $u->state_data ?? [];
+        $name = mb_substr(trim($text), 0, 100);
+        $user = $this->staff($u);
+        $u->setState(null);
+        if ($name === '' || ! $user) {
+            $this->menu($u, 'منوی اصلی:');
+
+            return;
+        }
+        $key = (string) Str::uuid();
+        try {
+            if ($d['proto'] === 'openvpn') {
+                abort_unless($user->hasPermission('accounts.create'), 403);
+                $password = Provisioning::generatePassword();
+                $job = str_starts_with($d['pick'], 'p:')
+                    ? app(PackageApplier::class)->createAccount(Package::query()->findOrFail((int) substr($d['pick'], 2)), $key,
+                        ['username' => null, 'password' => $password, 'comment' => $name], $user->id)
+                    : app(Provisioning::class)->create($key, ['username' => null, 'password' => $password, 'group' => substr($d['pick'], 2),
+                        'days' => $d['days'] ?? null, 'multi_login' => null, 'volume_mb' => isset($d['gb']) ? (int) round($d['gb'] * 1024) : null, 'comment' => $name], $user->id);
+                if ($job->status !== 'completed') {
+                    $this->menu($u, '⏳ ساخت اکانت در سرور کامل نشد ('.mb_substr((string) $job->last_error, 0, 120).'). در پنل بخش «ساخت‌های نیمه‌کاره» را ببینید.');
+
+                    return;
+                }
+                $this->menu($u, "✅ اکانت OpenVPN ساخته شد\n👤 ".$name."\n\nنام کاربری: ".$job->username."\nرمز: ".$password);
+
+                return;
+            }
+            abort_unless($user->hasPermission('mt_accounts.create'), 403);
+            if (str_starts_with($d['pick'], 'p:')) {
+                $p = Package::query()->findOrFail((int) substr($d['pick'], 2));
+                $a = app(MtProvisioning::class)->create($p->mtGroup, $key, ['days' => $p->duration_days, 'volume_gb' => $p->volume_gb,
+                    'multi_login' => $p->multi_login, 'comment' => $name, 'package_id' => $p->id], $user->id);
+            } else {
+                $g = MtGroup::query()->findOrFail((int) substr($d['pick'], 2));
+                $a = app(MtProvisioning::class)->create($g, $key, ['days' => $d['days'] ?? null, 'volume_gb' => $d['gb'] ?? null, 'comment' => $name], $user->id);
+            }
+        } catch (HttpException) {
+            $this->menu($u, 'دسترسی ساخت این نوع اکانت را ندارید.');
+
+            return;
+        } catch (RuntimeException $e) {
+            $this->menu($u, '❗ '.(($e instanceof IbsException) ? ErrorMessages::for($e) : $e->getMessage()));
+
+            return;
+        }
+        if ($a->status === 'failed') {
+            $this->menu($u, '❗ روتر ساخت اکانت را نپذیرفت: '.mb_substr((string) $a->error, 0, 150));
+
+            return;
+        }
+        $this->sendMtCredentials($u, $a, "✅ اکانت {$a->protocolLabel()} ساخته شد\n👤 {$name}".($a->status === 'pending' ? "\n⏳ روتر الان در دسترس نیست؛ اکانت تا چند دقیقه دیگر روی روتر ساخته می‌شود." : ''));
+    }
+
+    /** Credentials as text; for WireGuard also one QR image per device. */
+    private function sendMtCredentials(BotUser $u, MtAccount $a, string $intro): void
+    {
+        if ($a->isWireguard()) {
+            foreach ($a->allDevices() as $dev) {
+                $conf = WgConfig::build($a, $dev instanceof MtDevice ? $dev : null);
+                $png = QrCode::png($conf);
+                $caption = '🛡 '.$a->username.($a->deviceCount() > 1 ? ' — دستگاه '.fa($dev->deviceNo()) : '').' — در برنامه WireGuard: ➕ ← Scan from QR code';
+                if ($png) {
+                    $this->api->sendPhoto($u->chat_id, $png, $caption);
+                }
+            }
+        }
+        $this->menu($u, $intro."\n\n".CustomerOrders::mtCredentials($a));
     }
 
     private function logout(BotUser $u): void
