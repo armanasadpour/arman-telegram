@@ -110,6 +110,41 @@ class AccountActionsTest extends IbsTestCase
         $this->assertSame(7 * 1073741824, $v->volume_total_bytes, 'usage never lowers the total');
     }
 
+    public function test_reset_to_first_login_restarts_time_and_refills_volume(): void
+    {
+        $this->syncCatalog();
+        $this->ibsUser('rst', 'vol-30d', 1024 * 10);   // 10 GB
+        $v = app(AccountSync::class)->importByUsername('rst');
+        $this->fake->connect('rst');
+        $this->fake->users[$v->ibs_user_id]['first_login'] = time() - 20 * 86400;
+        $this->fake->users[$v->ibs_user_id]['credit'] = 1024 * 2;   // 2 GB left
+        $v = app(AccountSync::class)->refresh($v);
+        $this->assertNotNull($v->first_login_ibs);
+
+        [$v, $note] = app(AccountActions::class)->resetToFirstLogin($v, 'مشتری جدید');
+        $this->assertNull($this->fake->users[$v->ibs_user_id]['first_login']);
+        $this->assertNull($v->first_login_ibs);
+        $this->assertSame(10 * 1073741824, $v->remainingBytes());
+        $this->assertSame(100, $v->volumeMeter()['pct']);
+        $this->assertStringContainsString('اولین اتصال بعدی', $note);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'accounts.reset_first_login']);
+    }
+
+    public function test_reset_falls_back_to_full_period_from_now_when_server_keeps_first_login(): void
+    {
+        $this->syncCatalog();
+        $this->ibsUser('rst2', 'test');
+        $v = app(AccountSync::class)->importByUsername('rst2');
+        $this->fake->connect('rst2');
+        $this->fake->users[$v->ibs_user_id]['first_login'] = time() - 10 * 86400;
+        $this->fake->keepFirstLogin = true;
+        $v = app(AccountSync::class)->refresh($v);
+        $rel = $v->effectiveRelExpSeconds();
+        [$v, $note] = app(AccountActions::class)->resetToFirstLogin($v, 'x');
+        $this->assertStringContainsString('از همین الان', $note);
+        $this->assertEqualsWithDelta(now()->addSeconds($rel)->getTimestamp(), $v->expires_at->getTimestamp(), 3700);
+    }
+
     public function test_delete_removes_from_ibsng_and_soft_deletes_mirror(): void
     {
         $a = $this->account();

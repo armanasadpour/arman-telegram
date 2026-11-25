@@ -114,6 +114,29 @@ class MtActions
         return $this->syncState($a);
     }
 
+    /** "Like new": usage back to zero and the validity starts again at the next connection. */
+    public function resetToFirstUse(MtAccount $a, string $reason): MtAccount
+    {
+        if ($a->trashed() || in_array($a->status, ['pending', 'failed'], true)) {
+            throw new RuntimeException('این اکانت قابل بازنشانی نیست.');
+        }
+        $before = ['expires_at' => $a->expires_at?->toIso8601String(), 'used_bytes' => $a->used_bytes];
+        DB::transaction(function () use ($a) {
+            $a->refresh();
+            $a->forceFill(['used_bytes' => 0, 'upload_bytes' => 0, 'download_bytes' => 0, 'first_used_at' => null, 'alerted_at' => null]);
+            if ($a->duration_days) {
+                // Counters stay: traffic already counted is not counted again; a session still open starts the clock at once.
+                $a->expires_at = $a->group?->start_on_first_use === false ? now()->addDays($a->duration_days) : null;
+            }
+            $this->recomputeStatus($a);
+            $a->save();
+        });
+        $this->audit->log('mt_accounts.reset', $a, 'بازنشانی تاریخ و حجم «'.$a->username.'» به حالت اولین اتصال',
+            ['expires_at' => [$before['expires_at'], $a->expires_at?->toIso8601String()], 'used_bytes' => [$before['used_bytes'], 0]], $reason);
+
+        return $this->syncState($a);
+    }
+
     public function applyPackage(Package $p, MtAccount $a, string $reason): MtAccount
     {
         if ($why = self::applicability($p, $a)) {

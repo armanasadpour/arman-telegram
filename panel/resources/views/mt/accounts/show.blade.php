@@ -97,6 +97,14 @@
           </div>
         @endif
         <div class="card">
+          <h2>بازنشانی تاریخ و حجم</h2>
+          <p class="muted small">مصرف صفر می‌شود{{ $a->isVolumeLimited() ? ' (حجم کامل '.fa_bytes($a->volume_limit_bytes).')' : '' }}{{ $a->duration_days ? ' و '.fa($a->duration_days).' روز از اولین اتصال بعدی شروع می‌شود' : '' }}.</p>
+          <form method="post" action="{{ route('mt.accounts.reset-first', $a) }}" data-confirm="تاریخ و حجم «{{ $a->username }}» بازنشانی شود و از اولین اتصال دوباره شروع شود؟">@csrf
+            <div class="field"><label for="rf_reason">دلیل</label><input id="rf_reason" name="reason" class="input" required minlength="3" maxlength="200"></div>
+            <button class="btn btn-secondary" type="submit">↺ بازنشانی با اولین اتصال</button>
+          </form>
+        </div>
+        <div class="card">
           <h2>{{ $a->status === 'disabled' ? 'فعال‌سازی' : 'غیرفعال‌سازی' }}</h2>
           <form method="post" action="{{ route('mt.accounts.toggle', $a) }}" data-confirm="{{ $a->status === 'disabled' ? 'اکانت فعال شود؟' : 'اکانت غیرفعال و اتصال‌های فعلی قطع شود؟' }}">@csrf
             <div class="field"><label for="tg_reason">دلیل</label><input id="tg_reason" name="reason" class="input" maxlength="200"></div>

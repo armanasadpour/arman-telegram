@@ -225,6 +225,19 @@ class AccountsController extends Controller
         return $this->attempt(fn () => $this->actions->addVolume($account, $mb, $d['reason']), 'حجم اکانت '.fa((string) $d['gb']).' گیگابایت افزایش یافت.');
     }
 
+    public function resetFirstLogin(Request $request, VpnAccount $account): RedirectResponse
+    {
+        $this->authorize('accounts.update');
+        $r = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:200']], [], ['reason' => 'دلیل'])['reason'];
+        try {
+            [, $note] = $this->actions->resetToFirstLogin($account, $r);
+        } catch (RuntimeException $e) {
+            return back()->with('error', $this->message($e));
+        }
+
+        return back()->with('success', 'اکانت بازنشانی شد: '.$note);
+    }
+
     public function destroy(Request $request, VpnAccount $account): RedirectResponse
     {
         $this->authorize('accounts.delete');

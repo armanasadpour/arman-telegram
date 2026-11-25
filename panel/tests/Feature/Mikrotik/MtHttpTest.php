@@ -77,7 +77,9 @@ class MtHttpTest extends MikrotikTestCase
         $this->assertSame('false', $this->ros->find('ppp/secret', 'name', 'act1')['disabled']);
         $this->actingAs($admin)->confirmed()->from(route('mt.accounts.show', $a))->post(route('mt.accounts.password', $a), ['password' => 'neu-pass'])->assertSessionHas('success');
         $this->assertSame('neu-pass', $this->ros->find('ppp/secret', 'name', 'act1')['password']);
-        $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertOk();
+        $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertOk()->assertSee('بازنشانی با اولین اتصال');
+        $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.reset-first', $a), ['reason' => 'فروش مجدد'])->assertSessionHas('success');
+        $this->actingAs($this->userWith(['mt_accounts.view']))->post(route('mt.accounts.reset-first', $a), ['reason' => 'xxx'])->assertForbidden();
         $this->actingAs($admin)->confirmed()->delete(route('mt.accounts.destroy', $a), ['reason' => 'تست حذف'])->assertRedirect('/mt/accounts');
         $this->assertNull($this->ros->find('ppp/secret', 'name', 'act1'));
         $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertOk()->assertSee('حذف‌شده');

@@ -120,6 +120,15 @@
           </div>
         @endif
         <div class="card">
+          <h2>بازنشانی تاریخ و حجم</h2>
+          <p class="muted small">اکانت مثل روز اول می‌شود: مدت اعتبار ({{ fa_duration($a->effectiveRelExpSeconds()) }}) از اولین اتصال بعدی شروع می‌شود{{ $a->isVolumeLimited() && $a->volume_total_bytes ? ' و حجم به '.fa_bytes((int) $a->volume_total_bytes).' برمی‌گردد' : '' }}.</p>
+          <form method="post" action="{{ route('accounts.reset-first', $a) }}" data-confirm="تاریخ و حجم «{{ $a->username }}» بازنشانی شود و از اولین اتصال دوباره شروع شود؟">
+            @csrf
+            <div class="field"><label for="reset_first_reason">دلیل</label><input id="reset_first_reason" name="reason" class="input" required minlength="3" maxlength="200"></div>
+            <button class="btn btn-secondary" type="submit">↺ بازنشانی با اولین اتصال</button>
+          </form>
+        </div>
+        <div class="card">
           <h2>{{ $a->locked ? 'فعال‌سازی دوباره' : 'غیرفعال‌سازی (قفل)' }}</h2>
           <form method="post" action="{{ route('accounts.lock', $a) }}" data-confirm="{{ $a->locked ? 'قفل برداشته شود؟' : 'اکانت قفل شود؟ کاربر دیگر نمی‌تواند وصل شود.' }}">
             @csrf

@@ -203,6 +203,15 @@ class MtAccountsController extends Controller
         return $this->run(fn () => $this->actions->resetUsage($account, $reason), 'مصرف صفر شد.');
     }
 
+    public function resetFirstUse(Request $request, MtAccount $account): RedirectResponse
+    {
+        $this->authorize('mt_accounts.update');
+        $reason = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:200']], [], ['reason' => 'دلیل'])['reason'];
+
+        return $this->run(fn () => $this->actions->resetToFirstUse($account, $reason),
+            'بازنشانی شد: مصرف صفر شد'.($account->duration_days ? ' و '.fa($account->duration_days).' روز از اولین اتصال بعدی شروع می‌شود' : '').'.');
+    }
+
     public function toggle(Request $request, MtAccount $account): RedirectResponse
     {
         $this->authorize('mt_accounts.update');

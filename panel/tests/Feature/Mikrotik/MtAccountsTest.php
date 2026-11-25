@@ -181,6 +181,26 @@ class MtAccountsTest extends MikrotikTestCase
         $this->assertNotSame($id, $a->fresh()->ros_id);
     }
 
+    public function test_reset_to_first_use(): void
+    {
+        $a = $this->create($this->l2tp, ['username' => 'rst', 'volume_gb' => 1]);
+        $this->ros->connectL2tp('rst');
+        $this->ros->trafficL2tp('rst', 0, 1100 * 1024 * 1024);
+        $this->poll();
+        $this->assertSame('depleted', $a->fresh()->status);
+        $this->ros->disconnectL2tp('rst');
+
+        app(MtActions::class)->resetToFirstUse($a->fresh(), 'مشتری جدید');
+        $a->refresh();
+        $this->assertSame(['active', 0, null, null], [$a->status, $a->used_bytes, $a->expires_at, $a->first_used_at]);
+        $this->assertSame('false', $this->ros->find('ppp/secret', 'name', 'rst')['disabled']);
+        $this->assertSame('not_started', $a->displayStatus());
+
+        $this->ros->connectL2tp('rst');
+        $this->poll();
+        $this->assertEqualsWithDelta(now()->addDays(30)->getTimestamp(), $a->fresh()->expires_at->getTimestamp(), 5, 'clock starts again on connect');
+    }
+
     public function test_password_keys_and_delete(): void
     {
         $a = $this->create($this->l2tp, ['username' => 'gus']);

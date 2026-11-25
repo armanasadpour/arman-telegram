@@ -101,6 +101,8 @@ class AccountsHttpTest extends IbsTestCase
         $r->assertRedirect(route('accounts.show', $a));
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/lock", ['reason' => 'test lock'])->assertSessionHas('success');
         $this->assertTrue($a->fresh()->locked);
+        $this->actingAs($admin)->get("/accounts/{$a->id}")->assertSee('بازنشانی با اولین اتصال');
+        $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/reset-first-login", ['reason' => 'فروش مجدد'])->assertSessionHas('success');
     }
 
     public function test_deleted_username_can_be_reused_and_unimported_one_offers_import(): void

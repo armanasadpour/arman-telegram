@@ -20,6 +20,9 @@ class FakeIbs implements Transport
 
     public array $charges = [];
 
+    /** Simulate an IBSng that ignores deleting first_login. */
+    public bool $keepFirstLogin = false;
+
     public array $users = [];      // id => ['username','password','group','credit','attrs'=>[], 'first_login'=>?int, 'created'=>int]
 
     public array $onlines = [];    // id => ['ras_ip','in_bytes','out_bytes','login_time_epoch','unique_id_val']
@@ -271,6 +274,9 @@ class FakeIbs implements Transport
             }
             foreach ((array) $p['to_del_attrs'] as $k) {
                 unset($u['attrs'][$k]);
+                if ($k === 'first_login' && ! $this->keepFirstLogin) {
+                    $u['first_login'] = null;
+                }
             }
             unset($u);
         }

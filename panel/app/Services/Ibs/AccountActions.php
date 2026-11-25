@@ -119,6 +119,58 @@ class AccountActions
         return $a;
     }
 
+    /**
+     * "Like new": the validity starts again at the next first login and the volume is full again.
+     * IBSng: delete the first_login attribute; if this server keeps it, the full period starts now instead.
+     *
+     * @return array{0: VpnAccount, 1: string} account and a Persian summary
+     */
+    public function resetToFirstLogin(VpnAccount $a, string $reason): array
+    {
+        $info = $this->liveInfo($a);
+        if (isset($info['attrs']['abs_exp_date'])) {
+            throw new RuntimeException('این اکانت تاریخ انقضای مطلق دارد و از اولین اتصال شمرده نمی‌شود.');
+        }
+        $a = $this->sync->apply($info) ?? $a;
+        $rel = $a->effectiveRelExpSeconds();
+        $before = ['first_login' => $a->first_login_ibs, 'credit' => (float) $a->credit];
+        $notes = [];
+
+        if ($rel && $a->first_login_ibs !== null) {
+            $this->ibs->updateAttrs($a->ibs_user_id, [], ['first_login']);
+            $after = $this->liveInfo($a);
+            if (isset($after['attrs']['first_login'])) {
+                // Server keeps first_login: give the full period from now (elapsed time + full validity).
+                $elapsed = max(0, $rel - (int) round((float) ($after['attrs']['time_to_nearest_exp_date'] ?? 0)));
+                $hours = (int) ceil(($elapsed + $rel) / 3600);
+                $this->ibs->updateAttrs($a->ibs_user_id, ['rel_exp_date' => $hours, 'rel_exp_date_unit' => 'Hours']);
+                $notes[] = 'مدت کامل ('.fa_duration($rel).') از همین الان شروع شد؛ سرور بازنشانی «اولین اتصال» را نپذیرفت';
+            } else {
+                $notes[] = 'زمان از اولین اتصال بعدی شروع می‌شود';
+            }
+        } elseif ($rel) {
+            $notes[] = 'هنوز وصل نشده بود؛ زمان از اولین اتصال شروع می‌شود';
+        }
+
+        $charge = $a->charge();
+        if ($charge?->isVolume() && (int) $a->volume_total_bytes > 0) {
+            $target = round(((int) $a->volume_total_bytes / 1024) * (float) $charge->cpk, 6);
+            $delta = round($target - (float) $a->credit, 6);
+            if (abs($delta) > 0.000001) {
+                $this->ibs->changeCredit($a->ibs_user_id, $delta, 'panel:reset');
+            }
+            $notes[] = 'حجم به '.fa_bytes((int) $a->volume_total_bytes).' برگشت';
+        } elseif ($charge?->isVolume()) {
+            $notes[] = 'حجم کامل این اکانت معلوم نیست (بسته‌ای از پنل نگرفته)؛ حجم تغییر نکرد';
+        }
+        $a = $this->sync->refresh($a);
+        $this->audit->log('accounts.reset_first_login', $a, 'بازنشانی تاریخ و حجم «'.$a->username.'» به حالت اولین اتصال', [
+            'first_login' => [$before['first_login'], $a->first_login_ibs], 'credit' => [$before['credit'], (float) $a->credit],
+        ], $reason);
+
+        return [$a, implode('، ', $notes).'.'];
+    }
+
     public function delete(VpnAccount $a, string $reason): void
     {
         $a = $this->live($a);
