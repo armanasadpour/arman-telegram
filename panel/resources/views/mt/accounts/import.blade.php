@@ -4,7 +4,7 @@
       <h1>وارد کردن {{ $g->isWireguard() ? 'Peerهای WireGuard' : 'کاربران L2TP' }} از روتر</h1>
       <p class="muted">گروه «{{ $g->name }}» — روتر {{ $g->router->name }}{{ $g->isWireguard() ? ' — اینترفیس '.$g->wg_interface : '' }}. روی روتر چیزی تغییر نمی‌کند؛ مصرف از همین لحظه شمرده می‌شود.</p>
     </div>
-    <a class="btn btn-secondary" href="{{ route('mt.groups.index') }}">بازگشت</a>
+    <a class="btn btn-secondary" href="{{ route($g->isWireguard() ? 'wg.groups' : 'l2tp.groups') }}">بازگشت</a>
   </div>
 
   @if(empty($rows))

@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
 use App\Services\Settings;
 use App\Services\SystemStatus;
+use App\Services\Updater;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
@@ -27,8 +29,6 @@ class SystemController extends Controller
     public function upgrade(AuditLogger $audit): RedirectResponse
     {
         abort_unless(request()->user()->isSuperAdmin(), 403, 'فقط مدیرکل می‌تواند به‌روزرسانی را اجرا کند.');
-        // Re-authentication happens in the same form (no redirect round-trip).
-        request()->validate(['password' => ['required', 'current_password']], [], ['password' => 'رمز عبور']);
         @set_time_limit(300);
         $before = SystemStatus::pendingMigrations();
         $code = Artisan::call('migrate', ['--force' => true]);
@@ -46,6 +46,47 @@ class SystemController extends Controller
         app(Settings::class)->set('system.version', config('panel.version'));
         $audit->log('system.upgraded', null, 'به‌روزرسانی به نسخه '.config('panel.version').' — '.$before.' Migration اجرا شد');
 
-        return back()->with('success', 'به‌روزرسانی به نسخه '.config('panel.version').' انجام شد.');
+        return redirect()->route('system.status')->with('success', 'به‌روزرسانی به نسخه '.config('panel.version').' انجام شد.');
+    }
+
+    public function updateForm(): View
+    {
+        abort_unless(request()->user()->isSuperAdmin(), 403, 'فقط مدیرکل می‌تواند به‌روزرسانی را نصب کند.');
+
+        return view('system.update', [
+            'version' => config('panel.version'),
+            'maxUpload' => min($this->bytes(ini_get('upload_max_filesize')), $this->bytes(ini_get('post_max_size'))),
+            'zip' => class_exists(\ZipArchive::class),
+        ]);
+    }
+
+    /** Upload a release ZIP (small update or full package), install it, then run the database upgrade in the new code. */
+    public function updateUpload(Request $request, Updater $updater, AuditLogger $audit): RedirectResponse
+    {
+        abort_unless($request->user()->isSuperAdmin(), 403, 'فقط مدیرکل می‌تواند به‌روزرسانی را نصب کند.');
+        if (! $request->hasFile('package')) {
+            return back()->with('error', 'فایلی دریافت نشد. اگر فایل بزرگ است (بسته کامل)، حجمش از سقف آپلود هاست بیشتر است؛ از بسته به‌روزرسانی سبک استفاده کنید.');
+        }
+        $request->validate(['package' => ['required', 'file', 'mimes:zip', 'max:204800']], ['package.mimes' => 'فقط فایل ZIP پنل قابل نصب است.']);
+        @set_time_limit(300);
+        try {
+            $r = $updater->install($request->file('package'));
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+        Cache::forget('system.pending_migrations');
+        $audit->log('system.update_installed', null, 'نصب '.($r['type'] === 'full' ? 'بسته کامل' : 'بسته به‌روزرسانی').' '.$r['from'].' ← '.$r['to'].' ('.$r['files'].' فایل)');
+
+        return redirect()->route('system.status')->with('success', 'فایل‌های نسخه '.$r['to'].' نصب شد ('.fa($r['files']).' فایل).')->with('auto_upgrade', true);
+    }
+
+    private function bytes(string|false $v): int
+    {
+        $v = trim((string) $v);
+        $n = (int) $v;
+
+        return match (strtolower(substr($v, -1))) {
+            'g' => $n * 1073741824, 'm' => $n * 1048576, 'k' => $n * 1024, default => $n,
+        } ?: PHP_INT_MAX;
     }
 }

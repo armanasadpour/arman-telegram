@@ -1,16 +1,17 @@
-<x-layouts.app title="ساخت اکانت L2TP / WireGuard">
+@php($pl = ['l2tp' => 'L2TP', 'wireguard' => 'WireGuard'][$proto ?? ''] ?? 'L2TP / WireGuard')
+<x-layouts.app :title="'ساخت اکانت '.$pl">
   @php($manualFirst = $packages->isEmpty() || old('mt_group_id') !== null)
   <div class="page-head">
     <div>
-      <h1>ساخت اکانت L2TP / WireGuard</h1>
+      <h1>ساخت اکانت {{ $pl }}</h1>
       <p class="muted">اکانت مستقیم روی روتر میکروتیک ساخته می‌شود؛ حجم، روز و تعداد اتصال را پنل کنترل می‌کند.</p>
     </div>
-    <a class="btn btn-secondary" href="{{ route('mt.accounts.index') }}">بازگشت</a>
+    <a class="btn btn-secondary" href="{{ route($proto === 'wireguard' ? 'wg.accounts' : ($proto === 'l2tp' ? 'l2tp.accounts' : 'mt.accounts.index')) }}">بازگشت</a>
   </div>
 
   @if($groups->isEmpty())
     <div class="card"><div class="empty"><x-icon name="layers"/><div>هیچ گروه فعالی نیست. ابتدا روی روتر L2TP یا WireGuard را فعال و یک گروه بسازید.</div>
-      @can('routers.view')<a class="btn mt-8" href="{{ route('mt.groups.index') }}">گروه‌ها</a>@endcan</div></div>
+      @can('routers.view')<a class="btn mt-8" href="{{ route($proto === 'wireguard' ? 'wg.groups' : 'l2tp.groups') }}">گروه‌ها</a>@endcan</div></div>
   @else
   <div class="create-wrap">
     <input class="seg-input" type="radio" name="create_mode" id="mode_pkg" @checked(! $manualFirst) @disabled($packages->isEmpty())>

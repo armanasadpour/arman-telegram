@@ -56,16 +56,15 @@ class UpgradeTest extends TestCase
         $this->get('/login')->assertOk();
         $this->post('/login', ['username' => 'boss', 'password' => 'Password12345'])->assertRedirect('/');
         $this->get('/')->assertRedirect(route('system.status'));
-        $this->get('/system')->assertOk()->assertSee('اجرای به‌روزرسانی')->assertSee('upgrade_password');
+        $this->get('/system')->assertOk()->assertSee('اجرای به‌روزرسانی');
 
-        $this->from('/system')->post('/system/upgrade', ['password' => 'wrong'])->assertSessionHasErrors('password');
         $this->assertFalse(Schema::hasTable('vpn_accounts'));
 
         $this->from('/system')->post('/system/upgrade', ['password' => 'Password12345'])->assertSessionHas('success');
         $this->assertTrue(Schema::hasTable('vpn_accounts'));
         $this->get('/')->assertOk();
         $this->get('/accounts')->assertOk();
-        $this->get('/system')->assertDontSee('upgrade_password');
+        $this->get('/system')->assertDontSee('اجرای به‌روزرسانی');
         $this->assertDatabaseHas('audit_logs', ['action' => 'system.upgraded']);
     }
 

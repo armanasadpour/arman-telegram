@@ -30,6 +30,10 @@ class MtAccountsController extends Controller
     {
         $this->authorize('mt_accounts.view');
         $f = $request->only(['q', 'status', 'protocol', 'router', 'group', 'creator']);
+        $proto = $request->route('proto');   // /l2tp/accounts, /wireguard/accounts
+        if ($proto) {
+            $f['protocol'] = $proto;
+        }
         $q = MtAccount::query()->with(['group', 'router', 'reseller', 'creator']);
         if (ctype_digit((string) ($f['creator'] ?? ''))) {
             $q->where('created_by', (int) $f['creator']);
@@ -51,28 +55,29 @@ class MtAccountsController extends Controller
                 $q->where($col, $f[$k]);
             }
         }
-        $counts = MtAccount::query()->selectRaw("count(*) as total, sum(case when is_online = 1 then 1 else 0 end) as online,
+        $counts = MtAccount::query()->when($proto, fn ($w) => $w->where('protocol', $proto))->selectRaw("count(*) as total, sum(case when is_online = 1 then 1 else 0 end) as online,
             sum(case when status = 'expired' then 1 else 0 end) as expired, sum(case when status = 'depleted' then 1 else 0 end) as depleted,
             sum(case when status in ('pending','failed') then 1 else 0 end) as problems")->first();
 
         return view('mt.accounts.index', [
             'accounts' => $q->orderByDesc('id')->paginate(30)->withQueryString(),
-            'filters' => $f, 'counts' => $counts,
+            'filters' => $proto ? array_diff_key($f, ['protocol' => 1]) : $f, 'counts' => $counts, 'proto' => $proto,
             'routers' => Router::query()->orderBy('name')->get(['id', 'name']),
-            'groups' => MtGroup::query()->with('router:id,name')->orderBy('name')->get(),
+            'groups' => MtGroup::query()->with('router:id,name')->when($proto, fn ($w) => $w->where('protocol', $proto))->orderBy('name')->get(),
             'creators' => User::query()->whereIn('id', MtAccount::withTrashed()->whereNotNull('created_by')->distinct()->select('created_by'))->orderBy('name')->get(['id', 'name', 'username']),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $this->authorize('mt_accounts.create');
-        $groups = MtGroup::query()->with('router')->where('is_active', true)->orderBy('protocol')->orderBy('name')->get()
+        $proto = in_array($request->query('protocol'), ['l2tp', 'wireguard'], true) ? $request->query('protocol') : null;
+        $groups = MtGroup::query()->with('router')->where('is_active', true)->when($proto, fn ($w) => $w->where('protocol', $proto))->orderBy('protocol')->orderBy('name')->get()
             ->filter(fn (MtGroup $g) => $g->router?->is_active && ($g->isWireguard() ? $g->router->wireguard_enabled : $g->router->l2tp_enabled))->values();
         $packages = Package::query()->with('mtGroup.router')->where('is_active', true)->where('type', 'new')->where('protocol', 'mikrotik')
             ->orderBy('sort_order')->orderBy('price_rial')->get()->filter(fn ($p) => $p->mtGroup && $groups->contains('id', $p->mt_group_id))->values();
 
-        return view('mt.accounts.create', ['groups' => $groups, 'jobKey' => (string) Str::uuid(),
+        return view('mt.accounts.create', ['groups' => $groups, 'proto' => $proto, 'jobKey' => (string) Str::uuid(),
             'packages' => $packages->map(fn ($p) => ['p' => $p, 'q' => $this->pricing->quote($p)])]);
     }
 
@@ -258,7 +263,7 @@ class MtAccountsController extends Controller
         try {
             $rows = $imp->candidates($group);
         } catch (RouterOsException $e) {
-            return redirect()->route('mt.groups.index')->with('error', $e->getMessage());
+            return redirect()->route($group->isWireguard() ? 'wg.groups' : 'l2tp.groups')->with('error', $e->getMessage());
         }
 
         return view('mt.accounts.import', ['g' => $group->load('router'), 'rows' => $rows]);
@@ -276,7 +281,7 @@ class MtAccountsController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('mt.accounts.index', ['group' => $group->id])->with('success', fa($r['imported']).' اکانت وارد پنل شد. مصرف از همین لحظه شمرده می‌شود.');
+        return redirect()->route($group->isWireguard() ? 'wg.accounts' : 'l2tp.accounts', ['group' => $group->id])->with('success', fa($r['imported']).' اکانت وارد پنل شد. مصرف از همین لحظه شمرده می‌شود.');
     }
 
     public function retry(MtAccount $account): RedirectResponse
@@ -314,7 +319,7 @@ class MtAccountsController extends Controller
             return back()->with('error', $e->getMessage().' اگر روتر برای همیشه از دسترس خارج شده، گزینه «فقط از پنل» را بزنید.');
         }
 
-        return redirect()->route('mt.accounts.index')->with('success', 'اکانت حذف شد.');
+        return redirect()->to($account->listUrl())->with('success', 'اکانت حذف شد.');
     }
 
     private function run(\Closure $fn, string $ok, ?int $reveal = null): RedirectResponse

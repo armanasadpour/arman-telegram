@@ -20,7 +20,7 @@
         </div>
         <div class="field"><label for="protocol">پروتکل</label>
           <select id="protocol" name="protocol" class="input">
-            @foreach(\App\Models\Package::PROTOCOLS as $k => $v)<option value="{{ $k }}" @selected(old('protocol', $p->protocol ?? 'openvpn') === $k)>{{ $v }}</option>@endforeach
+            @foreach(\App\Models\Package::PROTOCOLS as $k => $v)<option value="{{ $k }}" @selected(old('protocol', $p->exists ? $p->protocol : (request('protocol') ?: 'openvpn')) === $k)>{{ $v }}</option>@endforeach
           </select>
           <div class="help">بسته تمدید/حجم میکروتیک روی همه اکانت‌های L2TP و WireGuard قابل اعمال است.</div>
         </div>

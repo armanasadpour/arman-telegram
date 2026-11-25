@@ -1,23 +1,24 @@
-<x-layouts.app title="اکانت‌های L2TP / WireGuard">
+@php($pl = ['l2tp' => 'L2TP', 'wireguard' => 'WireGuard'][$proto ?? ''] ?? 'L2TP / WireGuard')
+<x-layouts.app :title="'اکانت‌های '.$pl">
   <div class="page-head">
     <div>
-      <h1>اکانت‌های L2TP / WireGuard</h1>
+      <h1>اکانت‌های {{ $pl }}</h1>
       <p class="muted">مصرف و وضعیت هر دقیقه از روترها خوانده می‌شود؛ اکانت منقضی یا حجم‌تمام خودکار قطع می‌شود.</p>
     </div>
     <div class="actions">
-      @can('routers.view')<a class="btn btn-secondary" href="{{ route('mt.groups.index') }}">گروه‌ها</a>@endcan
-      @can('mt_accounts.create')<a class="btn" href="{{ route('mt.accounts.create') }}">ساخت اکانت</a>@endcan
+      @can('routers.view')<a class="btn btn-secondary" href="{{ route($proto === 'wireguard' ? 'wg.groups' : ($proto === 'l2tp' ? 'l2tp.groups' : 'mt.groups.index')) }}">گروه و تعرفه</a>@endcan
+      @can('mt_accounts.create')<a class="btn" href="{{ route('mt.accounts.create', $proto ? ['protocol' => $proto] : []) }}">ساخت اکانت {{ $proto ? $pl : '' }}</a>@endcan
     </div>
   </div>
 
   <div class="grid stats mb-16">
-    <a class="card stat" href="{{ route('mt.accounts.index') }}"><div class="label">اکانت‌ها</div><div class="value">{{ fa((int) $counts->total) }}</div></a>
-    <a class="card stat" href="{{ route('mt.accounts.index', ['status' => 'online']) }}"><div class="label">آنلاین</div><div class="value">{{ fa((int) $counts->online) }}</div></a>
-    <a class="card stat" href="{{ route('mt.accounts.index', ['status' => 'expired']) }}"><div class="label">منقضی</div><div class="value">{{ fa((int) $counts->expired) }}</div></a>
-    <a class="card stat" href="{{ route('mt.accounts.index', ['status' => 'depleted']) }}"><div class="label">حجم تمام‌شده</div><div class="value">{{ fa((int) $counts->depleted) }}</div></a>
+    <a class="card stat" href="{{ url()->current() }}"><div class="label">اکانت‌ها</div><div class="value">{{ fa((int) $counts->total) }}</div></a>
+    <a class="card stat" href="{{ url()->current().'?'.http_build_query(['status' => 'online']) }}"><div class="label">آنلاین</div><div class="value">{{ fa((int) $counts->online) }}</div></a>
+    <a class="card stat" href="{{ url()->current().'?'.http_build_query(['status' => 'expired']) }}"><div class="label">منقضی</div><div class="value">{{ fa((int) $counts->expired) }}</div></a>
+    <a class="card stat" href="{{ url()->current().'?'.http_build_query(['status' => 'depleted']) }}"><div class="label">حجم تمام‌شده</div><div class="value">{{ fa((int) $counts->depleted) }}</div></a>
   </div>
   @if((int) $counts->problems > 0)
-    <div class="alert alert-warning">{{ fa((int) $counts->problems) }} اکانت در حال ساخت یا ناموفق است. <a href="{{ route('mt.accounts.index', ['status' => 'pending']) }}">در حال ساخت</a> · <a href="{{ route('mt.accounts.index', ['status' => 'failed']) }}">ناموفق</a></div>
+    <div class="alert alert-warning">{{ fa((int) $counts->problems) }} اکانت در حال ساخت یا ناموفق است. <a href="{{ url()->current().'?'.http_build_query(['status' => 'pending']) }}">در حال ساخت</a> · <a href="{{ url()->current().'?'.http_build_query(['status' => 'failed']) }}">ناموفق</a></div>
   @endif
 
   <div class="card">
@@ -29,10 +30,10 @@
             <option value="{{ $k }}" @selected(($filters['status'] ?? '') === $k)>{{ $v }}</option>
           @endforeach
         </select></div>
-      <div class="field"><label for="protocol">پروتکل</label>
+      @unless($proto)<div class="field"><label for="protocol">پروتکل</label>
         <select id="protocol" name="protocol" class="input"><option value="">همه</option>
           @foreach(\App\Models\MtGroup::PROTOCOLS as $k => $v)<option value="{{ $k }}" @selected(($filters['protocol'] ?? '') === $k)>{{ $v }}</option>@endforeach
-        </select></div>
+        </select></div>@endunless
       <div class="field"><label for="group">گروه</label>
         <select id="group" name="group" class="input"><option value="">همه</option>
           @foreach($groups as $g)<option value="{{ $g->id }}" @selected((string) ($filters['group'] ?? '') === (string) $g->id)>{{ $g->name }} ({{ $g->router?->name }})</option>@endforeach
@@ -41,11 +42,11 @@
         <select id="creator" name="creator" class="input"><option value="">همه مدیران</option>
           @foreach($creators as $c)<option value="{{ $c->id }}" @selected((string) ($filters['creator'] ?? '') === (string) $c->id)>{{ $c->name }} ({{ $c->username }})</option>@endforeach
         </select></div>
-      <div class="actions"><button class="btn" type="submit">اعمال</button>@if(array_filter($filters))<a class="btn btn-secondary" href="{{ route('mt.accounts.index') }}">حذف فیلتر</a>@endif</div>
+      <div class="actions"><button class="btn" type="submit">اعمال</button>@if(array_filter($filters))<a class="btn btn-secondary" href="{{ url()->current() }}">حذف فیلتر</a>@endif</div>
     </form>
 
     @if($accounts->isEmpty())
-      <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانت L2TP یا WireGuard ساخته نشده است.' }}</div></div>
+      <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانت '.$pl.' ساخته نشده است.' }}</div></div>
     @else
       <div class="table-wrap">
         <div class="acc-list only-mobile">

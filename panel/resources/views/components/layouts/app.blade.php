@@ -39,22 +39,31 @@
     @can('reports.view')
       <a href="{{ route('reports.index') }}" @class(['active' => request()->routeIs('reports.*')])><x-icon name="activity"/>گزارش‌ها</a>
     @endcan
-    @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view') || auth()->user()->can('routers.view') || auth()->user()->can('mt_accounts.view'))
-      <div class="section">سرور</div>
+    @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view'))
+      <div class="section">OpenVPN</div>
       @can('accounts.view')
         <a href="{{ route('accounts.index') }}" @class(['active' => request()->routeIs('accounts.*')])><x-icon name="user"/>اکانت‌های OpenVPN</a>
       @endcan
       @can('ibs_groups.view')
-        <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups')])><x-icon name="layers"/>گروه‌ها و تعرفه‌ها</a>
-      @endcan
-      @can('routers.view')
-        <a href="{{ route('routers.index') }}" @class(['active' => request()->routeIs('routers.*')])><x-icon name="link"/>روترهای میکروتیک</a>
-        <a href="{{ route('mt.groups.index') }}" @class(['active' => request()->routeIs('mt.groups.*')])><x-icon name="layers"/>گروه‌های L2TP / WireGuard</a>
-      @endcan
-      @can('mt_accounts.view')
-        <a href="{{ route('mt.accounts.index') }}" @class(['active' => request()->routeIs('mt.accounts.*')])><x-icon name="key"/>اکانت‌های L2TP / WireGuard</a>
+        <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups*')])><x-icon name="layers"/>گروه و تعرفه OpenVPN</a>
       @endcan
     @endif
+    @php($mtProto = request()->route('proto') ?? request('protocol') ?? (request()->route('account') instanceof \App\Models\MtAccount ? request()->route('account')->protocol : (request()->route('group') instanceof \App\Models\MtGroup ? request()->route('group')->protocol : null)))
+    @foreach(['l2tp' => ['L2TP', 'l2tp.accounts', 'l2tp.groups'], 'wireguard' => ['WireGuard', 'wg.accounts', 'wg.groups']] as $pk => [$pl, $accRoute, $grpRoute])
+      @if(auth()->user()->can('mt_accounts.view') || auth()->user()->can('routers.view'))
+        <div class="section">{{ $pl }}</div>
+        @can('mt_accounts.view')
+          <a href="{{ route($accRoute) }}" @class(['active' => request()->routeIs($accRoute) || (request()->routeIs('mt.accounts.*') && $mtProto === $pk)])><x-icon name="key"/>اکانت‌های {{ $pl }}</a>
+        @endcan
+        @can('routers.view')
+          <a href="{{ route($grpRoute) }}" @class(['active' => request()->routeIs($grpRoute) || (request()->routeIs('mt.groups.*', 'mt.import') && $mtProto === $pk)])><x-icon name="layers"/>گروه و تعرفه {{ $pl }}</a>
+        @endcan
+      @endif
+    @endforeach
+    @can('routers.view')
+      <div class="section">سرورها</div>
+      <a href="{{ route('routers.index') }}" @class(['active' => request()->routeIs('routers.*')])><x-icon name="link"/>روترهای میکروتیک</a>
+    @endcan
     @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view') || auth()->user()->can('resellers.view') || auth()->user()->can('payments.view'))
       <div class="section">فروش</div>
       @can('payments.view')

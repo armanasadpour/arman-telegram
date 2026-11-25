@@ -5,7 +5,7 @@
       <h1>{{ $g->exists ? 'ویرایش گروه «'.$g->name.'»' : 'گروه جدید '.($wg ? 'WireGuard' : 'L2TP/IPsec') }}</h1>
       <p class="muted">روتر: <strong>{{ $g->router->name }}</strong> <bdi class="ltr">({{ $g->router->host }})</bdi></p>
     </div>
-    <a class="btn btn-secondary" href="{{ route('mt.groups.index') }}">بازگشت</a>
+    <a class="btn btn-secondary" href="{{ route($wg ? 'wg.groups' : 'l2tp.groups') }}">بازگشت</a>
   </div>
 
   @if($routerError)

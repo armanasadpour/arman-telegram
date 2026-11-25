@@ -17,7 +17,7 @@ class MtHttpTest extends MikrotikTestCase
         $this->actingAs($admin)->get('/mt/groups')->assertOk()->assertSee('هرنگ')->assertSee('+ گروه WireGuard');
         $this->actingAs($admin)->get('/mt/groups/create?router='.$this->router->id.'&protocol=wireguard')->assertOk()->assertSee('wg1');
         $this->actingAs($admin)->post('/mt/groups', ['router_id' => $this->router->id, 'protocol' => 'wireguard', 'name' => 'WG دوم', 'wg_interface' => 'wg1',
-            'rate_limit' => '10M/20M', 'start_on_first_use' => 1, 'is_active' => 1])->assertRedirect('/mt/groups');
+            'rate_limit' => '10M/20M', 'start_on_first_use' => 1, 'is_active' => 1])->assertRedirect('/wireguard/groups');
         $g = MtGroup::query()->where('name', 'WG دوم')->firstOrFail();
         $this->assertSame(['10.20.0.0/24', '10.20.0.1', $this->serverPub, 13231], [$g->wg_network, $g->wg_server_ip, $g->wg_server_public_key, $g->wg_listen_port]);
     }
@@ -27,7 +27,7 @@ class MtHttpTest extends MikrotikTestCase
         $this->ros->menus['interface/l2tp-server/server'] = [['enabled' => 'true', 'use-ipsec' => 'required', 'ipsec-secret' => 'ROUTER-PSK']];
         $admin = $this->superAdmin();
         $this->actingAs($admin)->post('/mt/groups', ['router_id' => $this->router->id, 'protocol' => 'l2tp', 'name' => 'L2TP ۱۰ مگ', 'ppp_profile' => 'l2tp-profile',
-            'new_profile' => 'panel-10M', 'new_profile_rate' => '10M/10M', 'multi_login' => 2, 'is_active' => 1])->assertRedirect('/mt/groups');
+            'new_profile' => 'panel-10M', 'new_profile_rate' => '10M/10M', 'multi_login' => 2, 'is_active' => 1])->assertRedirect('/l2tp/groups');
         $p = $this->ros->find('ppp/profile', 'name', 'panel-10M');
         $this->assertSame(['10M/10M', 'l2tp-pool', '10.10.0.1'], [$p['rate-limit'], $p['remote-address'], $p['local-address']]);
         $g = MtGroup::query()->where('name', 'L2TP ۱۰ مگ')->firstOrFail();
@@ -49,6 +49,20 @@ class MtHttpTest extends MikrotikTestCase
         $this->actingAs($admin)->get(route('mt.accounts.connect', $a))->assertRedirect('/confirm-password');
         $this->actingAs($admin)->confirmed()->get(route('mt.accounts.connect', $a))->assertOk()->assertSee('PrivateKey');
         $this->assertStringNotContainsString($a->wg_private_key, AuditLog::query()->get()->toJson());
+    }
+
+    public function test_separate_l2tp_and_wireguard_menus(): void
+    {
+        $prov = app(\App\Services\Mikrotik\MtProvisioning::class);
+        $prov->create($this->l2tp, (string) Str::uuid(), ['username' => 'onlyl2tp'], null);
+        $prov->create($this->wg, (string) Str::uuid(), ['username' => 'onlywg'], null);
+        $admin = $this->superAdmin();
+        $this->actingAs($admin)->get('/')->assertSee('اکانت‌های L2TP')->assertSee('گروه و تعرفه WireGuard')->assertSee('گروه و تعرفه OpenVPN');
+        $this->actingAs($admin)->get('/l2tp/accounts')->assertOk()->assertSee('onlyl2tp')->assertDontSee('onlywg');
+        $this->actingAs($admin)->get('/wireguard/accounts')->assertOk()->assertSee('onlywg')->assertDontSee('onlyl2tp');
+        $this->actingAs($admin)->get('/wireguard/groups')->assertOk()->assertSee('+ گروه WireGuard')->assertDontSee('+ گروه L2TP')->assertSee('تعرفه‌ها');
+        $this->actingAs($admin)->get('/l2tp/groups')->assertOk()->assertSee('L2TP ایران')->assertDontSee('+ گروه WireGuard');
+        $this->actingAs($admin)->get('/mt/accounts/create?protocol=wireguard')->assertOk()->assertSee('ساخت اکانت WireGuard')->assertDontSee('L2TP ایران');
     }
 
     public function test_permissions(): void
@@ -80,7 +94,7 @@ class MtHttpTest extends MikrotikTestCase
         $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertOk()->assertSee('بازنشانی با اولین اتصال');
         $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.reset-first', $a), ['reason' => 'فروش مجدد'])->assertSessionHas('success');
         $this->actingAs($this->userWith(['mt_accounts.view']))->post(route('mt.accounts.reset-first', $a), ['reason' => 'xxx'])->assertForbidden();
-        $this->actingAs($admin)->confirmed()->delete(route('mt.accounts.destroy', $a), ['reason' => 'تست حذف'])->assertRedirect('/mt/accounts');
+        $this->actingAs($admin)->confirmed()->delete(route('mt.accounts.destroy', $a), ['reason' => 'تست حذف'])->assertRedirect('/l2tp/accounts');
         $this->assertNull($this->ros->find('ppp/secret', 'name', 'act1'));
         $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertOk()->assertSee('حذف‌شده');
     }

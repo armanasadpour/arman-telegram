@@ -101,6 +101,12 @@ class MtAccount extends Model
         return $this->protocol === 'wireguard';
     }
 
+    /** The account list this account belongs in (L2TP or WireGuard menu). */
+    public function listUrl(): string
+    {
+        return route($this->isWireguard() ? 'wg.accounts' : 'l2tp.accounts');
+    }
+
     public function protocolLabel(): string
     {
         return MtGroup::PROTOCOLS[$this->protocol] ?? $this->protocol;

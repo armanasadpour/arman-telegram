@@ -21,14 +21,17 @@ class MtGroupsController extends Controller
 {
     public function __construct(private RouterConnector $ros, private AuditLogger $audit) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('routers.view');
+        $proto = $request->route('proto');
+        $groups = MtGroup::query()->with('router')->withCount(['accounts' => fn ($q) => $q->whereNull('deleted_at')])
+            ->when($proto, fn ($w) => $w->where('protocol', $proto))->orderBy('router_id')->orderBy('protocol')->orderBy('name')->get();
+        // packages ("tariffs") of this protocol: new-account packages of its groups, plus MikroTik renewal / top-up packages
+        $packages = Package::query()->with('mtGroup')->where('protocol', 'mikrotik')->orderBy('type')->orderBy('sort_order')->orderBy('price_rial')->get()
+            ->filter(fn ($p) => ! $proto || $p->type !== 'new' || $p->mtGroup?->protocol === $proto)->values();
 
-        return view('mt.groups.index', [
-            'groups' => MtGroup::query()->with('router')->withCount(['accounts' => fn ($q) => $q->whereNull('deleted_at')])->orderBy('router_id')->orderBy('protocol')->orderBy('name')->get(),
-            'routers' => Router::query()->orderBy('name')->get(),
-        ]);
+        return view('mt.groups.index', ['groups' => $groups, 'routers' => Router::query()->orderBy('name')->get(), 'proto' => $proto, 'packages' => $packages]);
     }
 
     public function create(Request $request): View|RedirectResponse
@@ -64,7 +67,7 @@ class MtGroupsController extends Controller
         }
         $this->audit->log('mt_groups.create', $g, 'ساخت گروه میکروتیک «'.$g->name.'» ('.$g->protocolLabel().') روی «'.$router->name.'»');
 
-        return redirect()->route('mt.groups.index')->with('success', 'گروه ساخته شد. اکنون می‌توانید برای آن بسته تعریف کنید یا اکانت بسازید.');
+        return redirect()->route($g->protocol === 'wireguard' ? 'wg.groups' : 'l2tp.groups')->with('success', 'گروه ساخته شد. اکنون می‌توانید برای آن بسته تعریف کنید یا اکانت بسازید.');
     }
 
     public function update(Request $request, MtGroup $group): RedirectResponse
@@ -78,7 +81,7 @@ class MtGroupsController extends Controller
         }
         $this->audit->log('mt_groups.update', $group, 'ویرایش گروه میکروتیک «'.$group->name.'»', AuditLogger::diff($before, $group->only(array_keys($before))));
 
-        return redirect()->route('mt.groups.index')->with('success', 'گروه ذخیره شد. تغییر پروفایل یا سرعت روی اکانت‌های جدید اعمال می‌شود.');
+        return redirect()->route($group->protocol === 'wireguard' ? 'wg.groups' : 'l2tp.groups')->with('success', 'گروه ذخیره شد. تغییر پروفایل یا سرعت روی اکانت‌های جدید اعمال می‌شود.');
     }
 
     public function destroy(MtGroup $group): RedirectResponse

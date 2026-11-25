@@ -4,7 +4,10 @@
       <h1>وضعیت سرویس‌ها</h1>
       <p class="muted">بررسی زنده در {{ jdate($checkedAt, 'Y/m/d H:i:s') }}</p>
     </div>
-    <a class="btn btn-secondary" href="{{ route('system.status') }}">بررسی دوباره</a>
+    <div class="actions">
+      @if(auth()->user()->isSuperAdmin())<a class="btn" href="{{ route('system.update') }}">بارگذاری به‌روزرسانی</a>@endif
+      <a class="btn btn-secondary" href="{{ route('system.status') }}">بررسی دوباره</a>
+    </div>
   </div>
   <div class="card">
     <div class="table-wrap">
@@ -30,12 +33,8 @@
     <div class="card card-danger">
       <h2>به‌روزرسانی دیتابیس به نسخه {{ config('panel.version') }}</h2>
       <p class="muted">{{ fa($pending) }} تغییر دیتابیس اجرا نشده است. پیش از اجرا از دیتابیس نسخه پشتیبان بگیرید (cPanel ← Backup).</p>
-      <form method="post" action="{{ route('system.upgrade') }}" data-confirm="از دیتابیس پشتیبان گرفته‌اید؟ به‌روزرسانی اجرا شود؟">
+      <form method="post" action="{{ route('system.upgrade') }}" @if(session('auto_upgrade')) data-autosubmit @endif>
         @csrf
-        <div class="field w-280">
-          <label for="upgrade_password">رمز عبور خودتان (برای تأیید)</label>
-          <input id="upgrade_password" name="password" type="password" class="input ltr" autocomplete="current-password" required>
-        </div>
         <button class="btn" type="submit">اجرای به‌روزرسانی</button>
       </form>
     </div>

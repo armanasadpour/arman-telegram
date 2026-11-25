@@ -15,7 +15,7 @@
           @endif
         @endcan
       @endunless
-      <a class="btn btn-secondary" href="{{ route('mt.accounts.index') }}">بازگشت</a>
+      <a class="btn btn-secondary" href="{{ $a->listUrl() }}">بازگشت</a>
     </div>
   </div>
 

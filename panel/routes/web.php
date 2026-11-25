@@ -111,6 +111,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/mt/groups/{group}', [MtGroupsController::class, 'update'])->name('mt.groups.update')->middleware('throttle:20,1');
     Route::delete('/mt/groups/{group}', [MtGroupsController::class, 'destroy'])->name('mt.groups.destroy');
     Route::get('/mt/accounts', [MtAccountsController::class, 'index'])->name('mt.accounts.index');
+    Route::get('/l2tp/accounts', [MtAccountsController::class, 'index'])->defaults('proto', 'l2tp')->name('l2tp.accounts');
+    Route::get('/wireguard/accounts', [MtAccountsController::class, 'index'])->defaults('proto', 'wireguard')->name('wg.accounts');
+    Route::get('/l2tp/groups', [MtGroupsController::class, 'index'])->defaults('proto', 'l2tp')->name('l2tp.groups');
+    Route::get('/wireguard/groups', [MtGroupsController::class, 'index'])->defaults('proto', 'wireguard')->name('wg.groups');
     Route::get('/mt/groups/{group}/import', [MtAccountsController::class, 'importForm'])->name('mt.import');
     Route::post('/mt/groups/{group}/import', [MtAccountsController::class, 'import'])->name('mt.import.store')->middleware('throttle:20,1');
     Route::get('/mt/accounts/create', [MtAccountsController::class, 'create'])->name('mt.accounts.create');
@@ -235,6 +239,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::get('/system', [SystemController::class, 'status'])->name('system.status');
     Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade')->middleware('throttle:10,1');
+    Route::get('/system/update', [SystemController::class, 'updateForm'])->name('system.update');
+    Route::post('/system/update', [SystemController::class, 'updateUpload'])->name('system.update.store')->middleware('throttle:10,1');
 });
 
 // Messenger webhooks (no session auth; secured by the random path secret and platform headers)
