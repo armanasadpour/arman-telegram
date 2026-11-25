@@ -76,7 +76,7 @@
               <div class="field">
                 <label for="relay_url">آدرس واسط</label>
                 <input class="input ltr" id="relay_url" name="relay_url" value="{{ old('relay_url', $bot->relay_url) }}" placeholder="https://xxx.workers.dev یا https://script.google.com/macros/s/…/exec">
-                <div class="help"><a href="{{ route('bots.relay', 'cloudflare') }}">کد و راهنمای Cloudflare Worker</a> — <a href="{{ route('bots.relay', 'gas') }}">کد و راهنمای Google Apps Script</a></div>
+                <div class="help">همان آدرس Worker یا Apps Script افزونه خبر (بستک‌نیوز) هم کار می‌کند. پیام‌ها را پنل هر چند ثانیه خودش می‌گیرد.<br><a href="{{ route('bots.relay', 'cloudflare') }}">کد و راهنمای Cloudflare Worker</a> — <a href="{{ route('bots.relay', 'gas') }}">کد و راهنمای Google Apps Script</a></div>
               </div>
             @endif
             <div class="field">

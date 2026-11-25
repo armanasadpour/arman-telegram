@@ -2,8 +2,11 @@
 
 use App\Bots\Notifier;
 use App\Bots\Outbox;
+use App\Bots\Platforms;
+use App\Bots\UpdateHandler;
 use App\Ibs\ErrorMessages;
 use App\Ibs\IbsConnector;
+use App\Models\Bot;
 use App\Models\MtAccount;
 use App\Models\ProvisioningJob;
 use App\Models\Role;
@@ -25,6 +28,7 @@ use App\Services\Mikrotik\MtProvisioning;
 use App\Services\PermissionRegistry;
 use App\Services\Settings;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
@@ -236,3 +240,49 @@ Artisan::command('mt:accounting', function () {
     return 0;
 })->purpose('Poll MikroTik usage, enforce limits, retry pending creations');
 Schedule::command('mt:accounting')->everyMinute()->withoutOverlapping(5);
+
+// Telegram through a Cloudflare / Apps Script relay: the panel fetches messages itself (getUpdates long polling)
+// for ~50 seconds per run, so replies come within a few seconds without Telegram having to reach this host.
+Artisan::command('bots:poll', function () {
+    if (! Schema::hasTable('bots')) {
+        return 0;
+    }
+    $bot = Bot::for('telegram');
+    if (! $bot->is_active || ! $bot->isConfigured() || $bot->relay_mode === 'direct') {
+        return 0;
+    }
+    $lock = Cache::lock('bots:poll', 70);
+    if (! $lock->get()) {
+        return 0;
+    }
+    try {
+        $api = app(Platforms::class)->for($bot);
+        $handler = app(UpdateHandler::class);
+        $settings = app(Settings::class);
+        $deadline = microtime(true) + (int) config('panel.bot_poll_seconds', 50);
+        $n = 0;
+        do {
+            $offset = (int) $settings->get('bots.telegram_offset', '0');
+            $left = (int) ($deadline - microtime(true));
+            $updates = $api->getUpdates($offset, max(0, min(20, $left - 2)));
+            foreach ($updates as $u) {
+                $settings->set('bots.telegram_offset', (string) ((int) ($u['update_id'] ?? 0) + 1));
+                $n += (int) ($handler->handle($bot, $u) === 'handled');
+            }
+            if ($updates) {
+                app(Outbox::class)->flush();
+            }
+        } while (microtime(true) < $deadline - 3);
+        $bot->forceFill(['last_error' => null, 'last_error_at' => null])->save();
+        $this->info("handled: $n");
+    } catch (Throwable $e) {
+        $msg = mb_substr(str_replace((string) $bot->token, '***', $e->getMessage()), 0, 500);
+        $bot->forceFill(['last_error_at' => now(), 'last_error' => $msg])->save();
+        $this->error($msg);
+    } finally {
+        $lock->release();
+    }
+
+    return 0;
+})->purpose('Fetch Telegram messages through the relay (when Telegram cannot reach this host)');
+Schedule::command('bots:poll')->everyMinute()->withoutOverlapping(2)->runInBackground();

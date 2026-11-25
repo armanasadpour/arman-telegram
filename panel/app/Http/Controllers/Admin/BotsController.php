@@ -109,7 +109,8 @@ class BotsController extends Controller
         $bot->forceFill(['bot_username' => $me['username'], 'webhook_set_at' => now(), 'last_error' => null, 'last_error_at' => null])->save();
         $this->audit->log('bots.connect', $bot, 'اتصال وبهوک ربات '.$bot->label());
 
-        return back()->with('success', 'ربات '.$bot->label().($me['username'] ? ' (@'.$me['username'].')' : '').' وصل شد. آدرس دریافت پیام‌ها ثبت شد.')
+        return back()->with('success', 'ربات '.$bot->label().($me['username'] ? ' (@'.$me['username'].')' : '').' وصل شد. '
+            .($url === 'polling' ? 'پیام‌ها از مسیر واسط هر چند ثانیه توسط پنل دریافت می‌شود (Cron هر دقیقه لازم است).' : 'آدرس دریافت پیام‌ها ثبت شد.'))
             ->with('probe', [$platform => ['raw' => $me['raw'], 'url' => preg_replace('#/hook/([a-z]+)/[A-Za-z0-9]+#', '/hook/$1/…', $url)]]);
     }
 

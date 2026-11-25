@@ -44,8 +44,28 @@ class TelegramLike implements Platform
         return ['username' => $r['username'] ?? null, 'raw' => $r];
     }
 
+    /** True when Telegram goes through a relay: updates are then fetched by the panel (getUpdates), no webhook. */
+    public function polls(): bool
+    {
+        return $this->mode() !== 'direct';
+    }
+
+    /** @return list<array> raw updates */
+    public function getUpdates(int $offset, int $timeout): array
+    {
+        $r = $this->call('getUpdates', ['offset' => $offset, 'timeout' => $timeout, 'allowed_updates' => ['message']], $timeout + 15);
+
+        return is_array($r) ? array_values(array_filter($r, 'is_array')) : [];
+    }
+
     public function setWebhook(): string
     {
+        if ($this->polls()) {
+            // Through a relay the panel fetches messages itself (every few seconds, by cron): no webhook may be set.
+            $this->call('deleteWebhook', ['drop_pending_updates' => false]);
+
+            return 'polling';
+        }
         $url = match ($this->mode()) {
             'cloudflare' => rtrim((string) $this->bot->relay_url, '/').'/hook',
             'gas' => (string) $this->bot->relay_url.'?s='.$this->bot->relaySecret(),
@@ -73,27 +93,38 @@ class TelegramLike implements Platform
         return $this->bot->platform === 'telegram' ? $this->bot->relay_mode : 'direct';
     }
 
-    /** @return mixed the "result" field */
-    private function call(string $method, array $params): mixed
+    /**
+     * Relays (same as the news plugin on this host):
+     *   Cloudflare Worker: transparent proxy, {worker}/bot<token>/<method> is api.telegram.org/bot<token>/<method>.
+     *   Google Apps Script: POST form fields bot_token, method, args (JSON) to the /exec URL.
+     *
+     * @return mixed the "result" field
+     */
+    private function call(string $method, array $params, int $timeout = 20): mixed
     {
         $token = (string) $this->bot->token;
         if ($token === '') {
             throw new BotApiException('توکن ربات تنظیم نشده است.');
         }
         try {
-            $http = Http::timeout(15)->connectTimeout(8)->acceptJson()->asJson();
+            $http = Http::timeout($timeout)->connectTimeout(10)->acceptJson();
             $res = match ($this->mode()) {
-                'cloudflare' => $http->withHeaders(['X-Relay-Secret' => $this->bot->relaySecret()])
-                    ->post(rtrim((string) $this->bot->relay_url, '/').'/api/bot'.$token.'/'.$method, $params),
-                'gas' => $http->post((string) $this->bot->relay_url, ['s' => $this->bot->relaySecret(), 'token' => $token, 'method' => $method, 'params' => $params]),
-                default => $http->post($this->base().$token.'/'.$method, $params),
+                'cloudflare' => $http->asJson()->post(rtrim((string) $this->bot->relay_url, '/').'/bot'.$token.'/'.$method, (object) $params),
+                // nested values (reply_markup, allowed_updates) go as JSON strings: Telegram accepts both forms, and the
+                // plugin's script re-posts the args as a flat form
+                'gas' => $http->asForm()->post((string) $this->bot->relay_url, ['bot_token' => $token, 'method' => $method,
+                    'args' => json_encode((object) array_map(fn ($v) => is_array($v) ? json_encode($v, JSON_UNESCAPED_UNICODE) : $v, $params), JSON_UNESCAPED_UNICODE)]),
+                default => $http->asJson()->post($this->base().$token.'/'.$method, (object) $params),
             };
         } catch (ConnectionException $e) {
             throw new BotApiException('اتصال به سرور '.$this->bot->label().' برقرار نشد: '.$this->clean($e->getMessage()));
         }
-        $j = $res->json();
+        $j = json_decode((string) $res->body(), true);
         if (! is_array($j) || ! ($j['ok'] ?? false)) {
             $desc = is_array($j) ? ($j['description'] ?? '') : '';
+            if (! is_array($j) && $this->mode() !== 'direct') {
+                $desc = 'پاسخ واسط JSON تلگرام نیست؛ کد Worker / Apps Script یا آدرس آن را بررسی کنید ('.mb_substr(trim(strip_tags((string) $res->body())), 0, 80).')';
+            }
             throw new BotApiException('پاسخ خطا از '.$this->bot->label().' (HTTP '.$res->status().')'.($desc !== '' ? ': '.$this->clean((string) $desc) : ''));
         }
 

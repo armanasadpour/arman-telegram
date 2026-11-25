@@ -7,6 +7,7 @@ use App\Bots\RelayCode;
 use App\Models\AuditLog;
 use App\Models\Bot;
 use App\Models\BotUser;
+use App\Services\Settings;
 use Illuminate\Support\Facades\Http;
 
 class BotAdminTest extends BotTestCase
@@ -55,38 +56,56 @@ class BotAdminTest extends BotTestCase
         $this->actingAs($this->userWith(['dashboard.view']))->get('/bots')->assertForbidden();
     }
 
-    public function test_cloudflare_relay_routes_calls_and_webhook(): void
+    public function test_cloudflare_relay_is_transparent_and_messages_are_polled(): void
     {
-        $bot = $this->bot('telegram', ['relay_mode' => 'cloudflare', 'relay_url' => 'https://relay.example.workers.dev']);
+        $bot = $this->bot('telegram', ['relay_mode' => 'cloudflare', 'relay_url' => 'https://relay.example.workers.dev/']);
         $admin = $this->superAdmin();
         $code = $this->actingAs($admin)->confirmed()->get('/bots/relay/cloudflare')->assertOk()->viewData('code');
-        $this->assertStringContainsString($bot->relaySecret(), $code);
-        $this->assertStringContainsString($bot->hookUrl(), $code);
+        $this->assertStringContainsString('"https://api.telegram.org" + url.pathname', $code, 'same worker as the news plugin');
 
-        $this->actingAs($admin)->from('/bots')->post('/bots/telegram/connect')->assertSessionHas('success');
-        $req = $this->request('/setWebhook');
-        $this->assertSame('https://relay.example.workers.dev/api/bot123456:SECRET-TOKEN_abc/setWebhook', $req->url());
-        $this->assertSame($bot->relaySecret(), $req->header('X-Relay-Secret')[0]);
-        $this->assertSame('https://relay.example.workers.dev/hook', $req->data()['url']);
-        $this->assertSame($bot->relaySecret(), $req->data()['secret_token']);
+        $this->actingAs($admin)->from('/bots')->post('/bots/telegram/connect')->assertSessionHas('success', fn ($m) => str_contains($m, 'واسط'));
+        $this->assertNotNull($this->request('relay.example.workers.dev/bot123456:SECRET-TOKEN_abc/getMe'));
+        $this->assertNotNull($this->request('relay.example.workers.dev/bot123456:SECRET-TOKEN_abc/deleteWebhook'), 'polling: webhook removed');
+        $this->assertNull($this->request('/setWebhook'));
         $this->assertNotContains(true, array_map(fn ($u) => str_contains($u, 'api.telegram.org'), $this->urls()), 'never calls Telegram directly');
 
-        // Incoming through the relay needs the relay header, not Telegram's
-        $this->withHeaders(['X-Telegram-Bot-Api-Secret-Token' => $bot->relaySecret()])->postJson('/hook/telegram/'.$bot->hook_secret, ['update_id' => 5])->assertForbidden();
-        $this->tg('/start')->assertOk();
-        $this->assertNotNull($this->request('relay.example.workers.dev/api/bot123456:SECRET-TOKEN_abc/sendMessage'));
+        // the panel fetches messages through the relay and answers through it
+        $this->freshHttpFake();
+        $polls = 0;
+        Http::fake(['relay.example.workers.dev/*' => function ($req) use (&$polls) {
+            if (str_ends_with($req->url(), '/getUpdates')) {
+                $polls++;
+
+                return Http::response(['ok' => true, 'result' => $polls === 1 && ($req->data()['offset'] ?? null) === 0 ? [
+                    ['update_id' => 77, 'message' => ['message_id' => 1, 'chat' => ['id' => 555, 'type' => 'private'], 'from' => ['id' => 555, 'first_name' => 'Ali'], 'text' => '/start']],
+                ] : []]);
+            }
+
+            return Http::response(['ok' => true, 'result' => ['message_id' => 9]]);
+        }]);
+        config(['panel.bot_poll_seconds' => 4]);
+        $this->artisan('bots:poll')->assertSuccessful();
+        $this->assertSame('78', app(Settings::class)->get('bots.telegram_offset'));
+        $sent = Http::recorded()->first(fn ($p) => str_ends_with($p[0]->url(), '/bot123456:SECRET-TOKEN_abc/sendMessage'));
+        $this->assertNotNull($sent, 'reply sent through the relay');
+        $this->assertSame('555', (string) $sent[0]->data()['chat_id']);
+        $this->artisan('bots:poll')->assertSuccessful();
+        $this->assertSame(1, \DB::table('bot_updates')->count(), 'each update handled once');
     }
 
     public function test_apps_script_relay_payload(): void
     {
         $bot = $this->bot('telegram', ['relay_mode' => 'gas', 'relay_url' => 'https://script.google.com/macros/s/ABC/exec']);
+        $this->freshHttpFake();
+        Http::fake(['script.google.com/*' => Http::response('{"ok":true,"result":{"username":"panel_bot"}}', 200, ['Content-Type' => 'text/plain'])]);
         $this->actingAs($this->superAdmin())->from('/bots')->post('/bots/telegram/connect')->assertSessionHas('success');
-        $req = Http::recorded()->map(fn ($p) => $p[0])->first(fn ($r) => ($r->data()['method'] ?? null) === 'setWebhook');
+        $req = Http::recorded()->map(fn ($p) => $p[0])->first(fn ($r) => ($r->data()['method'] ?? null) === 'getMe');
         $this->assertSame('https://script.google.com/macros/s/ABC/exec', $req->url());
-        $this->assertSame($bot->relaySecret(), $req->data()['s']);
-        $this->assertSame('https://script.google.com/macros/s/ABC/exec?s='.$bot->relaySecret(), $req->data()['params']['url']);
-        $this->assertArrayNotHasKey('secret_token', $req->data()['params']);
-        $this->assertStringContainsString('doPost', RelayCode::appsScript($bot));
+        $this->assertSame('123456:SECRET-TOKEN_abc', $req->data()['bot_token'], 'same fields as the news plugin script');
+        $this->assertTrue($req->isForm());
+        $del = Http::recorded()->map(fn ($p) => $p[0])->first(fn ($r) => ($r->data()['method'] ?? null) === 'deleteWebhook');
+        $this->assertSame(['drop_pending_updates' => false], json_decode($del->data()['args'], true));
+        $this->assertStringContainsString('e.parameter.bot_token', RelayCode::appsScript($bot));
     }
 
     public function test_rubika_parse_and_keypad(): void

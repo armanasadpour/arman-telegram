@@ -4,14 +4,11 @@ namespace App\Http\Controllers\Bots;
 
 use App\Bots\Engine;
 use App\Bots\Platforms;
+use App\Bots\UpdateHandler;
 use App\Http\Controllers\Controller;
 use App\Models\Bot;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 /**
  * POST /hook/{platform}/{secret}. The random path secret identifies the bot; Telegram also proves itself
@@ -36,23 +33,8 @@ class WebhookController extends Controller
         if (! is_array($payload)) {
             return response()->json(['ok' => true]);
         }
-        $in = $platforms->for($bot)->parse($payload);
-        if (! $in) {
-            return response()->json(['ok' => true]);
-        }
-        try {
-            DB::table('bot_updates')->insert(['bot_id' => $bot->id, 'update_key' => mb_substr($in->updateKey, 0, 100), 'created_at' => now()]);
-        } catch (QueryException) {
-            return response()->json(['ok' => true, 'duplicate' => true]);   // already handled
-        }
-        $bot->forceFill(['last_update_at' => now()])->save();
-        try {
-            $engine->handle($bot, $in);
-        } catch (Throwable $e) {
-            Log::error('bot handling failed', ['platform' => $bot->platform, 'error' => mb_substr(str_replace((string) $bot->token, '***', $e->getMessage()), 0, 500)]);
-            $bot->forceFill(['last_error_at' => now(), 'last_error' => mb_substr(str_replace((string) $bot->token, '***', $e->getMessage()), 0, 500)])->save();
-        }
+        $r = app(UpdateHandler::class)->handle($bot, $payload);
 
-        return response()->json(['ok' => true]);
+        return response()->json($r === 'duplicate' ? ['ok' => true, 'duplicate' => true] : ['ok' => true]);
     }
 }
