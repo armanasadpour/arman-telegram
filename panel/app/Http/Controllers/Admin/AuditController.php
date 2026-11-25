@@ -46,6 +46,8 @@ class AuditController extends Controller
         'accounts.add_volume' => 'افزایش حجم اکانت',
         'accounts.delete' => 'حذف اکانت',
         'accounts.import_all' => 'وارد کردن همه اکانت‌ها',
+        'ibs_groups.create' => 'ساخت گروه در سرور',
+        'ibs_groups.update' => 'ویرایش گروه در سرور',
         'accounts.provision_review' => 'ساخت اکانت نیازمند رسیدگی',
         'accounts.provision_compensated' => 'لغو ساخت اکانت و پاک‌سازی',
         'accounts.provision_resolved' => 'بستن دستی ساخت اکانت',

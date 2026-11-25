@@ -162,6 +162,23 @@ class IbsConnector
         ];
     }
 
+    /** group.addNewGroup (IBSng name rules: letters, digits, "_" and "-"). */
+    public function addGroup(string $name, string $comment): void
+    {
+        $this->write('group.addNewGroup', ['group_name' => $name, 'comment' => $comment]);
+    }
+
+    /**
+     * group.updateGroupAttrs — same attribute names as users (rel_exp_date+unit, multi_login, normal_charge).
+     *
+     * @param  array<string,mixed>  $attrs
+     * @param  list<string>  $delete
+     */
+    public function updateGroupAttrs(string $name, array $attrs, array $delete = []): void
+    {
+        $this->write('group.updateGroupAttrs', ['group_name' => $name, 'attrs' => $attrs ?: new \stdClass, 'to_del_attrs' => $delete]);
+    }
+
     /** Adds (or with a negative value, subtracts) credit. */
     public function changeCredit(int $userId, float $credit, string $comment): void
     {

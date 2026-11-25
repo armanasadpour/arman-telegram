@@ -117,13 +117,58 @@ class FakeIbs implements Transport
         $this->need($p, 'group_name');
         $g = $this->groups[$p['group_name']] ?? $this->fault('GROUP_NAME_INVALID', 'Group name '.$p['group_name'].' is invalid');
         $raw = array_map('strval', $g['attrs']);
-        $raw['normal_charge'] = (string) (array_search($g['attrs']['normal_charge'], array_keys($this->charges), true) + 1);
         $attrs = $g['attrs'];
+        if (isset($g['attrs']['normal_charge'])) {
+            $raw['normal_charge'] = (string) (array_search($g['attrs']['normal_charge'], array_keys($this->charges), true) + 1);
+        }
         unset($attrs['rel_exp_date']);
-        $attrs += $this->relParsed($g['attrs']['rel_exp_date']);
-        $attrs['multi_login'] = (string) $g['attrs']['multi_login'];
+        if (isset($g['attrs']['rel_exp_date'])) {
+            $attrs += $this->relParsed($g['attrs']['rel_exp_date']);
+        }
+        if (isset($g['attrs']['multi_login'])) {
+            $attrs['multi_login'] = (string) $g['attrs']['multi_login'];
+        }
 
         return ['group_id' => $g['id'], 'group_name' => $p['group_name'], 'comment' => '', 'owner_id' => 0, 'owner_name' => 'system', 'raw_attrs' => $raw, 'attrs' => $attrs];
+    }
+
+    private function m_group_addNewGroup(array $p): int
+    {
+        $this->need($p, 'group_name', 'comment');
+        if ($p['group_name'] === '' || preg_match('/[^a-zA-Z0-9_\-]/', $p['group_name'])) {
+            $this->fault('GROUP_NAME_INVALID', 'Group name '.$p['group_name'].' is invalid');
+        }
+        if (isset($this->groups[$p['group_name']])) {
+            $this->fault('GROUP_NAME_TAKEN', 'Group name '.$p['group_name'].' already exists');
+        }
+        $id = max(array_column($this->groups, 'id') ?: [0]) + 1;
+        $this->groups[$p['group_name']] = ['id' => $id, 'attrs' => []];
+
+        return $id;
+    }
+
+    private function m_group_updateGroupAttrs(array $p): string
+    {
+        $this->need($p, 'group_name', 'attrs', 'to_del_attrs');
+        isset($this->groups[$p['group_name']]) || $this->fault('GROUP_NAME_INVALID', 'Group name '.$p['group_name'].' is invalid');
+        $a = (array) $p['attrs'];
+        if (array_key_exists('normal_charge', $a) && ! isset($this->charges[$a['normal_charge']])) {
+            $this->fault('CHARGE_NAME_INVALID', 'Charge name '.$a['normal_charge'].' is invalid');
+        }
+        $g = &$this->groups[$p['group_name']]['attrs'];
+        if (array_key_exists('rel_exp_date', $a)) {
+            $g['rel_exp_date'] = (int) $a['rel_exp_date'] * ['Hours' => 3600, 'Days' => 86400, 'Months' => 2592000, 'Years' => 31536000][$a['rel_exp_date_unit']];
+        }
+        foreach (['multi_login', 'normal_charge'] as $k) {
+            if (array_key_exists($k, $a)) {
+                $g[$k] = $k === 'multi_login' ? (int) $a[$k] : $a[$k];
+            }
+        }
+        foreach ((array) $p['to_del_attrs'] as $k) {
+            unset($g[$k]);
+        }
+
+        return '';
     }
 
     private function m_charge_listCharges(array $p): array

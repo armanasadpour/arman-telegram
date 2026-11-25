@@ -12,6 +12,7 @@ final class ErrorMessages
         'NORMAL_USERNAME_DOESNT_EXISTS' => 'این نام کاربری در سرور وجود ندارد.',
         'USERID_DOESNT_EXISTS' => 'این اکانت در سرور وجود ندارد (احتمالاً حذف شده است).',
         'BAD_NORMAL_USERNAME' => 'نام کاربری شامل کاراکتر غیرمجاز است.',
+        'GROUP_NAME_TAKEN' => 'گروهی با این نام در سرور وجود دارد.',
         'GROUP_NAME_INVALID' => 'گروه انتخاب‌شده در سرور وجود ندارد.',
         'ACCESS_DENIED' => 'مدیر سرور تنظیم‌شده اجازه این عملیات را ندارد.',
         'INCORRECT_PASSWORD' => 'رمز مدیر سرور نادرست است.',
