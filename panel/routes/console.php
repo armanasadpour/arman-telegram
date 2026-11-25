@@ -5,7 +5,10 @@ use App\Ibs\IbsConnector;
 use App\Models\ProvisioningJob;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Services\AuditLogger;
+use App\Services\Finance\ResellerSales;
+use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
 use App\Services\Ibs\Provisioning;
 use App\Services\PermissionRegistry;
@@ -110,12 +113,12 @@ Schedule::command('ibs:sync-accounts')->everyFiveMinutes()->withoutOverlapping(1
 Schedule::command('ibs:sync-catalog')->hourly()->withoutOverlapping(10);
 
 // ---------------------------------------------------------------- Resellers (phase 5)
-$ibsCommand('resellers:sync-sales', fn () => 'updated: '.app(\App\Services\Finance\ResellerSales::class)->syncPending(), 'Settle reseller sales whose provisioning finished later');
+$ibsCommand('resellers:sync-sales', fn () => 'updated: '.app(ResellerSales::class)->syncPending(), 'Settle reseller sales whose provisioning finished later');
 Schedule::command('resellers:sync-sales')->everyMinute()->withoutOverlapping(5);
 
-Artisan::command('wallets:reconcile', function (\App\Services\Finance\WalletService $w) {
+Artisan::command('wallets:reconcile', function (WalletService $w) {
     $bad = 0;
-    foreach (\App\Models\Wallet::query()->cursor() as $wallet) {
+    foreach (Wallet::query()->cursor() as $wallet) {
         $r = $w->reconcile($wallet);
         if (! $r['ok']) {
             $bad++;

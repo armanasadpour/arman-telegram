@@ -10,13 +10,14 @@ use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Admin\ProvisioningJobsController;
 use App\Http\Controllers\Admin\ResellersController;
 use App\Http\Controllers\Admin\RoleController;
-use App\Http\Controllers\Portal\PortalController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\CronController;
+use App\Http\Controllers\Portal\PortalController;
+use App\Http\Middleware\EnsureReseller;
 use App\Http\Middleware\RequireRecentPasswordConfirmation;
 use Illuminate\Support\Facades\Route;
 
@@ -91,7 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/resellers/{reseller}/fixed-price', [ResellersController::class, 'setFixedPrice'])->name('resellers.fixed-price');
 
     // Reseller portal
-    Route::prefix('r')->name('portal.')->middleware(\App\Http\Middleware\EnsureReseller::class)->group(function () {
+    Route::prefix('r')->name('portal.')->middleware(EnsureReseller::class)->group(function () {
         Route::get('/', [PortalController::class, 'dashboard'])->name('dashboard');
         Route::get('/prices', [PortalController::class, 'prices'])->name('prices');
         Route::get('/sell', [PortalController::class, 'sellForm'])->name('sell');

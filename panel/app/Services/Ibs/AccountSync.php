@@ -8,6 +8,7 @@ use App\Models\IbsCharge;
 use App\Models\IbsGroup;
 use App\Models\VpnAccount;
 use App\Services\Settings;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -285,7 +286,7 @@ class AccountSync
     /** Ids checked per minute since the import started, for the progress banner. */
     public function importRate(array $st): ?float
     {
-        $mins = isset($st['started_at']) ? max(1, now()->diffInMinutes(\Carbon\Carbon::parse($st['started_at']), true)) : null;
+        $mins = isset($st['started_at']) ? max(1, now()->diffInMinutes(Carbon::parse($st['started_at']), true)) : null;
 
         return $mins ? ((int) $st['cursor']) / $mins : null;
     }

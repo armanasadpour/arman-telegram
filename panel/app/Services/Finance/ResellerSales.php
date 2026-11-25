@@ -3,6 +3,8 @@
 namespace App\Services\Finance;
 
 use App\Ibs\ErrorMessages;
+use App\Ibs\IbsException;
+use App\Ibs\IbsNotConfiguredException;
 use App\Ibs\IbsUnavailableException;
 use App\Models\Package;
 use App\Models\ProvisioningJob;
@@ -207,7 +209,7 @@ class ResellerSales
 
     private function message(Throwable $e): string
     {
-        return $e instanceof \App\Ibs\IbsException || $e instanceof IbsUnavailableException || $e instanceof \App\Ibs\IbsNotConfiguredException
+        return $e instanceof IbsException || $e instanceof IbsUnavailableException || $e instanceof IbsNotConfiguredException
             ? ErrorMessages::for($e) : $e->getMessage();
     }
 }

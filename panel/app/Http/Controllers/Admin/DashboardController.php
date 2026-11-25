@@ -9,12 +9,13 @@ use App\Models\User;
 use App\Models\VpnAccount;
 use App\Services\Settings;
 use App\Services\SystemStatus;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, SystemStatus $status): View|\Illuminate\Http\RedirectResponse
+    public function __invoke(Request $request, SystemStatus $status): View|RedirectResponse
     {
         if ($request->user()->isReseller()) {
             return redirect()->route('portal.dashboard');

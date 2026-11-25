@@ -14,6 +14,7 @@ use App\Models\VpnAccount;
 use App\Services\Finance\InsufficientBalanceException;
 use App\Services\Finance\ResellerPricing;
 use App\Services\Finance\ResellerSales;
+use App\Services\Finance\WalletService;
 use App\Services\Ibs\Provisioning;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -105,7 +106,7 @@ class ResellerSalesTest extends ResellerTestCase
         $this->assertSame('refunded', $s->status);
         $this->assertSame(1_000_000, $this->balance($r));
         $this->assertSame(['manual_credit', 'purchase', 'refund'], LedgerEntry::query()->orderBy('id')->pluck('type')->all());
-        $this->assertTrue(app(\App\Services\Finance\WalletService::class)->reconcile(app(\App\Services\Finance\WalletService::class)->walletFor('reseller', $r->id))['ok']);
+        $this->assertTrue(app(WalletService::class)->reconcile(app(WalletService::class)->walletFor('reseller', $r->id))['ok']);
     }
 
     public function test_compensated_provisioning_refunds(): void

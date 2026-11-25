@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 /**
@@ -42,14 +43,15 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class);
     }
 
-    public function reseller(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function reseller(): HasOne
     {
         return $this->hasOne(Reseller::class);
     }
 
     public function isReseller(): bool
     {
-        return $this->reseller !== null;
+        // Role first: avoids touching the resellers table for staff (it may not exist yet during an upgrade).
+        return $this->roles->contains('name', config('permissions.reseller_role', 'reseller')) && $this->reseller !== null;
     }
 
     public function isSuperAdmin(): bool

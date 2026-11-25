@@ -12,8 +12,11 @@ class UpgradeTest extends TestCase
     /** Simulate a 0.2.1 install that just received the 0.3.0 files. */
     private function makePending(bool $halfFinished = false): void
     {
-        Schema::dropIfExists('provisioning_jobs');
-        Schema::dropIfExists('vpn_accounts');
+        // Later-phase tables reference these through foreign keys (MariaDB enforces the order).
+        foreach (['reseller_sales', 'reseller_category_discounts', 'reseller_prices', 'ledger_entries', 'wallets', 'provisioning_jobs', 'vpn_accounts', 'resellers'] as $t) {
+            Schema::dropIfExists($t);
+        }
+        DB::table('migrations')->where('migration', 'like', '%create_reseller_tables')->delete();
         if (! $halfFinished) {
             Schema::dropIfExists('ibs_groups');
             Schema::dropIfExists('ibs_charges');
@@ -51,6 +54,25 @@ class UpgradeTest extends TestCase
         $this->makePending(halfFinished: true); // ibs_charges/ibs_groups exist, migration not recorded
         $this->actingAs($admin)->from('/system')->post('/system/upgrade', ['password' => 'Password12345'])->assertSessionHas('success');
         $this->assertTrue(Schema::hasTable('provisioning_jobs'));
+        $this->assertTrue(Schema::hasColumn('vpn_accounts', 'reseller_id'));
+    }
+
+    public function test_upgrade_from_040_adds_reseller_tables(): void
+    {
+        $admin = $this->superAdmin();
+        foreach (['reseller_sales', 'reseller_category_discounts', 'reseller_prices', 'ledger_entries', 'wallets'] as $t) {
+            Schema::dropIfExists($t);
+        }
+        Schema::table('vpn_accounts', fn ($t) => $t->dropConstrainedForeignId('reseller_id'));
+        Schema::dropIfExists('resellers');
+        DB::table('migrations')->where('migration', 'like', '%create_reseller_tables')->delete();
+        Cache::forget('system.pending_migrations');
+        config(['panel.check_upgrade_in_tests' => true]);
+
+        $this->actingAs($admin)->from('/system')->post('/system/upgrade', ['password' => 'Password12345'])->assertSessionHas('success');
+        $this->assertTrue(Schema::hasTable('ledger_entries'));
+        $this->assertTrue(Schema::hasColumn('vpn_accounts', 'reseller_id'));
+        $this->actingAs($admin)->get('/resellers')->assertOk();
     }
 
     public function test_others_see_maintenance_and_cannot_upgrade(): void
