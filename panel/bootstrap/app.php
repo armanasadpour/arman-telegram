@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureDatabaseUpToDate;
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ThrottlePerRoute;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,7 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(prepend: [EnsureInstalled::class], append: [ApplyDisplaySettings::class, EnsureUserIsActive::class, EnsureDatabaseUpToDate::class, SecurityHeaders::class]);
-        $middleware->validateCsrfTokens(except: ['hook/*']);
+        $middleware->alias(['throttle' => ThrottlePerRoute::class]);
+        $middleware->validateCsrfTokens(except: ['hook/*', 'pay/callback/*']);
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));
     })

@@ -15,12 +15,18 @@ abstract class BotTestCase extends ResellerTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Http::fake([
+        Http::fake($this->extraFakes() + [
             'api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['message_id' => 1, 'username' => 'panel_bot']]),
             'tapi.bale.ai/*' => Http::response(['ok' => true, 'result' => ['message_id' => 1, 'username' => 'panel_bale_bot']]),
             'botapi.rubika.ir/*' => Http::response(['status' => 'OK', 'data' => ['message_id' => '1', 'bot' => ['username' => 'panel_rbot']]]),
             '*' => Http::response(['ok' => true, 'result' => true]),
         ]);
+    }
+
+    /** Subclasses add host => response/callback stubs that must win over the catch-all. */
+    protected function extraFakes(): array
+    {
+        return [];
     }
 
     protected function freshHttpFake(): void

@@ -7,7 +7,9 @@ use App\Models\ProvisioningJob;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Payments\Payments;
 use App\Services\AuditLogger;
+use App\Services\Finance\CustomerOrders;
 use App\Services\Finance\ResellerSales;
 use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
@@ -144,3 +146,15 @@ Artisan::command('bots:send', function () {
     return 0;
 })->purpose('Send queued bot notifications');
 Schedule::command('bots:send')->everyMinute()->withoutOverlapping(5);
+
+Artisan::command('payments:reverify', function () {
+    if (! Schema::hasTable('payments')) {
+        return 0;
+    }
+    $n = app(Payments::class)->reverifyStuck();
+    $o = app(CustomerOrders::class)->syncPending();
+    $this->info("payments rechecked: {$n}, orders settled: {$o}");
+
+    return 0;
+})->purpose('Re-verify uncertain bank/USDT payments and settle customer orders');
+Schedule::command('payments:reverify')->everyMinute()->withoutOverlapping(5);

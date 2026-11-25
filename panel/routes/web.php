@@ -8,6 +8,8 @@ use App\Http\Controllers\Admin\DiscountsController;
 use App\Http\Controllers\Admin\IbsGroupsController;
 use App\Http\Controllers\Admin\IbsSettingsController;
 use App\Http\Controllers\Admin\PackagesController;
+use App\Http\Controllers\Admin\PaymentsController;
+use App\Http\Controllers\Admin\PaymentSettingsController;
 use App\Http\Controllers\Admin\ProvisioningJobsController;
 use App\Http\Controllers\Admin\ResellersController;
 use App\Http\Controllers\Admin\RoleController;
@@ -19,6 +21,7 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\BotLinkController;
 use App\Http\Controllers\Bots\WebhookController;
 use App\Http\Controllers\CronController;
+use App\Http\Controllers\Pay\PayController;
 use App\Http\Controllers\Portal\PortalController;
 use App\Http\Middleware\EnsureReseller;
 use App\Http\Middleware\RequireRecentPasswordConfirmation;
@@ -56,6 +59,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/bots/{platform}', [BotsController::class, 'update'])->name('bots.update');
         Route::post('/bots/{platform}/rotate', [BotsController::class, 'rotateSecret'])->name('bots.rotate');
         Route::get('/bots/relay/{kind}', [BotsController::class, 'relay'])->name('bots.relay');
+        Route::post('/payments/{payment}/approve', [PaymentsController::class, 'approve'])->name('payments.approve');
+        Route::post('/payments/{payment}/reject', [PaymentsController::class, 'reject'])->name('payments.reject');
+        Route::post('/customer-orders/{order}/refund', [PaymentsController::class, 'refundOrder'])->name('orders.refund');
+        Route::get('/settings/payments', [PaymentSettingsController::class, 'edit'])->name('payments.settings');
+        Route::put('/settings/payments', [PaymentSettingsController::class, 'update'])->name('payments.settings.update');
         Route::delete('/accounts/{account}', [AccountsController::class, 'destroy'])->name('accounts.destroy');
         Route::post('/accounts/{account}/reveal', [AccountsController::class, 'reveal'])->name('accounts.reveal')->middleware('throttle:20,1');
         Route::post('/resellers/{reseller}/adjust', [ResellersController::class, 'adjust'])->name('resellers.adjust');
@@ -63,6 +71,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/resellers/{reseller}/sales/{sale}/refund', [ResellersController::class, 'refundSale'])->name('resellers.refund-sale');
         Route::post('/accounts/jobs/{job}/resolve', [ProvisioningJobsController::class, 'resolve'])->name('accounts.jobs.resolve');
     });
+
+    // Payments
+    Route::get('/payments', [PaymentsController::class, 'index'])->name('payments.index');
+    Route::get('/payments/{payment}', [PaymentsController::class, 'show'])->name('payments.show');
+    Route::get('/payments/{payment}/receipt', [PaymentsController::class, 'receipt'])->name('payments.receipt');
+    Route::post('/payments/{payment}/recheck', [PaymentsController::class, 'recheck'])->name('payments.recheck')->middleware('throttle:20,1');
 
     // Bots
     Route::get('/bots', [BotsController::class, 'index'])->name('bots.index');
@@ -112,6 +126,8 @@ Route::middleware('auth')->group(function () {
 
     // Reseller portal
     Route::prefix('r')->name('portal.')->middleware(EnsureReseller::class)->group(function () {
+        Route::get('/topup', [PortalController::class, 'topupForm'])->name('topup');
+        Route::post('/topup', [PortalController::class, 'topup'])->name('topup.store')->middleware('throttle:20,1');
         Route::get('/', [PortalController::class, 'dashboard'])->name('dashboard');
         Route::get('/prices', [PortalController::class, 'prices'])->name('prices');
         Route::get('/sell', [PortalController::class, 'sellForm'])->name('sell');
@@ -158,3 +174,10 @@ Route::middleware('auth')->group(function () {
 
 // Messenger webhooks (no session auth; secured by the random path secret and platform headers)
 Route::post('/hook/{platform}/{secret}', WebhookController::class)->where('platform', 'telegram|bale|rubika')->where('secret', '[A-Za-z0-9]{20,64}')->middleware('throttle:600,1')->name('bots.hook');
+
+// Public payment pages (addressed by the payment's random UUID)
+Route::get('/pay/{uuid}', [PayController::class, 'show'])->name('pay.show')->middleware('throttle:60,1');
+Route::post('/pay/{uuid}/go', [PayController::class, 'go'])->name('pay.go')->middleware('throttle:20,1');
+Route::post('/pay/{uuid}/card', [PayController::class, 'card'])->name('pay.card')->middleware('throttle:10,1');
+Route::post('/pay/{uuid}/usdt', [PayController::class, 'usdt'])->name('pay.usdt')->middleware('throttle:10,1');
+Route::match(['get', 'post'], '/pay/callback/{uuid}', [PayController::class, 'callback'])->name('pay.callback')->middleware('throttle:60,1');

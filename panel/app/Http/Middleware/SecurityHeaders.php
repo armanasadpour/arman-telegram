@@ -16,7 +16,11 @@ class SecurityHeaders
         $h->set('X-Frame-Options', 'DENY');
         $h->set('Referrer-Policy', 'same-origin');
         $h->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-        $h->set('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+        // A payment page may post to its bank's origin only (set by PayController, never from user input).
+        $extra = (string) $h->get('X-Panel-Form-Action', '');
+        $h->remove('X-Panel-Form-Action');
+        $extra = preg_match('#^https?://[A-Za-z0-9.:\-]+$#', $extra) ? ' '.$extra : '';
+        $h->set('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; form-action 'self'{$extra}; frame-ancestors 'none'; base-uri 'none'");
         if ($request->isSecure()) {
             $h->set('Strict-Transport-Security', 'max-age=31536000');
         }

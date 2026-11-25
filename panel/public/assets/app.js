@@ -22,6 +22,9 @@
     var b = form.querySelector('button[type=submit]');
     if (b) { b.disabled = true; b.dataset.label = b.textContent; b.textContent = 'در حال انجام…'; }
   });
+  // Payment hand-off: forms marked data-autosubmit post themselves (the button stays as a fallback).
+  var auto = document.querySelector('form[data-autosubmit]');
+  if (auto) { setTimeout(function () { auto.submit(); }, 300); }
   // Restore buttons when navigating back (bfcache).
   window.addEventListener('pageshow', function () {
     document.querySelectorAll('form[data-submitted]').forEach(function (f) {

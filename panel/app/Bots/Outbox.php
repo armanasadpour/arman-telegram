@@ -24,13 +24,14 @@ class Outbox
             }
             try {
                 $this->platforms->for($row->bot)->send($row->chat_id, $row->text);
-                $row->forceFill(['status' => 'sent', 'sent_at' => now(), 'error' => null, 'attempts' => $row->attempts + 1])->save();
+                $row->forceFill(['status' => 'sent', 'sent_at' => now(), 'error' => null, 'attempts' => $row->attempts + 1] + ($row->sensitive ? ['text' => '[ارسال شد — محتوای محرمانه حذف شد]'] : []))->save();
                 $sent++;
             } catch (Throwable $e) {
                 $n = $row->attempts + 1;
                 $row->forceFill([
                     'attempts' => $n, 'error' => mb_substr($e->getMessage(), 0, 500),
                     'status' => $n > count(self::BACKOFF_MIN) ? 'failed' : 'pending',
+                ] + ($n > count(self::BACKOFF_MIN) && $row->sensitive ? ['text' => '[ارسال نشد — محتوای محرمانه حذف شد]'] : []) + [
                     'next_attempt_at' => now()->addMinutes(self::BACKOFF_MIN[min($n, count(self::BACKOFF_MIN)) - 1]),
                 ])->save();
                 $failed++;

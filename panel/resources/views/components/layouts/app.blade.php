@@ -30,6 +30,7 @@
       <a href="{{ route('portal.accounts') }}" @class(['active' => request()->routeIs('portal.accounts*')])><x-icon name="user"/>اکانت‌های من</a>
       <a href="{{ route('portal.sales') }}" @class(['active' => request()->routeIs('portal.sales*')])><x-icon name="list"/>فروش‌ها</a>
       <a href="{{ route('portal.ledger') }}" @class(['active' => request()->routeIs('portal.ledger')])><x-icon name="key"/>کیف پول</a>
+      <a href="{{ route('portal.topup') }}" @class(['active' => request()->routeIs('portal.topup')])><x-icon name="tag"/>شارژ کیف پول</a>
       <a href="{{ route('portal.prices') }}" @class(['active' => request()->routeIs('portal.prices')])><x-icon name="tag"/>قیمت‌های من</a>
     @endif
     @can('dashboard.view')
@@ -44,8 +45,11 @@
         <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups')])><x-icon name="layers"/>گروه‌ها و تعرفه‌ها</a>
       @endcan
     @endif
-    @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view') || auth()->user()->can('resellers.view'))
+    @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view') || auth()->user()->can('resellers.view') || auth()->user()->can('payments.view'))
       <div class="section">فروش</div>
+      @can('payments.view')
+        <a href="{{ route('payments.index') }}" @class(['active' => request()->routeIs('payments.index', 'payments.show')])><x-icon name="key"/>پرداخت‌ها</a>
+      @endcan
       @can('resellers.view')
         <a href="{{ route('resellers.index') }}" @class(['active' => request()->routeIs('resellers.*')])><x-icon name="users"/>همکاران فروش</a>
       @endcan
@@ -65,8 +69,11 @@
         <a href="{{ route('roles.index') }}" @class(['active' => request()->routeIs('roles.*')])><x-icon name="shield"/>نقش‌ها و دسترسی‌ها</a>
       @endcan
     @endif
-    @if(auth()->user()->can('audit.view') || auth()->user()->can('settings.view') || auth()->user()->can('system.view') || auth()->user()->can('bots.view'))
+    @if(auth()->user()->can('audit.view') || auth()->user()->can('settings.view') || auth()->user()->can('system.view') || auth()->user()->can('bots.view') || auth()->user()->can('payments.sensitive'))
       <div class="section">سیستم</div>
+      @can('payments.sensitive')
+        <a href="{{ route('payments.settings') }}" @class(['active' => request()->routeIs('payments.settings*')])><x-icon name="settings"/>درگاه‌های پرداخت</a>
+      @endcan
       @can('bots.view')
         <a href="{{ route('bots.index') }}" @class(['active' => request()->routeIs('bots.*')])><x-icon name="message"/>ربات‌ها</a>
       @endcan

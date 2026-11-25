@@ -21,6 +21,11 @@ class Notifier
         return $this->queue(BotUser::query()->where('user_id', $userId)->where('is_blocked', false), $text);
     }
 
+    public function toBotUser(int $botUserId, string $text, bool $sensitive = false): int
+    {
+        return $this->queue(BotUser::query()->whereKey($botUserId)->where('is_blocked', false), $text, $sensitive);
+    }
+
     /** Every linked panel user that holds $permission (staff only; resellers never hold admin permissions). */
     public function toStaff(string $permission, string $text): int
     {
@@ -56,7 +61,7 @@ class Notifier
         }
     }
 
-    private function queue($botUsers, string $text): int
+    private function queue($botUsers, string $text, bool $sensitive = false): int
     {
         try {
             $n = 0;
@@ -64,7 +69,7 @@ class Notifier
                 if (! $bu->bot?->is_active) {
                     continue;
                 }
-                BotOutbox::query()->create(['bot_id' => $bu->bot_id, 'chat_id' => $bu->chat_id, 'text' => $text]);
+                BotOutbox::query()->create(['bot_id' => $bu->bot_id, 'chat_id' => $bu->chat_id, 'text' => $text, 'sensitive' => $sensitive]);
                 $n++;
             }
 

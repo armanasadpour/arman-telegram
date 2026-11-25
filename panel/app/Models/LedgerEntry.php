@@ -18,7 +18,7 @@ class LedgerEntry extends Model
     public const UPDATED_AT = null;
 
     public const TYPES = [
-        'manual_credit' => 'شارژ دستی', 'manual_debit' => 'کسر دستی', 'topup' => 'شارژ آنلاین',
+        'manual_credit' => 'شارژ دستی', 'manual_debit' => 'کسر دستی', 'topup' => 'شارژ (پرداخت)',
         'purchase' => 'خرید', 'refund' => 'بازگشت وجه', 'reversal' => 'اصلاح (معکوس)',
     ];
 

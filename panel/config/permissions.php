@@ -30,6 +30,7 @@ return [
         'settings' => ['title' => 'تنظیمات', 'actions' => ['view', 'update', 'sensitive']],
         'system' => ['title' => 'وضعیت سرویس‌ها', 'actions' => ['view']],
         'bots' => ['title' => 'ربات‌ها (تلگرام، بله، روبیکا)', 'actions' => ['view', 'update', 'sensitive']],
+        'payments' => ['title' => 'پرداخت‌ها و درگاه‌ها', 'actions' => ['view', 'sensitive']],
     ],
 
     // Role that bypasses all checks. Created by the installer; cannot be deleted or edited.

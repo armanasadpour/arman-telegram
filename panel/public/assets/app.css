@@ -146,3 +146,6 @@ form.inline{display:inline-block;margin-inline-start:8px}
 textarea.code,details pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre;overflow:auto}
 details pre{background:var(--surface-2,#f4f5f7);padding:8px;border-radius:8px;max-height:280px}
 details summary{cursor:pointer}
+.w-full{width:100%}.break{word-break:break-all}
+.card-inset{background:var(--surface-2);border-radius:var(--radius-sm);padding:12px}
+.stat-line{display:flex;justify-content:space-between;align-items:center;font-size:1.1rem}

@@ -9,13 +9,17 @@ use App\Ibs\IbsUnavailableException;
 use App\Models\Bot;
 use App\Models\BotLinkCode;
 use App\Models\BotUser;
+use App\Models\CustomerOrder;
 use App\Models\LedgerEntry;
 use App\Models\Package;
+use App\Models\Payment;
 use App\Models\ProvisioningJob;
 use App\Models\Reseller;
 use App\Models\ResellerSale;
 use App\Models\VpnAccount;
+use App\Payments\Payments;
 use App\Services\AuditLogger;
+use App\Services\Finance\CustomerOrders;
 use App\Services\Finance\InsufficientBalanceException;
 use App\Services\Finance\ResellerPricing;
 use App\Services\Finance\ResellerSales;
@@ -65,6 +69,20 @@ class Engine
     public const CONFIRM = '✅ تأیید و پرداخت از کیف پول';
 
     public const AUTO = '⚙️ خودکار';
+
+    public const BUY = '🛍 خرید اکانت';
+
+    public const CRENEW = '🔄 تمدید اکانت من';
+
+    public const TOPUP = '➕ شارژ کیف پول';
+
+    public const PAY_WALLET = '💰 پرداخت از موجودی کیف پول';
+
+    public const PAY_ONLINE = '💳 پرداخت آنلاین';
+
+    public const PAY_CARD = '🏦 کارت به کارت';
+
+    public const PAY_USDT = '💵 تتر (USDT)';
 
     private const MAX_FAILED = 5;
 
@@ -136,13 +154,21 @@ class Engine
 
     private function menuRows(BotUser $u): array
     {
-        $rows = [[self::MY_ACCOUNTS, self::LINK], [self::PRICES, self::SUPPORT]];
+        $rows = [[self::MY_ACCOUNTS, self::LINK]];
         $user = $u->user;
+        $isReseller = $user && $user->is_active && $user->isReseller();
+        if ($isReseller) {
+            $rows[] = [self::SELL, self::RENEW];
+            $rows[] = [self::WALLET, self::SALES];
+        } else {
+            $rows[] = [self::BUY, self::CRENEW];
+            if ($this->wallets->walletFor('customer', $u->id)->balance > 0) {
+                $rows[] = [self::WALLET];
+            }
+        }
+        $rows[] = [self::PRICES, self::SUPPORT];
         if ($user && $user->is_active) {
-            if ($user->isReseller()) {
-                $rows[] = [self::SELL, self::RENEW];
-                $rows[] = [self::WALLET, self::SALES];
-            } elseif ($user->hasPermission('dashboard.view')) {
+            if (! $isReseller && $user->hasPermission('dashboard.view')) {
                 $rows[] = [self::STATUS];
             }
             $rows[] = [self::LOGOUT];
@@ -180,6 +206,8 @@ class Engine
             self::SELL => $this->sellStart($u),
             self::RENEW => $this->ask($u, 'renew_acc', [], 'نام کاربری اکانتی را که می‌خواهید تمدید یا حجمش را افزایش دهید بفرستید:'),
             self::SALES => $this->recentSales($u),
+            self::BUY => $this->buyStart($u),
+            self::CRENEW => $this->crenewStart($u),
             self::STATUS => $this->systemStatus($u),
             self::LOGOUT => $this->logout($u),
             default => $this->menu($u, 'منوی اصلی:'),
@@ -205,6 +233,15 @@ class Engine
             'sell_confirm', 'renew_confirm' => $text === self::CONFIRM ? $this->sellConfirm($u) : $this->ask($u, $u->state, $d, 'برای ادامه «تأیید» یا «انصراف» را بزنید.', [[self::CONFIRM]]),
             'renew_acc' => $this->renewAccount($u, $text),
             'renew_pkg' => $this->renewPicked($u, $text),
+            'wallet' => $text === self::TOPUP ? $this->ask($u, 'topup_amount', [], 'مبلغ شارژ را به تومان بفرستید (مثلاً 500000):') : $this->menu($u, 'منوی اصلی:'),
+            'topup_amount' => $this->topupAmount($u, $text),
+            'buy_pkg' => $this->buyPicked($u, $text),
+            'crenew_acc' => $this->crenewAccount($u, $text),
+            'crenew_pkg' => $this->buyPicked($u, $text),
+            'pay_method' => $this->payMethod($u, $text),
+            'usdt_net' => $this->usdtNetwork($u, $text),
+            'card_note' => $this->cardNote($u, $text),
+            'usdt_hash' => $this->usdtHash($u, $text),
             default => $this->menu($u, 'منوی اصلی:'),
         };
     }
@@ -339,15 +376,15 @@ class Engine
     private function wallet(BotUser $u): void
     {
         $r = $this->reseller($u);
-        if (! $r) {
-            $this->menu($u, 'این بخش فقط برای همکاران است.');
-
-            return;
-        }
-        $w = $this->wallets->walletFor('reseller', $r->id);
+        $w = $r ? $this->wallets->walletFor('reseller', $r->id) : $this->wallets->walletFor('customer', $u->id);
         $lines = ['👛 موجودی: '.fa_money($w->balance), '', 'آخرین تراکنش‌ها:'];
         foreach (LedgerEntry::query()->where('wallet_id', $w->id)->orderByDesc('id')->limit(5)->get() as $e) {
             $lines[] = ($e->amount >= 0 ? '➕ ' : '➖ ').fa_money(abs($e->amount)).' — '.(LedgerEntry::TYPES[$e->type] ?? $e->type).' — '.jdate($e->created_at, 'm/d H:i');
+        }
+        if ($r && $this->payments()->enabledMethods()) {
+            $this->ask($u, 'wallet', [], implode("\n", $lines), [[self::TOPUP]]);
+
+            return;
         }
         $this->menu($u, implode("\n", $lines));
     }
@@ -546,6 +583,259 @@ class Engine
             default => '⏳ در حال انجام است؛ نتیجه را همین‌جا اطلاع می‌دهیم.',
         };
         $this->menu($u, $msg);
+    }
+
+    // ------------------------------------------------------------------ customer purchases and payments
+
+    private function payments(): Payments
+    {
+        return app(Payments::class);
+    }
+
+    private function orders(): CustomerOrders
+    {
+        return app(CustomerOrders::class);
+    }
+
+    private function buyStart(BotUser $u): void
+    {
+        $this->publicPackages($u, ['new'], 'buy_pkg', [], 'بسته مورد نظر را انتخاب کنید:');
+    }
+
+    private function crenewStart(BotUser $u): void
+    {
+        $accounts = $u->accounts()->whereNull('ibs_deleted_at')->orderBy('username')->limit(10)->get();
+        if ($accounts->isEmpty()) {
+            $this->menu($u, 'ابتدا اکانت خود را با «'.self::LINK.'» به ربات اضافه کنید.');
+
+            return;
+        }
+        $opts = [];
+        foreach ($accounts as $a) {
+            $opts['👤 '.$a->username] = $a->id;
+        }
+        $this->ask($u, 'crenew_acc', ['opts' => $opts], 'کدام اکانت را تمدید یا حجمش را افزایش می‌دهید؟', array_map(fn ($l) => [$l], array_keys($opts)));
+    }
+
+    private function crenewAccount(BotUser $u, string $text): void
+    {
+        $id = ($u->state_data['opts'] ?? [])[$text] ?? null;
+        $a = $id ? $u->accounts()->whereKey($id)->first() : null;
+        if (! $a) {
+            $this->crenewStart($u);
+
+            return;
+        }
+        $this->publicPackages($u, ['renewal', 'topup'], 'crenew_pkg', ['account_id' => $a->id], 'اکانت '.$a->username."\n\nبسته تمدید یا افزایش حجم را انتخاب کنید:");
+    }
+
+    private function publicPackages(BotUser $u, array $types, string $state, array $data, string $prompt): void
+    {
+        $opts = [];
+        foreach (Package::query()->where('is_active', true)->whereIn('type', $types)->orderBy('sort_order')->limit(20)->get() as $p) {
+            $opts['📦 '.$p->name.' — '.fa_money($this->pricing->quote($p)->finalPrice)] = $p->id;
+        }
+        if (! $opts) {
+            $this->menu($u, 'فعلاً بسته‌ای برای این کار تعریف نشده است.');
+
+            return;
+        }
+        $this->ask($u, $state, $data + ['opts' => $opts], $prompt, array_map(fn ($l) => [$l], array_keys($opts)));
+    }
+
+    private function buyPicked(BotUser $u, string $text): void
+    {
+        $p = $this->picked($u, $text);
+        if (! $p) {
+            $this->ask($u, $u->state, $u->state_data ?? [], 'لطفاً یکی از بسته‌های فهرست را انتخاب کنید.', array_map(fn ($l) => [$l], array_keys($u->state_data['opts'] ?? [])));
+
+            return;
+        }
+        $target = ! empty($u->state_data['account_id']) ? $u->accounts()->whereKey($u->state_data['account_id'])->first() : null;
+        try {
+            $order = $this->orders()->create($u, $p, $target);
+        } catch (RuntimeException $e) {
+            $u->setState(null);
+            $this->menu($u, '❗ '.$e->getMessage());
+
+            return;
+        }
+        $balance = $this->orders()->walletBalance($u);
+        $intro = '🧾 سفارش #'.fa((string) $order->id)."\nبسته: ".$p->name.' — '.$p->summary()."\nمبلغ: ".fa_money($order->price_rial);
+        $this->payChoice($u, ['order_id' => $order->id, 'price' => $order->price_rial, 'amount' => max($order->price_rial - $balance, 0)], $intro, $balance >= $order->price_rial);
+    }
+
+    private function topupAmount(BotUser $u, string $text): void
+    {
+        $toman = (int) preg_replace('/\D/', '', strtr($text, ['۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9', ',' => '', '٬' => '']));
+        if ($toman * 10 < Payments::MIN_RIAL || $toman * 10 > Payments::MAX_RIAL) {
+            $this->ask($u, 'topup_amount', [], 'مبلغ نامعتبر است. مبلغ را به تومان بفرستید:');
+
+            return;
+        }
+        $this->payChoice($u, ['amount' => $toman * 10], 'شارژ کیف پول: '.fa_money($toman * 10), false);
+    }
+
+    /** Offer the enabled payment methods (and the wallet, when it already covers the order). */
+    private function payChoice(BotUser $u, array $data, string $intro, bool $walletCovers): void
+    {
+        $opts = [];
+        if ($walletCovers) {
+            $opts[self::PAY_WALLET] = 'wallet';
+        }
+        $enabled = $this->payments()->enabledMethods();
+        $online = array_values(array_intersect(array_keys($enabled), Payment::ONLINE));
+        foreach ($online as $m) {
+            $opts[count($online) > 1 ? '💳 '.$enabled[$m] : self::PAY_ONLINE] = $m;
+        }
+        if (isset($enabled['card'])) {
+            $opts[self::PAY_CARD] = 'card';
+        }
+        if (isset($enabled['usdt'])) {
+            $opts[self::PAY_USDT] = 'usdt';
+        }
+        if (! $opts) {
+            $u->setState(null);
+            $this->menu($u, $intro."\n\nفعلاً روش پرداختی فعال نیست. با پشتیبانی تماس بگیرید.");
+
+            return;
+        }
+        $amountLine = ! $walletCovers && isset($data['price']) && $data['amount'] < $data['price']
+            ? "\nمبلغ قابل پرداخت (پس از کسر موجودی کیف پول): ".fa_money(max($data['amount'], Payments::MIN_RIAL)) : '';
+        $this->ask($u, 'pay_method', $data + ['opts' => $opts], $intro.$amountLine."\n\nروش پرداخت را انتخاب کنید:", array_map(fn ($l) => [$l], array_keys($opts)));
+    }
+
+    private function payMethod(BotUser $u, string $text): void
+    {
+        $d = $u->state_data ?? [];
+        $method = ($d['opts'] ?? [])[$text] ?? null;
+        if (! $method) {
+            $this->ask($u, 'pay_method', $d, 'لطفاً یکی از روش‌های پرداخت را انتخاب کنید.', array_map(fn ($l) => [$l], array_keys($d['opts'] ?? [])));
+
+            return;
+        }
+        if ($method === 'wallet') {
+            $u->setState(null);
+            $order = CustomerOrder::query()->where('bot_user_id', $u->id)->find($d['order_id'] ?? 0);
+            if (! $order) {
+                $this->menu($u, 'سفارش پیدا نشد.');
+
+                return;
+            }
+            $order = $this->orders()->fulfil($order);
+            app(Outbox::class)->flush(20);
+            $this->menu($u, $order->status === 'awaiting_payment' ? '❗ موجودی کیف پول کافی نیست.' : 'سفارش ثبت شد؛ نتیجه را همین‌جا می‌بینید.');
+
+            return;
+        }
+        if ($method === 'usdt') {
+            $nets = array_intersect_key(Payment::NETWORKS, $this->payments()->usdtNetworks());
+            if (count($nets) > 1) {
+                $o = [];
+                foreach ($nets as $k => $l) {
+                    $o['🔗 '.$l] = $k;
+                }
+                $this->ask($u, 'usdt_net', ['order_id' => $d['order_id'] ?? null, 'amount' => $d['amount'], 'price' => $d['price'] ?? null, 'opts' => $o], 'شبکه انتقال تتر را انتخاب کنید:', array_map(fn ($l) => [$l], array_keys($o)));
+
+                return;
+            }
+            $d['network'] = (string) array_key_first($nets);
+        }
+        $this->createPayment($u, $method, $d);
+    }
+
+    private function usdtNetwork(BotUser $u, string $text): void
+    {
+        $d = $u->state_data ?? [];
+        $net = ($d['opts'] ?? [])[$text] ?? null;
+        if (! $net) {
+            $this->ask($u, 'usdt_net', $d, 'لطفاً یکی از شبکه‌ها را انتخاب کنید.', array_map(fn ($l) => [$l], array_keys($d['opts'] ?? [])));
+
+            return;
+        }
+        $this->createPayment($u, 'usdt', $d + ['network' => $net]);
+    }
+
+    private function createPayment(BotUser $u, string $method, array $d): void
+    {
+        $u->setState(null);
+        $r = empty($d['order_id']) ? $this->reseller($u) : null;
+        $wallet = $r ? $this->wallets->walletFor('reseller', $r->id) : $this->wallets->walletFor('customer', $u->id);
+        $amount = max((int) $d['amount'], Payments::MIN_RIAL);
+        try {
+            $p = $this->payments()->create($method, $wallet, $amount, [
+                'purpose' => empty($d['order_id']) ? 'topup' : 'order', 'bot_user_id' => $u->id,
+                'created_by' => $u->user_id, 'usdt_network' => $method === 'usdt' ? ($d['network'] ?? null) : null,
+            ]);
+        } catch (RuntimeException $e) {
+            $this->menu($u, '❗ '.$e->getMessage());
+
+            return;
+        }
+        if (! empty($d['order_id'])) {
+            CustomerOrder::query()->where('bot_user_id', $u->id)->whereKey($d['order_id'])->update(['payment_id' => $p->id]);
+        }
+        $link = route('pay.show', $p->uuid);
+        if ($p->isOnline()) {
+            $this->menu($u, '💳 پرداخت '.fa_money($p->amount_rial)."\n\nبرای پرداخت روی لینک زیر بزنید:\n".$link."\n\nپس از پرداخت، نتیجه همین‌جا اعلام می‌شود.");
+
+            return;
+        }
+        if ($method === 'card') {
+            $lines = ['🏦 مبلغ '.fa_money($p->amount_rial).' را دقیقاً به یکی از کارت‌های زیر واریز کنید:', ''];
+            foreach ($this->payments()->cards() as $c) {
+                $lines[] = trim(chunk_split($c['number'], 4, ' ')).' — '.($c['holder'] ?? '').' ('.($c['bank'] ?? '').')';
+            }
+            $lines[] = '';
+            $lines[] = 'سپس «شماره پیگیری» و «۴ رقم آخر کارت خودتان» را در یک پیام بفرستید.';
+            $lines[] = 'برای ارسال تصویر رسید: '.$link;
+            $this->ask($u, 'card_note', ['payment_id' => $p->id], implode("\n", $lines));
+
+            return;
+        }
+        $this->ask($u, 'usdt_hash', ['payment_id' => $p->id], '💵 دقیقاً '.rtrim(rtrim((string) $p->usdt_amount, '0'), '.').' USDT در شبکه '
+            .(Payment::NETWORKS[$p->usdt_network] ?? '')." به این آدرس بفرستید:\n\n".($this->payments()->usdtNetworks()[$p->usdt_network] ?? '')
+            ."\n\nارسال در شبکه یا توکن دیگر قابل بازگشت نیست. پس از ارسال، «هش تراکنش» (TxID) را اینجا بفرستید.");
+    }
+
+    private function cardNote(BotUser $u, string $text): void
+    {
+        $p = Payment::query()->where('bot_user_id', $u->id)->find($u->state_data['payment_id'] ?? 0);
+        $u->setState(null);
+        if (! $p) {
+            $this->menu($u, 'پرداخت پیدا نشد.');
+
+            return;
+        }
+        try {
+            $this->payments()->reportCard($p, mb_substr($text, 0, 250));
+        } catch (RuntimeException $e) {
+            $this->menu($u, '❗ '.$e->getMessage());
+
+            return;
+        }
+        $this->menu($u, '✅ اطلاعات واریز ثبت شد. پس از بررسی مدیر، نتیجه همین‌جا اعلام می‌شود.');
+    }
+
+    private function usdtHash(BotUser $u, string $text): void
+    {
+        $p = Payment::query()->where('bot_user_id', $u->id)->find($u->state_data['payment_id'] ?? 0);
+        if (! $p) {
+            $u->setState(null);
+            $this->menu($u, 'پرداخت پیدا نشد.');
+
+            return;
+        }
+        try {
+            $p = $this->payments()->submitUsdtHash($p, $text);
+        } catch (RuntimeException $e) {
+            $this->ask($u, 'usdt_hash', ['payment_id' => $p->id], '❗ '.$e->getMessage().' دوباره هش را بفرستید:');
+
+            return;
+        }
+        $u->setState(null);
+        app(Outbox::class)->flush(20);
+        $this->menu($u, $p->status === 'paid' ? '✅ تراکنش تأیید شد.' : '⏳ هش ثبت شد: '.($p->error ?? 'در انتظار تأیید شبکه').' — خودکار دوباره بررسی و نتیجه اعلام می‌شود.');
     }
 
     private function welcome(): string

@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\LedgerEntry;
 use App\Models\Package;
+use App\Models\Payment;
 use App\Models\Reseller;
 use App\Models\ResellerSale;
 use App\Models\VpnAccount;
+use App\Payments\Payments;
 use App\Services\Finance\ResellerPricing;
 use App\Services\Finance\ResellerSales;
 use App\Services\Finance\WalletService;
@@ -149,6 +151,36 @@ class PortalController extends Controller
         $wallet = $this->wallets->walletFor('reseller', $me->id);
 
         return view('portal.ledger', ['wallet' => $wallet, 'entries' => LedgerEntry::query()->where('wallet_id', $wallet->id)->orderByDesc('id')->paginate(25)]);
+    }
+
+    public function topupForm(Request $request, Payments $payments): View
+    {
+        $me = $this->me($request);
+
+        return view('portal.topup', [
+            'wallet' => $this->wallets->walletFor('reseller', $me->id),
+            'methods' => $payments->enabledMethods(),
+            'networks' => array_intersect_key(Payment::NETWORKS, $payments->usdtNetworks()),
+            'recent' => Payment::query()->where('wallet_id', $this->wallets->walletFor('reseller', $me->id)->id)->orderByDesc('id')->limit(10)->get(),
+        ]);
+    }
+
+    public function topup(Request $request, Payments $payments): RedirectResponse
+    {
+        $me = $this->me($request);
+        $d = $request->validate([
+            'amount_toman' => ['required', 'integer', 'between:1000,200000000'],
+            'method' => ['required', 'string', 'in:'.implode(',', array_keys($payments->enabledMethods()) ?: ['none'])],
+            'network' => ['required_if:method,usdt', 'nullable', 'in:trc20,erc20,bep20'],
+        ], [], ['amount_toman' => 'مبلغ', 'method' => 'روش پرداخت', 'network' => 'شبکه']);
+        try {
+            $p = $payments->create($d['method'], $this->wallets->walletFor('reseller', $me->id), (int) $d['amount_toman'] * 10,
+                ['created_by' => $request->user()->id, 'usdt_network' => $d['method'] === 'usdt' ? $d['network'] : null]);
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('pay.show', $p->uuid);
     }
 
     private function ownAccount(Reseller $me, int $id): VpnAccount
