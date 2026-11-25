@@ -25,6 +25,19 @@
   // Payment hand-off: forms marked data-autosubmit post themselves (the button stays as a fallback).
   var auto = document.querySelector('form[data-autosubmit]');
   if (auto) { setTimeout(function () { auto.submit(); }, 300); }
+  // Usage meters: start full and drain down to the real value.
+  document.querySelectorAll('progress[data-animate]').forEach(function (bar) {
+    var target = +bar.getAttribute('value'); bar.value = 100;
+    var start = null;
+    function step(ts) {
+      if (start === null) start = ts;
+      var k = Math.min(1, (ts - start) / 900), e = 1 - Math.pow(1 - k, 3);
+      bar.value = 100 - (100 - target) * e;
+      if (k < 1) requestAnimationFrame(step);
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { bar.value = target; return; }
+    setTimeout(function () { requestAnimationFrame(step); }, 150);
+  });
   // Restore buttons when navigating back (bfcache).
   window.addEventListener('pageshow', function () {
     document.querySelectorAll('form[data-submitted]').forEach(function (f) {

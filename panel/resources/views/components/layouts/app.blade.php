@@ -82,6 +82,7 @@
       @endcan
       @can('settings.view')
         <a href="{{ route('settings.edit') }}" @class(['active' => request()->routeIs('settings.*')])><x-icon name="settings"/>تنظیمات</a>
+        <a href="{{ route('alerts.settings') }}" @class(['active' => request()->routeIs('alerts.*')])><x-icon name="message"/>اعلان‌ها</a>
         <a href="{{ route('ibs.settings') }}" @class(['active' => request()->routeIs('ibs.settings*')])><x-icon name="link"/>اتصال به سرور IBSng</a>
       @endcan
       @can('system.view')

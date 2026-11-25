@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AccountsController;
+use App\Http\Controllers\Admin\AlertsController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\BotsController;
 use App\Http\Controllers\Admin\CleanupController;
@@ -79,6 +80,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{payment}', [PaymentsController::class, 'show'])->name('payments.show');
     Route::get('/payments/{payment}/receipt', [PaymentsController::class, 'receipt'])->name('payments.receipt');
     Route::post('/payments/{payment}/recheck', [PaymentsController::class, 'recheck'])->name('payments.recheck')->middleware('throttle:20,1');
+
+    // Alerts
+    Route::get('/settings/alerts', [AlertsController::class, 'edit'])->name('alerts.settings');
+    Route::put('/settings/alerts', [AlertsController::class, 'update'])->name('alerts.settings.update');
+    Route::post('/settings/alerts/test', [AlertsController::class, 'testReport'])->name('alerts.test')->middleware('throttle:5,1');
+    Route::get('/bots/outbox', [AlertsController::class, 'outbox'])->name('bots.outbox');
 
     // Bots
     Route::get('/bots', [BotsController::class, 'index'])->name('bots.index');

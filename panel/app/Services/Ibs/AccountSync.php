@@ -115,7 +115,13 @@ class AccountSync
         if ($account->trashed()) {
             $account->restore();
         }
-        $account->fill(['ibs_user_id' => $userId] + $values)->save();
+        $account->fill(['ibs_user_id' => $userId] + $values);
+        // Volume meter baseline for accounts the panel did not create: the largest remaining volume seen.
+        $rem = $account->remainingBytes();
+        if ($rem !== null && $rem > (int) $account->volume_total_bytes) {
+            $account->volume_total_bytes = $rem;
+        }
+        $account->save();
 
         return $account;
     }
@@ -156,6 +162,17 @@ class AccountSync
         $this->settings->set('sync.accounts_at', now()->toIso8601String());
 
         return $done;
+    }
+
+    /** Refresh specific accounts (100 per server call). @param iterable<VpnAccount> $accounts */
+    public function refreshMany(iterable $accounts): int
+    {
+        $n = 0;
+        foreach (collect($accounts)->chunk(100) as $chunk) {
+            $n += $this->refreshBatch($chunk->values()->all());
+        }
+
+        return $n;
     }
 
     /** @param list<VpnAccount> $accounts */

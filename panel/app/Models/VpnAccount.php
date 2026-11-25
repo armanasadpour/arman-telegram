@@ -83,6 +83,53 @@ class VpnAccount extends Model
         return ($rem !== null && $this->volume_total_bytes !== null) ? max(0, $this->volume_total_bytes - $rem) : null;
     }
 
+    /**
+     * Days meter. pct = share of the validity still left (100 before first login).
+     *
+     * @return array{pct:int, remaining:int, total:int, started:bool}|null
+     */
+    public function timeMeter(): ?array
+    {
+        $total = (int) ($this->effectiveRelExpSeconds() ?? 0);
+        if (! $this->expires_at) {
+            return $total > 0 ? ['pct' => 100, 'remaining' => $total, 'total' => $total, 'started' => false] : null;
+        }
+        $remaining = max(0, $this->expires_at->getTimestamp() - now()->getTimestamp());
+        $total = max($total, $remaining, 1);
+
+        return ['pct' => (int) min(100, max(0, round($remaining * 100 / $total))), 'remaining' => $remaining, 'total' => $total, 'started' => true];
+    }
+
+    /**
+     * Volume meter. Total = the package volume when the panel created/topped it up, otherwise the largest
+     * remaining volume the panel has seen for this account (imported accounts).
+     *
+     * @return array{pct:int, remaining:int, total:int, used:int}|null
+     */
+    public function volumeMeter(): ?array
+    {
+        $rem = $this->remainingBytes();
+        if ($rem === null || ! $this->isVolumeLimited()) {
+            return null;
+        }
+        $total = max((int) $this->volume_total_bytes, $rem, 1);
+
+        return ['pct' => (int) min(100, max(0, round($rem * 100 / $total))), 'remaining' => $rem, 'total' => $total, 'used' => $total - $rem];
+    }
+
+    public static function meterLevel(int $pct): string
+    {
+        return $pct <= 15 ? 'low' : ($pct <= 40 ? 'warn' : 'ok');
+    }
+
+    /** Text bar for messengers: ▰▰▰▰▰▱▱▱▱▱ */
+    public static function textBar(int $pct, int $cells = 10): string
+    {
+        $full = (int) round($pct * $cells / 100);
+
+        return str_repeat('▰', $full).str_repeat('▱', $cells - $full);
+    }
+
     /** Operator comment without the internal "panel:<job-key>" tracking prefix. */
     public function displayComment(): ?string
     {

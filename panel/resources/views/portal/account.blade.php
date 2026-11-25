@@ -8,10 +8,9 @@
   </div>
   <div class="grid stats mb-16">
     <div class="card stat"><div class="label">وضعیت</div><div class="value small">@include('accounts._status', ['a' => $a])</div></div>
-    <div class="card stat"><div class="label">انقضا</div><div class="value small">{{ $a->expires_at ? jdate($a->expires_at, 'Y/m/d') : fa_duration($a->effectiveRelExpSeconds()) }}</div><div class="hint">{{ $a->expires_at ? ($a->expires_at->isPast() ? 'منقضی شده' : fa((int) ceil(now()->diffInSeconds($a->expires_at) / 86400)).' روز باقی‌مانده') : 'پس از اولین اتصال شروع می‌شود' }}</div></div>
-    <div class="card stat"><div class="label">حجم</div><div class="value small">{{ $a->isVolumeLimited() ? fa_bytes($a->remainingBytes()) : 'بدون محدودیت' }}</div></div>
     <div class="card stat"><div class="label">اتصال</div><div class="value small">{{ $a->is_online ? fa($a->online_sessions).' نشست آنلاین' : 'آفلاین' }}</div></div>
   </div>
+  @include('accounts._meters', ['a' => $a, 'class' => 'mb-16'])
   <div class="card">
     <h2>سوابق فروش این اکانت</h2>
     @if($sales->isEmpty())<div class="empty"><div>—</div></div>@else

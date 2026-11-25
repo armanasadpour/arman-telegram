@@ -51,6 +51,7 @@ class AuditController extends Controller
         'accounts.cleanup_cancelled' => 'توقف حذف گروهی',
         'ibs_groups.create' => 'ساخت گروه در سرور',
         'bots.update' => 'تنظیمات ربات',
+        'settings.alerts' => 'تنظیمات اعلان‌ها',
         'payments.approve' => 'تأیید دستی پرداخت',
         'payments.reject' => 'رد پرداخت',
         'payments.settings' => 'تنظیمات درگاه‌های پرداخت',

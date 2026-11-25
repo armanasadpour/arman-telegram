@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Payments\Payments;
+use App\Services\Alerts\Alerts;
 use App\Services\AuditLogger;
 use App\Services\Finance\CustomerOrders;
 use App\Services\Finance\ResellerSales;
@@ -163,3 +164,13 @@ Artisan::command('payments:reverify', function () {
     return 0;
 })->purpose('Re-verify uncertain bank/USDT payments and settle customer orders');
 Schedule::command('payments:reverify')->everyMinute()->withoutOverlapping(5);
+
+Artisan::command('alerts:run', function () {
+    if (! Schema::hasTable('alert_log')) {
+        return 0;
+    }
+    $this->info(json_encode(app(Alerts::class)->run()));
+
+    return 0;
+})->purpose('Customer expiry/volume alerts, reseller digests, admin daily report, server down/up');
+Schedule::command('alerts:run')->everyTenMinutes()->withoutOverlapping(15);

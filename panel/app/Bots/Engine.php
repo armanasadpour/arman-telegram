@@ -308,15 +308,22 @@ class Engine
     private function accountCard(VpnAccount $a): string
     {
         $lines = ['👤 '.$a->username, 'وضعیت: '.(VpnAccount::STATUS_LABELS[$a->status()][0] ?? $a->status())];
-        if ($a->expires_at) {
-            $lines[] = 'انقضا: '.jdate($a->expires_at, 'Y/m/d').($a->expires_at->isFuture() ? ' ('.fa((int) ceil(now()->diffInDays($a->expires_at, true))).' روز مانده)' : '');
-        } elseif ($a->effectiveRelExpSeconds()) {
-            $lines[] = 'مدت: '.fa_duration($a->effectiveRelExpSeconds()).' از اولین اتصال';
+        if ($tm = $a->timeMeter()) {
+            $lines[] = '';
+            $lines[] = '⏳ زمان: '.VpnAccount::textBar($tm['pct']).' '.fa($tm['pct']).'٪';
+            $lines[] = $tm['started']
+                ? ($tm['remaining'] > 0 ? fa_duration($tm['remaining']).' مانده از '.fa_duration($tm['total']).' — تا '.jdate($a->expires_at, 'Y/m/d') : 'منقضی شده در '.jdate($a->expires_at, 'Y/m/d'))
+                : fa_duration($tm['total']).' — از اولین اتصال شروع می‌شود';
         }
-        if ($a->isVolumeLimited()) {
-            $lines[] = 'حجم باقی‌مانده: '.fa_bytes($a->remainingBytes());
+        if ($vm = $a->volumeMeter()) {
+            $lines[] = '';
+            $lines[] = '📶 حجم: '.VpnAccount::textBar($vm['pct']).' '.fa($vm['pct']).'٪';
+            $lines[] = fa_bytes($vm['remaining']).' مانده از '.fa_bytes($vm['total']);
+        } elseif ($a->charge() && ! $a->isVolumeLimited()) {
+            $lines[] = '📶 حجم: نامحدود';
         }
         if ($a->is_online) {
+            $lines[] = '';
             $lines[] = '🟢 اکنون متصل';
         }
 

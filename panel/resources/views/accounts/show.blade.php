@@ -33,31 +33,12 @@
   <div class="grid stats mb-16">
     <div class="card stat"><div class="label">وضعیت</div><div class="value small">@include('accounts._status', ['a' => $a])</div></div>
     <div class="card stat">
-      <div class="label">انقضا</div>
-      @if($a->expires_at)
-        <div class="value small">{{ jdate($a->expires_at, 'Y/m/d H:i') }}</div>
-        <div class="hint">{{ $a->expires_at->isPast() ? 'منقضی شده — '.fa_ago($a->expires_at) : fa((int) ceil(now()->diffInSeconds($a->expires_at) / 86400)).' روز باقی‌مانده' }}</div>
-      @else
-        <div class="value small">{{ $rel ? fa_duration($rel) : '—' }}</div>
-        <div class="hint">پس از اولین اتصال شروع می‌شود</div>
-      @endif
-    </div>
-    <div class="card stat">
-      <div class="label">حجم</div>
-      @if($a->isVolumeLimited())
-        <div class="value small">{{ fa_bytes($rem) }}</div>
-        <div class="hint">باقی‌مانده @if($total) از {{ fa_bytes($total) }} — مصرف‌شده {{ fa_bytes($used) }} ({{ fa($pct) }}٪) @else (حجم کل این اکانت در پنل ثبت نشده) @endif</div>
-      @else
-        <div class="value small">بدون محدودیت</div>
-        <div class="hint">تعرفه گروه حجمی نیست</div>
-      @endif
-    </div>
-    <div class="card stat">
       <div class="label">اتصال</div>
       <div class="value small">{{ $a->is_online ? fa($a->online_sessions).' نشست آنلاین' : 'آفلاین' }}</div>
       <div class="hint">حداکثر همزمان: {{ $a->effectiveMultiLogin() !== null ? fa($a->effectiveMultiLogin()) : '—' }}</div>
     </div>
   </div>
+  @include('accounts._meters', ['a' => $a, 'class' => 'mb-16'])
 
   <div class="grid two">
     <div class="card">

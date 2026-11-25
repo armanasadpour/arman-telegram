@@ -4,7 +4,10 @@
       <h1>ربات‌ها</h1>
       <p class="muted">تلگرام، بله و روبیکا — منوی مشتری (اکانت‌های من، تعرفه‌ها)، فروش و تمدید همکاران از کیف پول، و اعلان مدیران.</p>
     </div>
-    <form method="post" action="{{ route('bots.reach') }}">@csrf<button class="btn btn-secondary" type="submit">تست دسترسی هاست به پیام‌رسان‌ها</button></form>
+    <div class="actions">
+      <a class="btn btn-secondary" href="{{ route('bots.outbox') }}">صف پیام‌ها</a>
+      <form method="post" action="{{ route('bots.reach') }}">@csrf<button class="btn btn-secondary" type="submit">تست دسترسی هاست به پیام‌رسان‌ها</button></form>
+    </div>
   </div>
 
   @if($reach = session('reach'))
@@ -28,7 +31,7 @@
   @endif
 
   @if($outbox['failed'] > 0)
-    <div class="alert alert-warning">{{ fa($outbox['failed']) }} اعلان پس از چند تلاش ارسال نشد.</div>
+    <div class="alert alert-warning">{{ fa($outbox['failed']) }} اعلان پس از چند تلاش ارسال نشد. <a href="{{ route('bots.outbox', ['status' => 'failed']) }}">مشاهده</a></div>
   @endif
 
   @foreach($bots as $platform => $bot)

@@ -102,7 +102,12 @@ class AccountActionsTest extends IbsTestCase
         $v = app(AccountSync::class)->importByUsername('vol');
         $v = app(AccountActions::class)->addVolume($v, 5 * 1024, 'خرید ۵ گیگ');
         $this->assertSame(7 * 1073741824, $v->remainingBytes());
-        $this->assertNull($v->volume_total_bytes, 'unknown total for imported accounts is not invented');
+        $this->assertSame(7 * 1073741824, $v->volume_total_bytes, 'imported: baseline = remaining when first seen, plus the top-up');
+        $this->assertSame(100, $v->volumeMeter()['pct']);
+        $this->fake->users[$v->ibs_user_id]['credit'] = 1024 * 3.5;   // 3.5 GB left after usage
+        $v = app(AccountSync::class)->refresh($v);
+        $this->assertSame(50, $v->volumeMeter()['pct']);
+        $this->assertSame(7 * 1073741824, $v->volume_total_bytes, 'usage never lowers the total');
     }
 
     public function test_delete_removes_from_ibsng_and_soft_deletes_mirror(): void

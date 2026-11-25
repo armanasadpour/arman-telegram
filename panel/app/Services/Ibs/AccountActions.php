@@ -108,11 +108,10 @@ class AccountActions
         }
         $credit = round($megabytes * 1024 * (float) $charge->cpk, 6);
         $before = (float) $a->credit;
+        $baseline = max((int) $a->volume_total_bytes, (int) $a->remainingBytes());
         $this->ibs->changeCredit($a->ibs_user_id, $credit, 'panel:+'.$megabytes.'MB');
         $a = $this->sync->refresh($a);
-        if ($a->volume_total_bytes !== null) {
-            $a->forceFill(['volume_total_bytes' => $a->volume_total_bytes + $megabytes * 1048576])->save();
-        }
+        $a->forceFill(['volume_total_bytes' => $baseline + $megabytes * 1048576])->save();
         $this->audit->log('accounts.add_volume', $a, 'افزایش حجم «'.$a->username.'» به میزان '.$megabytes.' مگابایت', [
             'credit' => [$before, (float) $a->credit],
         ], $reason);
