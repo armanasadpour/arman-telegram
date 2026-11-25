@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CustomerOrder;
+use App\Models\MtAccount;
 use App\Models\Payment;
 use App\Models\ProvisioningJob;
 use App\Models\ResellerSale;
@@ -15,6 +16,9 @@ use App\Services\Settings;
 use App\Services\SystemStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -70,6 +74,53 @@ class DashboardController extends Controller
             'jobs' => ProvisioningJob::query()->whereIn('status', ProvisioningJob::OPEN)->count(),
         ];
 
-        return view('dashboard', compact('stats', 'problems', 'recent', 'accounts', 'finance', 'attention') + ['generatedAt' => now()]);
+        $protocols = $this->protocolCards($user);
+
+        return view('dashboard', compact('stats', 'problems', 'recent', 'accounts', 'finance', 'attention', 'protocols') + ['generatedAt' => now()]);
+    }
+
+    /** Headline numbers per protocol: active / online / expired / data used (total and today). */
+    private function protocolCards(User $user): array
+    {
+        $cards = [];
+        if ($user->can('accounts.view')) {
+            // IBSng reports remaining credit, not usage: used = package volume − remaining, for volume-limited accounts.
+            $used = Cache::remember('dash.ovpn_used', 600, function () {
+                $sum = 0;
+                VpnAccount::query()->with('group.charge')->whereNull('ibs_deleted_at')->whereNotNull('volume_total_bytes')->select(['id', 'group_name', 'credit', 'volume_total_bytes'])
+                    ->chunkById(1000, function ($rows) use (&$sum) {
+                        foreach ($rows as $a) {
+                            $sum += (int) ($a->usedBytes() ?? 0);
+                        }
+                    });
+
+                return $sum;
+            });
+            $live = VpnAccount::query()->whereNull('ibs_deleted_at');
+            $cards['openvpn'] = [
+                'title' => 'OpenVPN', 'url' => route('accounts.index'),
+                'active' => (clone $live)->where('locked', false)->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>=', now()))->count(),
+                'online' => VpnAccount::query()->where('is_online', true)->count(),
+                'expired' => (clone $live)->where('expires_at', '<', now())->count(),
+                'used' => $used, 'today' => null,
+            ];
+        }
+        if ($user->can('mt_accounts.view') && Schema::hasTable('mt_accounts')) {
+            $day = now()->setTimezone('Asia/Tehran')->toDateString();
+            foreach (['l2tp' => ['L2TP', 'l2tp.accounts'], 'wireguard' => ['WireGuard', 'wg.accounts']] as $p => [$title, $route]) {
+                $q = MtAccount::query()->where('protocol', $p);
+                $cards[$p] = [
+                    'title' => $title, 'url' => route($route),
+                    'active' => (clone $q)->where('status', 'active')->count(),
+                    'online' => (clone $q)->where('is_online', true)->count(),
+                    'expired' => (clone $q)->whereIn('status', ['expired', 'depleted'])->count(),
+                    'used' => (int) (clone $q)->withTrashed()->sum('used_bytes'),
+                    'today' => (int) DB::table('mt_usage_daily')->join('mt_accounts', 'mt_accounts.id', '=', 'mt_usage_daily.mt_account_id')
+                        ->where('mt_accounts.protocol', $p)->where('mt_usage_daily.day', $day)->sum(DB::raw('mt_usage_daily.upload_bytes + mt_usage_daily.download_bytes')),
+                ];
+            }
+        }
+
+        return $cards;
     }
 }

@@ -503,3 +503,29 @@ details.card.adv>summary::-webkit-details-marker{display:none}
 h2.inline{display:inline}
 @media (max-width:640px){.connect-grid{grid-template-columns:1fr}.qr-box{max-width:280px;margin:0 auto}}
 .acc-customer{font-size:.9rem;font-weight:700;color:var(--text);line-height:1.6}
+
+/* ---------- dashboard protocol cards ---------- */
+.proto-cards{display:flex;flex-direction:column;gap:14px;margin-bottom:20px}
+.proto-card{--c1:#fff;--c2:#fff;--ink:#111;--soft:rgba(0,0,0,.08);position:relative;display:block;padding:20px 22px;border-radius:22px;color:var(--ink);text-decoration:none;overflow:hidden;isolation:isolate;
+  background:linear-gradient(135deg,var(--c1),var(--c2));box-shadow:0 10px 28px -12px var(--shadow-c,rgba(0,0,0,.35)),0 2px 6px -2px rgba(0,0,0,.08);transition:transform .2s ease,box-shadow .2s ease}
+.proto-card::before{content:"";position:absolute;inset:auto -60px -90px auto;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.45),transparent 70%);z-index:-1}
+.proto-card::after{content:"";position:absolute;inset:-70px auto auto -50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),transparent 70%);z-index:-1}
+.proto-card:hover{transform:translateY(-2px);box-shadow:0 16px 34px -14px var(--shadow-c,rgba(0,0,0,.4))}
+.proto-card:active{transform:scale(.99)}
+.proto-openvpn{--c1:#ffe0b8;--c2:#ffc48a;--ink:#1a1206;--soft:rgba(26,18,6,.08);--shadow-c:rgba(230,130,30,.55)}
+.proto-l2tp{--c1:#bfe3ff;--c2:#8cc8ff;--ink:#06121f;--soft:rgba(6,18,31,.08);--shadow-c:rgba(40,120,220,.5)}
+.proto-wireguard{--c1:#a3243c;--c2:#6e0f24;--ink:#fff;--soft:rgba(255,255,255,.12);--shadow-c:rgba(120,15,40,.6)}
+.proto-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.proto-card-title{font-size:1.45rem;font-weight:900;letter-spacing:.3px;direction:ltr}
+.proto-card-go{width:34px;height:34px;display:grid;place-items:center;border-radius:12px;background:var(--soft);font-size:1.2rem;font-weight:700}
+.proto-card-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pc-stat{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:14px;background:var(--soft);backdrop-filter:blur(2px);min-width:0}
+.pc-label{font-size:.78rem;opacity:.75;font-weight:600}
+.pc-value{font-size:1.35rem;font-weight:900;line-height:1.4;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.pc-value.pc-small{font-size:1.02rem}
+.pc-sub{font-size:.72rem;opacity:.7}
+.pc-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.25);animation:pc-pulse 1.8s ease-in-out infinite}
+.proto-wireguard .pc-dot{background:#7dffa8;box-shadow:0 0 0 3px rgba(125,255,168,.25)}
+@keyframes pc-pulse{50%{box-shadow:0 0 0 6px rgba(22,163,74,0)}}
+@media (max-width:640px){.proto-card{padding:18px}.proto-card-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.proto-card-title{font-size:1.3rem}}
+@media (prefers-reduced-motion:reduce){.pc-dot{animation:none}.proto-card{transition:none}}

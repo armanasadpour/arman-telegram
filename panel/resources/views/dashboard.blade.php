@@ -6,6 +6,25 @@
     </div>
   </div>
 
+  @if($protocols)
+    <div class="proto-cards">
+      @foreach($protocols as $key => $c)
+        <a class="proto-card proto-{{ $key }}" href="{{ $c['url'] }}">
+          <div class="proto-card-head">
+            <span class="proto-card-title">{{ $c['title'] }}</span>
+            <span class="proto-card-go" aria-hidden="true">‹</span>
+          </div>
+          <div class="proto-card-stats">
+            <div class="pc-stat"><span class="pc-label">فعال</span><span class="pc-value">{{ fa($c['active']) }}</span></div>
+            <div class="pc-stat"><span class="pc-label">آنلاین</span><span class="pc-value">@if($c['online'] > 0)<i class="pc-dot"></i>@endif{{ fa($c['online']) }}</span></div>
+            <div class="pc-stat"><span class="pc-label">منقضی</span><span class="pc-value">{{ fa($c['expired']) }}</span></div>
+            <div class="pc-stat"><span class="pc-label">مصرف دیتا</span><span class="pc-value pc-small">{{ fa_bytes($c['used']) }}</span>@if($c['today'] !== null)<span class="pc-sub">امروز {{ fa_bytes($c['today']) }}</span>@endif</div>
+          </div>
+        </a>
+      @endforeach
+    </div>
+  @endif
+
   @if($problems)
     <div class="alert alert-warning">
       <strong>هشدارهای سیستم:</strong>
