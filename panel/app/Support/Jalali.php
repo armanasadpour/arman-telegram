@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use DateTimeZone;
 
@@ -134,5 +135,19 @@ final class Jalali
     public static function number(int|float $n, int $decimals = 0): string
     {
         return self::digits(number_format($n, $decimals, '.', '٬'));
+    }
+
+    /** "1405/09/10" (Persian or Latin digits) -> start of that day in the display time zone, or null. */
+    public static function parseDate(?string $value): ?CarbonImmutable
+    {
+        if (! preg_match('#^(\d{4})/(\d{1,2})/(\d{1,2})$#', trim(self::toLatinDigits((string) $value)), $m)) {
+            return null;
+        }
+        [$gy, $gm, $gd] = self::toGregorian((int) $m[1], (int) $m[2], (int) $m[3]);
+        if (! checkdate($gm, $gd, $gy) || (int) $m[2] < 1 || (int) $m[2] > 12 || (int) $m[3] < 1 || (int) $m[3] > 31) {
+            return null;
+        }
+
+        return CarbonImmutable::create($gy, $gm, $gd, 0, 0, 0, config('app.display_timezone', 'Asia/Tehran'));
     }
 }

@@ -18,6 +18,29 @@
     </div>
   @endif
 
+  @if(array_sum($attention) > 0)
+    <div class="alert alert-warning">
+      <strong>نیازمند رسیدگی:</strong>
+      @if($attention['payments_review'])@can('payments.view')<a href="{{ route('payments.index', ['status' => 'review']) }}">{{ fa($attention['payments_review']) }} پرداخت منتظر بررسی</a> · @endcan @endif
+      @if($attention['sales_review'])@can('resellers.view')<a href="{{ route('resellers.index') }}">{{ fa($attention['sales_review']) }} فروش همکار</a> · @endcan @endif
+      @if($attention['orders_review'])@can('payments.view')<a href="{{ route('payments.index') }}">{{ fa($attention['orders_review']) }} سفارش مشتری</a> · @endcan @endif
+      @if($attention['jobs'])@can('accounts.view')<a href="{{ route('accounts.jobs') }}">{{ fa($attention['jobs']) }} ساخت نیمه‌کاره</a>@endcan @endif
+    </div>
+  @endif
+
+  @if($finance)
+    @php($sum = $finance['sum'])
+    <div class="kpis mb-16">
+      <a class="kpi" href="{{ route('reports.index', ['from' => jdate(now(), 'Y/m/d'), 'to' => jdate(now(), 'Y/m/d')]) }}"><div class="label">فروش امروز</div><div class="value">{{ fa_money($sum($finance['today'])) }}</div><div class="hint">{{ fa($finance['today']['sales_count'] + $finance['today']['orders_count']) }} فروش — پرداخت {{ fa_money($finance['today']['payments_rial']) }}</div></a>
+      <a class="kpi" href="{{ route('reports.index', ['from' => jdate(now()->subDays(6), 'Y/m/d'), 'to' => jdate(now(), 'Y/m/d')]) }}"><div class="label">۷ روز اخیر</div><div class="value">{{ fa_money($sum($finance['week'])) }}</div><div class="hint">{{ fa($finance['week']['sales_count'] + $finance['week']['orders_count']) }} فروش</div></a>
+      <a class="kpi" href="{{ route('reports.index') }}"><div class="label">۳۰ روز اخیر</div><div class="value">{{ fa_money($sum($finance['month'])) }}</div><div class="hint">{{ fa($finance['month']['sales_count'] + $finance['month']['orders_count']) }} فروش — {{ fa($finance['month']['new_accounts']) }} اکانت جدید</div></a>
+    </div>
+    <div class="charts mb-16">
+      <div class="card"><h2>فروش ۱۴ روز اخیر</h2><x-chart :values="$finance['daily']['revenue']" money kind="success"/></div>
+      <div class="card"><h2>تعداد فروش ۱۴ روز اخیر</h2><x-chart :values="$finance['daily']['count']"/></div>
+    </div>
+  @endif
+
   <div class="mb-16 grid stats">
     @can('staff.view')
       <a class="card stat" href="{{ route('staff.index') }}">
@@ -68,8 +91,4 @@
     </div>
   @endcan
 
-  <div class="card">
-    <h2>بخش‌های در راه</h2>
-    <p class="m0 muted">آمار اکانت‌ها، فروش، پرداخت‌ها و همکاران پس از اتصال به سرور (فاز ۳) و ماژول‌های فروش (فازهای ۴ تا ۹) به این داشبورد اضافه می‌شوند. تا آن زمان هیچ عدد آزمایشی یا نمایشی اینجا نشان داده نمی‌شود.</p>
-  </div>
 </x-layouts.app>

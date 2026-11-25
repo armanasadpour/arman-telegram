@@ -14,11 +14,14 @@ use App\Services\Finance\ResellerPricing;
 use App\Services\Finance\ResellerSales;
 use App\Services\Finance\WalletService;
 use App\Services\Pricing\PackageRules;
+use App\Services\Reports\CsvExport;
+use App\Services\Reports\Reports;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Reseller portal. Every query is scoped to the logged-in reseller; another reseller's
@@ -51,6 +54,7 @@ class PortalController extends Controller
                 'month_spent' => (int) (clone $ok)->where('created_at', '>=', $monthStart)->sum('cost_rial'),
             ],
             'recent' => ResellerSale::query()->with('package')->where('reseller_id', $me->id)->orderByDesc('id')->limit(5)->get(),
+            'daily' => app(Reports::class)->daily(...array_merge(app(Reports::class)->lastDays(30), [$me->id])),
         ]);
     }
 
@@ -151,6 +155,17 @@ class PortalController extends Controller
         $wallet = $this->wallets->walletFor('reseller', $me->id);
 
         return view('portal.ledger', ['wallet' => $wallet, 'entries' => LedgerEntry::query()->where('wallet_id', $wallet->id)->orderByDesc('id')->paginate(25)]);
+    }
+
+    /** Own data only: sales / ledger / accounts as Excel CSV (last N days, max 366). */
+    public function export(Request $request, string $type, CsvExport $csv): StreamedResponse
+    {
+        $me = $this->me($request);
+        abort_unless(in_array($type, ['sales', 'ledger', 'accounts'], true), 404);
+        $r = app(Reports::class);
+        [$f, $t] = $r->range(...$r->lastDays(min(366, max(1, (int) $request->query('days', 90)))));
+
+        return $csv->download($type, $f, $t, 'my-'.$type.'.csv', $me->id);
     }
 
     public function topupForm(Request $request, Payments $payments): View

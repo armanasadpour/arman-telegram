@@ -31,6 +31,7 @@ return [
         'system' => ['title' => 'وضعیت سرویس‌ها', 'actions' => ['view']],
         'bots' => ['title' => 'ربات‌ها (تلگرام، بله، روبیکا)', 'actions' => ['view', 'update', 'sensitive']],
         'payments' => ['title' => 'پرداخت‌ها و درگاه‌ها', 'actions' => ['view', 'sensitive']],
+        'reports' => ['title' => 'گزارش‌ها و خروجی اکسل', 'actions' => ['view', 'export']],
     ],
 
     // Role that bypasses all checks. Created by the installer; cannot be deleted or edited.

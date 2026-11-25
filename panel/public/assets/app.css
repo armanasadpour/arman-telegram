@@ -179,3 +179,15 @@ details summary{cursor:pointer}
 @keyframes meter-flow{from{background-position:0 0}to{background-position:-36px 0}}
 .meters.compact{grid-template-columns:1fr 1fr;gap:8px}.meters.compact .meter{padding:8px 10px}.meters.compact .meter-pct{font-size:1rem}.meters.compact .meter-bar{height:8px}
 @media (prefers-reduced-motion:reduce){.meter-bar::-webkit-progress-value,.meter-bar::-moz-progress-bar{animation:none}}
+/* charts */
+.chart{margin:0}.chart svg{width:100%;height:200px;display:block}
+.chart-grid{stroke:var(--border);stroke-width:1;stroke-dasharray:4 4}
+.chart-bar{fill:var(--primary);transition:opacity .15s}.chart-success .chart-bar{fill:#2fb344}.chart-warn .chart-bar{fill:#f59f00}.chart-violet .chart-bar{fill:#7048e8}
+.chart-hit{fill:transparent}g:hover .chart-bar{opacity:.75}
+.chart-x{fill:var(--muted);font-size:13px;font-family:var(--font)}
+.chart-cap{display:flex;justify-content:space-between;color:var(--muted);font-size:.85rem;margin-top:4px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.kpi .label{color:var(--muted);font-size:.85rem}.kpi .value{font-size:1.35rem;font-weight:900;margin-top:4px}.kpi .hint{color:var(--muted);font-size:.8rem}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}

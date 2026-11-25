@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Admin\PaymentsController;
 use App\Http\Controllers\Admin\PaymentSettingsController;
 use App\Http\Controllers\Admin\ProvisioningJobsController;
+use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\ResellersController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -81,6 +82,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{payment}/receipt', [PaymentsController::class, 'receipt'])->name('payments.receipt');
     Route::post('/payments/{payment}/recheck', [PaymentsController::class, 'recheck'])->name('payments.recheck')->middleware('throttle:20,1');
 
+    // Reports
+    Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
+    Route::get('/reports/export/{type}', [ReportsController::class, 'export'])->name('reports.export')->middleware('throttle:20,1');
+
     // Alerts
     Route::get('/settings/alerts', [AlertsController::class, 'edit'])->name('alerts.settings');
     Route::put('/settings/alerts', [AlertsController::class, 'update'])->name('alerts.settings.update');
@@ -139,6 +144,7 @@ Route::middleware('auth')->group(function () {
     // Reseller portal
     Route::prefix('r')->name('portal.')->middleware(EnsureReseller::class)->group(function () {
         Route::get('/topup', [PortalController::class, 'topupForm'])->name('topup');
+        Route::get('/export/{type}', [PortalController::class, 'export'])->name('export')->middleware('throttle:20,1');
         Route::post('/topup', [PortalController::class, 'topup'])->name('topup.store')->middleware('throttle:20,1');
         Route::get('/', [PortalController::class, 'dashboard'])->name('dashboard');
         Route::get('/prices', [PortalController::class, 'prices'])->name('prices');

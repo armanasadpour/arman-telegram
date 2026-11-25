@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\CustomerOrder;
+use App\Models\Payment;
 use App\Models\ProvisioningJob;
+use App\Models\ResellerSale;
 use App\Models\User;
 use App\Models\VpnAccount;
+use App\Services\Reports\Reports;
 use App\Services\Settings;
 use App\Services\SystemStatus;
 use Illuminate\Http\RedirectResponse;
@@ -46,6 +50,26 @@ class DashboardController extends Controller
             ? AuditLog::query()->orderByDesc('id')->limit(8)->get()
             : collect();
 
-        return view('dashboard', compact('stats', 'problems', 'recent', 'accounts') + ['generatedAt' => now()]);
+        $finance = null;
+        if ($user->can('reports.view')) {
+            $r = app(Reports::class);
+            [$from14, $to] = $r->lastDays(14);
+            $sum = fn (array $t) => $t['sales_rial'] + $t['orders_rial'];
+            $finance = [
+                'today' => $r->totals($to, $to),
+                'week' => $r->totals($to->subDays(6), $to),
+                'month' => $r->totals($to->subDays(29), $to),
+                'daily' => $r->daily($from14, $to),
+                'sum' => $sum,
+            ];
+        }
+        $attention = [
+            'sales_review' => ResellerSale::query()->where('status', 'needs_review')->count(),
+            'orders_review' => CustomerOrder::query()->where('status', 'needs_review')->count(),
+            'payments_review' => Payment::query()->where('status', 'review')->count(),
+            'jobs' => ProvisioningJob::query()->whereIn('status', ProvisioningJob::OPEN)->count(),
+        ];
+
+        return view('dashboard', compact('stats', 'problems', 'recent', 'accounts', 'finance', 'attention') + ['generatedAt' => now()]);
     }
 }

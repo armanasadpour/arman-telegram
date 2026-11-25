@@ -36,6 +36,9 @@
     @can('dashboard.view')
       <a href="{{ route('dashboard') }}" @class(['active' => request()->routeIs('dashboard')])><x-icon name="home"/>داشبورد</a>
     @endcan
+    @can('reports.view')
+      <a href="{{ route('reports.index') }}" @class(['active' => request()->routeIs('reports.*')])><x-icon name="activity"/>گزارش‌ها</a>
+    @endcan
     @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view'))
       <div class="section">سرور</div>
       @can('accounts.view')

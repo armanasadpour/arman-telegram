@@ -1,5 +1,6 @@
 <?php
 
+use App\Bots\Notifier;
 use App\Bots\Outbox;
 use App\Ibs\ErrorMessages;
 use App\Ibs\IbsConnector;
@@ -137,9 +138,13 @@ Artisan::command('wallets:reconcile', function (WalletService $w) {
         }
     }
     $bad ? $this->error("$bad wallet(s) out of balance") : $this->info('All wallets reconcile with the ledger.');
+    if ($bad) {
+        app(Notifier::class)->toStaff('wallets.view', '🚨 '.fa($bad).' کیف پول با دفتر کل مطابقت ندارد (احتمال دست‌کاری مستقیم دیتابیس). صفحه همکاران را بررسی کنید.');
+    }
 
     return $bad ? 1 : 0;
 })->purpose('Verify every wallet balance against its ledger');
+Schedule::command('wallets:reconcile')->dailyAt('03:17')->withoutOverlapping(30);
 
 Artisan::command('bots:send', function () {
     if (! Schema::hasTable('bot_outbox')) {

@@ -9,6 +9,18 @@
     <a class="card stat" href="{{ route('portal.sales') }}"><div class="label">فروش این ماه</div><div class="value">{{ fa($stats['month_sales']) }}</div><div class="hint">خرید: {{ fa_money($stats['month_spent']) }}</div></a>
     <div class="card stat"><div class="label">سود این ماه</div><div class="value small">{{ fa_money($stats['month_profit']) }}</div><div class="hint">قیمت فروش − قیمت خرید</div></div>
   </div>
+  <div class="charts mb-16">
+    <div class="card"><h2>سود ۳۰ روز اخیر</h2><x-chart :values="$daily['profit']" money kind="success"/></div>
+    <div class="card"><h2>تعداد فروش ۳۰ روز اخیر</h2><x-chart :values="$daily['sales']"/></div>
+  </div>
+  <div class="card">
+    <h2>خروجی اکسل (۹۰ روز اخیر)</h2>
+    <div class="actions">
+      <a class="btn btn-secondary" href="{{ route('portal.export', 'sales') }}">فروش‌های من</a>
+      <a class="btn btn-secondary" href="{{ route('portal.export', 'ledger') }}">تراکنش‌های کیف پول</a>
+      <a class="btn btn-secondary" href="{{ route('portal.export', 'accounts') }}">اکانت‌های من</a>
+    </div>
+  </div>
   <div class="card">
     <div class="card-head"><h2>آخرین فروش‌ها</h2><a class="btn btn-secondary btn-sm" href="{{ route('portal.sales') }}">همه</a></div>
     @if($recent->isEmpty())<div class="empty"><div>هنوز فروشی ندارید.</div></div>@else
