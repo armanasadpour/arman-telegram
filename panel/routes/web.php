@@ -86,6 +86,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/mt/accounts/{account}/connect', [MtAccountsController::class, 'connect'])->name('mt.accounts.connect')->whereNumber('account');
         Route::post('/mt/accounts/{account}/password', [MtAccountsController::class, 'password'])->name('mt.accounts.password');
         Route::post('/mt/accounts/{account}/keys', [MtAccountsController::class, 'keys'])->name('mt.accounts.keys');
+        Route::post('/mt/accounts/{account}/private-key', [MtAccountsController::class, 'privateKey'])->name('mt.accounts.private-key');
         Route::delete('/mt/accounts/{account}', [MtAccountsController::class, 'destroy'])->name('mt.accounts.destroy');
         Route::post('/accounts/jobs/{job}/resolve', [ProvisioningJobsController::class, 'resolve'])->name('accounts.jobs.resolve');
     });
@@ -110,6 +111,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/mt/groups/{group}', [MtGroupsController::class, 'update'])->name('mt.groups.update')->middleware('throttle:20,1');
     Route::delete('/mt/groups/{group}', [MtGroupsController::class, 'destroy'])->name('mt.groups.destroy');
     Route::get('/mt/accounts', [MtAccountsController::class, 'index'])->name('mt.accounts.index');
+    Route::get('/mt/groups/{group}/import', [MtAccountsController::class, 'importForm'])->name('mt.import');
+    Route::post('/mt/groups/{group}/import', [MtAccountsController::class, 'import'])->name('mt.import.store')->middleware('throttle:20,1');
     Route::get('/mt/accounts/create', [MtAccountsController::class, 'create'])->name('mt.accounts.create');
     Route::post('/mt/accounts', [MtAccountsController::class, 'store'])->name('mt.accounts.store')->middleware('throttle:30,1');
     Route::post('/mt/accounts/from-package', [MtAccountsController::class, 'storeFromPackage'])->name('mt.accounts.store-package')->middleware('throttle:30,1');

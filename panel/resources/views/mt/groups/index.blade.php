@@ -39,6 +39,9 @@
               <td><a href="{{ route('mt.accounts.index', ['group' => $g->id]) }}">{{ fa($g->accounts_count) }}</a></td>
               <td>@if($g->is_active)<span class="badge badge-success">فعال</span>@else<span class="badge">غیرفعال</span>@endif</td>
               <td class="actions">
+                @can('mt_accounts.create')
+                  <a class="btn btn-secondary btn-sm" href="{{ route('mt.import', $g) }}">وارد کردن از روتر</a>
+                @endcan
                 @can('routers.update')
                   <a class="btn btn-secondary btn-sm" href="{{ route('mt.groups.edit', $g) }}">ویرایش</a>
                   @if($g->accounts_count === 0)

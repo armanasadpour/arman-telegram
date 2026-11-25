@@ -128,6 +128,14 @@
     <div class="grid two">
       @can('mt_accounts.sensitive')
         <div class="card">
+          @if($a->isWireguard() && ! $a->wg_private_key)
+            <h2>ثبت کلید خصوصی مشتری</h2>
+            <p class="muted small">خط «PrivateKey» از فایل WireGuard فعلی مشتری؛ با کلید عمومی روی روتر چک می‌شود.</p>
+            <form method="post" action="{{ route('mt.accounts.private-key', $a) }}" class="mb-12">@csrf
+              <div class="field"><input name="private_key" class="input ltr" maxlength="60" required autocomplete="off" placeholder="PrivateKey = ..."></div>
+              <button class="btn btn-secondary" type="submit">ثبت کلید</button>
+            </form>
+          @endif
           @if($a->isWireguard())
             <h2>کلید جدید</h2>
             <p class="muted small">فایل و QR قبلی از کار می‌افتد؛ برای وقتی که فایل مشتری لو رفته یا روی دستگاه دیگری استفاده می‌شود.</p>

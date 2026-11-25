@@ -162,8 +162,13 @@ class MtProvisioning
             $a->forceFill(['wg_address' => $this->freeAddress($g, $used)])->save();
         }
 
-        return $this->ros->add($r, 'interface/wireguard/peers', ['interface' => (string) $g->wg_interface, 'public-key' => (string) $a->wg_public_key,
-            'preshared-key' => (string) $a->wg_preshared_key, 'allowed-address' => $a->wg_address.'/32', 'comment' => $a->rosComment(), 'disabled' => 'no']);
+        $attrs = ['interface' => (string) $g->wg_interface, 'public-key' => (string) $a->wg_public_key,
+            'allowed-address' => $a->wg_address.'/32', 'comment' => $a->rosComment(), 'disabled' => 'no'];
+        if ($a->wg_preshared_key) {
+            $attrs['preshared-key'] = (string) $a->wg_preshared_key;
+        }
+
+        return $this->ros->add($r, 'interface/wireguard/peers', $attrs);
     }
 
     /** Per-peer speed limit (simple queue). Failure is recorded, not fatal. */

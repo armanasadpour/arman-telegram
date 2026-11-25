@@ -2,7 +2,10 @@
 @php($g = $a->group)
 <section class="card connect-card mb-16">
   <header class="step-head"><span class="step-no">🔐</span><div><h2>اطلاعات اتصال برای مشتری</h2><p class="muted small">این اطلاعات محرمانه است؛ فقط برای خود مشتری بفرستید.</p></div></header>
-  @if($a->isWireguard())
+  @if($a->isWireguard() && ! $a->wg_private_key)
+    <div class="alert alert-warning">این Peer از روتر وارد شده و روتر کلید خصوصی مشتری را نگه نمی‌دارد؛ مشتری با همان فایل قبلی‌اش وصل می‌شود.
+      برای ساخت فایل/QR در پنل: کلید خصوصی را از فایل فعلی مشتری (خط PrivateKey) پایین همین صفحه ثبت کنید، یا «ساخت کلید جدید» بزنید و فایل جدید بدهید.</div>
+  @elseif($a->isWireguard())
     @php($conf = \App\Services\Mikrotik\WgConfig::build($a))
     <div class="connect-grid">
       <div class="qr-box">{!! \App\Support\QrCode::svg($conf, 4) !!}<div class="muted small">در برنامه WireGuard: ➕ → Scan from QR code</div></div>
@@ -20,7 +23,7 @@
       <dt>نوع VPN</dt><dd>L2TP/IPsec PSK</dd>
       <dt>سرور</dt><dd><bdi class="ltr" id="c_srv">{{ $g->endpoint() }}</bdi> <button type="button" class="chip" data-copy="#c_srv">کپی</button></dd>
       <dt>نام کاربری</dt><dd><bdi class="ltr" id="c_user">{{ $a->username }}</bdi> <button type="button" class="chip" data-copy="#c_user">کپی</button></dd>
-      <dt>رمز</dt><dd><bdi class="ltr" id="c_pass">{{ $a->password }}</bdi> <button type="button" class="chip" data-copy="#c_pass">کپی</button></dd>
+      <dt>رمز</dt><dd>@if($a->password !== null && $a->password !== '')<bdi class="ltr" id="c_pass">{{ $a->password }}</bdi> <button type="button" class="chip" data-copy="#c_pass">کپی</button>@else<span class="muted">از روتر خوانده نشد (کاربر panel دسترسی sensitive ندارد)؛ با «تغییر رمز» رمز تازه بگذارید.</span>@endif</dd>
       <dt>کلید IPsec (PSK)</dt><dd>@if($g->ipsec_psk)<bdi class="ltr" id="c_psk">{{ $g->ipsec_psk }}</bdi> <button type="button" class="chip" data-copy="#c_psk">کپی</button>@else<span class="muted">در گروه ثبت نشده</span>@endif</dd>
     </dl>
     <pre class="sr-only" id="l2all">نوع: L2TP/IPsec PSK

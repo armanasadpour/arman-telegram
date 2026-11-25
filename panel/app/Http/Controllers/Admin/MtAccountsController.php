@@ -11,6 +11,7 @@ use App\Models\User;
 use App\RouterOs\RouterOsException;
 use App\Services\Mikrotik\MtAccounting;
 use App\Services\Mikrotik\MtActions;
+use App\Services\Mikrotik\MtImporter;
 use App\Services\Mikrotik\MtProvisioning;
 use App\Services\Pricing\PricingEngine;
 use Illuminate\Http\RedirectResponse;
@@ -240,6 +241,41 @@ class MtAccountsController extends Controller
         $this->authorize('mt_accounts.sensitive');
 
         return $this->run(fn () => $this->actions->regenerateKeys($account, 'از پنل'), 'کلید جدید ساخته شد؛ فایل/QR جدید را برای مشتری بفرستید (فایل قبلی دیگر کار نمی‌کند).', reveal: $account->id);
+    }
+
+    public function privateKey(Request $request, MtAccount $account): RedirectResponse
+    {
+        $this->authorize('mt_accounts.sensitive');
+        $k = $request->validate(['private_key' => ['required', 'string', 'max:60']])['private_key'];
+
+        return $this->run(fn () => $this->actions->setPrivateKey($account, $k), 'کلید ثبت شد؛ فایل و QR حالا قابل نمایش است.', reveal: $account->id);
+    }
+
+    public function importForm(MtGroup $group, MtImporter $imp): View|RedirectResponse
+    {
+        $this->authorize('mt_accounts.create');
+        try {
+            $rows = $imp->candidates($group);
+        } catch (RouterOsException $e) {
+            return redirect()->route('mt.groups.index')->with('error', $e->getMessage());
+        }
+
+        return view('mt.accounts.import', ['g' => $group->load('router'), 'rows' => $rows]);
+    }
+
+    public function import(Request $request, MtGroup $group, MtImporter $imp): RedirectResponse
+    {
+        $this->authorize('mt_accounts.create');
+        $d = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:2000'], 'ids.*' => ['string', 'regex:/^\*[0-9A-Fa-f]{1,16}$/'],
+            'days' => ['nullable', 'integer', 'min:1', 'max:3650'], 'volume_gb' => ['nullable', 'numeric', 'min:0.1', 'max:100000']],
+            ['ids.required' => 'دست‌کم یک مورد را انتخاب کنید.']);
+        try {
+            $r = $imp->import($group, $d['ids'], isset($d['days']) ? (int) $d['days'] : null, isset($d['volume_gb']) ? (float) $d['volume_gb'] : null, $request->user()->id);
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('mt.accounts.index', ['group' => $group->id])->with('success', fa($r['imported']).' اکانت وارد پنل شد. مصرف از همین لحظه شمرده می‌شود.');
     }
 
     public function retry(MtAccount $account): RedirectResponse

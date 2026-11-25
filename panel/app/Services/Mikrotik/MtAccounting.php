@@ -99,6 +99,24 @@ class MtAccounting
         return $stats;
     }
 
+    /** Mark the live L2TP sessions of just-imported accounts as already counted. @param list<int> $ids */
+    public function baselineL2tp(Router $r, array $ids): void
+    {
+        $bytes = [];
+        foreach ($this->ros->get($r, 'interface', ['type' => 'l2tp-in']) as $if) {
+            $bytes[$if['name'] ?? ''] = [RosValues::int($if['rx-byte'] ?? 0), RosValues::int($if['tx-byte'] ?? 0)];
+        }
+        $byUser = [];
+        foreach ($this->ros->get($r, 'interface/l2tp-server') as $s) {
+            if (RosValues::bool($s['dynamic'] ?? 'false') && ($s['user'] ?? '') !== '') {
+                $byUser[$s['user']][($s['.id'] ?? '').'|'.($s['name'] ?? '')] = $bytes[$s['name'] ?? ''] ?? [0, 0];
+            }
+        }
+        foreach (MtAccount::query()->whereKey($ids)->get() as $a) {
+            $a->forceFill(['counters' => ['sessions' => $byUser[$a->username] ?? []]])->save();
+        }
+    }
+
     /** @param list<array{key:string,rx:int,tx:int,ip:?string,uptime:int}> $sessions */
     private function l2tpDelta(MtAccount $a, array $sessions): array
     {

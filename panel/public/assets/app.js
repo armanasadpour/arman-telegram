@@ -73,6 +73,12 @@
       if (port && (port.value === '' || defaults.indexOf(port.value) !== -1)) port.value = r.getAttribute('data-port');
     });
   });
+  // "Select all" checkboxes.
+  document.querySelectorAll('[data-check-all]').forEach(function (all) {
+    all.addEventListener('change', function () {
+      document.querySelectorAll(all.getAttribute('data-check-all')).forEach(function (c) { c.checked = all.checked; });
+    });
+  });
   // Restore buttons when navigating back (bfcache).
   window.addEventListener('pageshow', function () {
     document.querySelectorAll('form[data-submitted]').forEach(function (f) {

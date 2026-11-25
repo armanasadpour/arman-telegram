@@ -282,6 +282,19 @@ class MtActions
         return $a;
     }
 
+    /** Imported peer: store the customer's private key (checked against the public key) so the panel can show the file/QR. */
+    public function setPrivateKey(MtAccount $a, string $private): MtAccount
+    {
+        $private = trim($private);
+        if (! $a->isWireguard() || ! WgKeys::valid($private) || WgKeys::publicFrom($private) !== $a->wg_public_key) {
+            throw new RuntimeException('این کلید خصوصی با کلید عمومی این Peer روی روتر جور نیست.');
+        }
+        $a->forceFill(['wg_private_key' => $private])->save();
+        $this->audit->log('mt_accounts.private_key', $a, 'ثبت کلید خصوصی برای «'.$a->username.'»');
+
+        return $a;
+    }
+
     // ---------------------------------------------------------------- delete
 
     /** Remove from the router, then from the panel. $panelOnly skips the router (when it is gone for good). */
