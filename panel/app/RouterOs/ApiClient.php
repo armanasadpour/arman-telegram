@@ -32,6 +32,37 @@ class ApiClient implements Client
         return $this->command($words);
     }
 
+    public function add(string $path, array $attrs): string
+    {
+        $words = ['/'.Paths::check($path).'/add'];
+        foreach (Paths::attrs($attrs) as $k => $v) {
+            $words[] = '='.$k.'='.$v;
+        }
+        $this->command($words);
+        if (! is_string($this->lastDone['ret'] ?? null)) {
+            throw new RouterOsException('روتر شناسه ردیف ساخته‌شده را برنگرداند.');
+        }
+
+        return $this->lastDone['ret'];
+    }
+
+    public function set(string $path, string $id, array $attrs): void
+    {
+        $words = ['/'.Paths::check($path).'/set', '=.id='.Paths::id($id)];
+        foreach (Paths::attrs($attrs) as $k => $v) {
+            $words[] = '='.$k.'='.$v;
+        }
+        $this->command($words);
+    }
+
+    public function remove(string $path, string $id): void
+    {
+        $this->command(['/'.Paths::check($path).'/remove', '=.id='.Paths::id($id)]);
+    }
+
+    /** @var array<string,string> attributes of the last !done (e.g. ret=*1F after add) */
+    private array $lastDone = [];
+
     /** @param list<string> $words @return list<array<string,string>> */
     public function command(array $words): array
     {
@@ -50,6 +81,7 @@ class ApiClient implements Client
             } elseif ($type === '!fatal') {
                 throw new RouterOsException('روتر اتصال را بست: '.($attrs['message'] ?? implode(' ', $s)));
             } elseif ($type === '!done') {
+                $this->lastDone = $attrs;
                 break;
             }
         }

@@ -84,6 +84,31 @@ class RouterConnectionTest extends RouterTestCase
         $this->assertContains('اینترفیس WireGuard', $fails);
     }
 
+    public function test_api_ssl_writes_add_set_remove_and_query(): void
+    {
+        [$port, $pin] = $this->startApiServer(true);
+        $r = $this->router(['transport' => 'api-ssl', 'host' => '127.0.0.1', 'port' => $port, 'cert_pin' => $pin]);
+        $ros = app(RouterConnector::class);
+        $id = $ros->add($r, 'ppp/secret', ['name' => 'apiuser', 'password' => 'p w=1', 'service' => 'l2tp', 'disabled' => 'no']);
+        $this->assertMatchesRegularExpression('/^\*[0-9A-F]+$/', $id);
+        $this->assertSame('p w=1', $ros->get($r, 'ppp/secret', ['name' => 'apiuser'])[0]['password']);
+        $this->assertCount(1, $ros->get($r, 'ppp/secret', ['name' => 'apiuser']), 'query filter applied');
+        $ros->set($r, 'ppp/secret', $id, ['disabled' => 'yes']);
+        $this->assertSame('yes', $ros->get($r, 'ppp/secret', ['name' => 'apiuser'])[0]['disabled']);
+        $ros->remove($r, 'ppp/secret', $id);
+        $this->assertSame([], $ros->get($r, 'ppp/secret', ['name' => 'apiuser']));
+        try {
+            $ros->add($r, 'ppp/secret', ['name' => 'dup']);
+            $this->fail('expected refusal');
+        } catch (RouterOsException $e) {
+            $this->assertStringContainsString('already exists', $e->getMessage());
+        }
+        $this->assertTrue($r->fresh()->isUp(), 'a refused write is not a health problem');
+        $this->expectException(RouterOsException::class);
+        $this->expectExceptionMessage('Invalid RouterOS id');
+        $ros->set($r, 'ppp/secret', '1; drop', ['disabled' => 'yes']);
+    }
+
     public function test_api_wrong_password(): void
     {
         [$port] = $this->startApiServer(false);

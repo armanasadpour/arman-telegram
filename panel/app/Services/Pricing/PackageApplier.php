@@ -26,7 +26,7 @@ class PackageApplier
     /** @param array{username:?string,password:?string,comment:?string} $opts */
     public function createAccount(Package $package, string $jobKey, array $opts, ?int $actorId): ProvisioningJob
     {
-        if ($package->type !== 'new' || ! $package->is_active) {
+        if ($package->type !== 'new' || ! $package->is_active || $package->protocol === 'mikrotik') {
             throw new RuntimeException('این بسته برای ساخت اکانت جدید قابل استفاده نیست.');
         }
         $quote = $this->pricing->quote($package);

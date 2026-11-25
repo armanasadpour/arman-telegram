@@ -1,6 +1,15 @@
 <x-layouts.app title="اکانت‌های من">
   <div class="page-head"><h1>اکانت‌های من</h1></div>
+  @if($mt->isNotEmpty())
+    <div class="card mb-16">
+      <h2>L2TP / WireGuard</h2>
+      <div class="acc-list">
+        @foreach($mt as $a)@include('mt.accounts._card', ['a' => $a, 'url' => route('portal.mt.show', $a)])@endforeach
+      </div>
+    </div>
+  @endif
   <div class="card">
+    @if($mt->isNotEmpty())<h2>OpenVPN</h2>@endif
     <form method="get" class="actions mb-12"><input name="q" value="{{ $q }}" class="input w-280" placeholder="جستجوی نام کاربری" aria-label="جستجو"><button class="btn btn-secondary" type="submit">جستجو</button></form>
     @if($accounts->isEmpty())<div class="empty"><div>{{ $q !== '' ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانتی نفروخته‌اید.' }}</div></div>@else
     <div class="acc-list only-mobile">

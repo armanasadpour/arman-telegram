@@ -13,7 +13,7 @@ class CustomerOrder extends Model
     ];
 
     protected $fillable = ['order_key', 'bot_user_id', 'package_id', 'type', 'price_snapshot', 'price_rial', 'payment_id', 'vpn_account_id',
-        'provisioning_job_id', 'debit_entry_id', 'refund_entry_id', 'status', 'error', 'secret'];
+        'provisioning_job_id', 'debit_entry_id', 'refund_entry_id', 'status', 'error', 'secret', 'mt_account_id'];
 
     protected $hidden = ['secret'];
 
@@ -37,6 +37,11 @@ class CustomerOrder extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(VpnAccount::class, 'vpn_account_id');
+    }
+
+    public function mtAccount(): BelongsTo
+    {
+        return $this->belongsTo(MtAccount::class, 'mt_account_id');
     }
 
     public function payment(): BelongsTo

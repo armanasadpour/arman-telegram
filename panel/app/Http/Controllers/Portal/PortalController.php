@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\LedgerEntry;
+use App\Models\MtAccount;
 use App\Models\Package;
 use App\Models\Payment;
 use App\Models\Reseller;
@@ -13,6 +14,7 @@ use App\Payments\Payments;
 use App\Services\Finance\ResellerPricing;
 use App\Services\Finance\ResellerSales;
 use App\Services\Finance\WalletService;
+use App\Services\Mikrotik\MtActions;
 use App\Services\Pricing\PackageRules;
 use App\Services\Reports\CsvExport;
 use App\Services\Reports\Reports;
@@ -47,8 +49,8 @@ class PortalController extends Controller
             'me' => $me,
             'wallet' => $this->wallets->walletFor('reseller', $me->id),
             'stats' => [
-                'accounts' => VpnAccount::query()->where('reseller_id', $me->id)->whereNull('ibs_deleted_at')->count(),
-                'online' => VpnAccount::query()->where('reseller_id', $me->id)->where('is_online', true)->count(),
+                'accounts' => VpnAccount::query()->where('reseller_id', $me->id)->whereNull('ibs_deleted_at')->count() + MtAccount::query()->where('reseller_id', $me->id)->count(),
+                'online' => VpnAccount::query()->where('reseller_id', $me->id)->where('is_online', true)->count() + MtAccount::query()->where('reseller_id', $me->id)->where('is_online', true)->count(),
                 'month_sales' => (clone $ok)->where('created_at', '>=', $monthStart)->count(),
                 'month_profit' => (int) (clone $ok)->where('created_at', '>=', $monthStart)->sum('profit_rial'),
                 'month_spent' => (int) (clone $ok)->where('created_at', '>=', $monthStart)->sum('cost_rial'),
@@ -69,9 +71,11 @@ class PortalController extends Controller
     public function sellForm(Request $request): View
     {
         $me = $this->me($request);
-        $target = $request->query('account') ? $this->ownAccount($me, (int) $request->query('account')) : null;
-        $packages = Package::query()->where('is_active', true)->where('type', $target ? '!=' : '=', 'new')->orderBy('sort_order')->orderBy('price_rial')->get()
-            ->filter(fn ($p) => ! $target || PackageRules::applicability($p, $target) === null);
+        $target = $request->query('account') ? $this->ownAccount($me, (int) $request->query('account'))
+            : ($request->query('mt') ? $this->ownMt($me, (int) $request->query('mt')) : null);
+        $packages = Package::query()->with('mtGroup.router')->where('is_active', true)->where('type', $target ? '!=' : '=', 'new')->orderBy('sort_order')->orderBy('price_rial')->get()
+            ->filter(fn ($p) => $target ? ($target instanceof MtAccount ? MtActions::applicability($p, $target) : PackageRules::applicability($p, $target)) === null
+                : (! $p->isMikrotik() || ($p->mtGroup?->is_active && $p->mtGroup->router?->is_active)));
 
         return view('portal.sell', [
             'me' => $me,
@@ -89,6 +93,7 @@ class PortalController extends Controller
             'sale_key' => ['required', 'uuid'],
             'package_id' => ['required', 'integer', 'exists:packages,id'],
             'account_id' => ['nullable', 'integer'],
+            'mt_account_id' => ['nullable', 'integer'],
             'sale_price_toman' => ['required', 'integer', 'between:0,1000000000'],
             'customer_name' => ['nullable', 'string', 'max:120'],
             'customer_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s۰-۹]+$/u'],
@@ -96,7 +101,8 @@ class PortalController extends Controller
             'password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/'],
         ], [], ['password' => 'رمز', 'package_id' => 'بسته', 'sale_price_toman' => 'قیمت فروش به مشتری', 'customer_name' => 'نام مشتری', 'customer_phone' => 'تلفن مشتری', 'username' => 'نام کاربری']);
 
-        $target = ! empty($d['account_id']) ? $this->ownAccount($me, (int) $d['account_id']) : null;
+        $target = ! empty($d['account_id']) ? $this->ownAccount($me, (int) $d['account_id'])
+            : (! empty($d['mt_account_id']) ? $this->ownMt($me, (int) $d['mt_account_id']) : null);
         try {
             $r = $this->sales->sell($me, Package::query()->findOrFail($d['package_id']), $d['sale_key'], (int) $d['sale_price_toman'] * 10, $d, $target, $request->user()->id);
         } catch (RuntimeException $e) {
@@ -105,7 +111,7 @@ class PortalController extends Controller
         $sale = $r['sale'];
 
         return match ($sale->status) {
-            'completed' => redirect()->route('portal.sales.show', $sale)->with('success', 'فروش انجام شد.')->with('new_password', $r['password']),
+            'completed' => redirect()->route('portal.sales.show', $sale)->with('success', 'فروش انجام شد.')->with('new_password', $r['password'])->with('mt_reveal', $sale->mt_account_id),
             'refunded', 'failed' => redirect()->route('portal.sales.show', $sale)->with('error', 'انجام نشد و مبلغ به کیف پول شما برگشت: '.$sale->error),
             default => redirect()->route('portal.sales.show', $sale)->with('error', 'انجام کار در سرور نامشخص ماند و برای بررسی ثبت شد. مبلغ پس از روشن شدن وضعیت یا تکمیل می‌شود یا برمی‌گردد.'),
         };
@@ -115,13 +121,13 @@ class PortalController extends Controller
     {
         $me = $this->me($request);
 
-        return view('portal.sales', ['sales' => ResellerSale::query()->with('package', 'account')->where('reseller_id', $me->id)->orderByDesc('id')->paginate(20)]);
+        return view('portal.sales', ['sales' => ResellerSale::query()->with('package', 'account', 'mtAccount')->where('reseller_id', $me->id)->orderByDesc('id')->paginate(20)]);
     }
 
     public function sale(Request $request, int $sale): View
     {
         $me = $this->me($request);
-        $s = ResellerSale::query()->with('package', 'account')->where('reseller_id', $me->id)->findOrFail($sale);
+        $s = ResellerSale::query()->with('package', 'account', 'mtAccount.group')->where('reseller_id', $me->id)->findOrFail($sale);
 
         return view('portal.sale', ['s' => $this->sales->syncOne($s)]);
     }
@@ -133,6 +139,9 @@ class PortalController extends Controller
 
         return view('portal.accounts', [
             'q' => $q,
+            'mt' => MtAccount::query()->with('group')->where('reseller_id', $me->id)
+                ->when($q !== '', fn ($w) => $w->where('username', 'like', '%'.str_replace(['%', '_'], ['\%', '\_'], $q).'%'))
+                ->orderByDesc('is_online')->orderBy('username')->limit(200)->get(),
             'accounts' => VpnAccount::query()->with('group.charge')->where('reseller_id', $me->id)->whereNull('ibs_deleted_at')
                 ->when($q !== '', fn ($w) => $w->where('username', 'like', "%$q%"))
                 ->orderByDesc('is_online')->orderBy('username')->paginate(25)->withQueryString(),
@@ -196,6 +205,23 @@ class PortalController extends Controller
         }
 
         return redirect()->route('pay.show', $p->uuid);
+    }
+
+    /** A reseller's own L2TP / WireGuard account, with its connection details (the reseller delivers them). */
+    public function mtAccount(Request $request, int $account): View
+    {
+        $me = $this->me($request);
+        $a = $this->ownMt($me, $account)->load('group', 'router');
+
+        return view('portal.mt-account', [
+            'a' => $a,
+            'sales' => ResellerSale::query()->with('package')->where('reseller_id', $me->id)->where('mt_account_id', $account)->orderByDesc('id')->get(),
+        ]);
+    }
+
+    private function ownMt(Reseller $me, int $id): MtAccount
+    {
+        return MtAccount::query()->where('reseller_id', $me->id)->findOrFail($id);
     }
 
     private function ownAccount(Reseller $me, int $id): VpnAccount

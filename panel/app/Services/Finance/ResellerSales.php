@@ -7,6 +7,7 @@ use App\Ibs\ErrorMessages;
 use App\Ibs\IbsException;
 use App\Ibs\IbsNotConfiguredException;
 use App\Ibs\IbsUnavailableException;
+use App\Models\MtAccount;
 use App\Models\Package;
 use App\Models\ProvisioningJob;
 use App\Models\Reseller;
@@ -14,6 +15,8 @@ use App\Models\ResellerSale;
 use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Ibs\Provisioning;
+use App\Services\Mikrotik\MtActions;
+use App\Services\Mikrotik\MtProvisioning;
 use App\Services\Pricing\PackageApplier;
 use App\Services\Pricing\PackageRules;
 use RuntimeException;
@@ -40,7 +43,7 @@ class ResellerSales
      * @param  array{customer_name:?string,customer_phone:?string,username:?string}  $opts
      * @return array{sale: ResellerSale, password: ?string}
      */
-    public function sell(Reseller $reseller, Package $package, string $saleKey, int $salePriceRial, array $opts, ?VpnAccount $target, int $actorId): array
+    public function sell(Reseller $reseller, Package $package, string $saleKey, int $salePriceRial, array $opts, VpnAccount|MtAccount|null $target, int $actorId): array
     {
         if ($existing = ResellerSale::query()->where('sale_key', $saleKey)->first()) {
             if ($existing->reseller_id !== $reseller->id) {
@@ -63,7 +66,7 @@ class ResellerSales
             if (! $target || $target->reseller_id !== $reseller->id) {
                 throw new RuntimeException('این اکانت متعلق به شما نیست.');
             }
-            if ($why = PackageRules::applicability($package, $target)) {
+            if ($why = $target instanceof MtAccount ? MtActions::applicability($package, $target) : PackageRules::applicability($package, $target)) {
                 throw new RuntimeException($why);
             }
         }
@@ -84,7 +87,8 @@ class ResellerSales
             'profit_rial' => $salePriceRial - $cost,
             'customer_name' => $opts['customer_name'] ?? null,
             'customer_phone' => $opts['customer_phone'] ?? null,
-            'vpn_account_id' => $target?->id,
+            'vpn_account_id' => $target instanceof VpnAccount ? $target->id : null,
+            'mt_account_id' => $target instanceof MtAccount ? $target->id : null,
             'status' => 'pending',
         ]);
 
@@ -105,7 +109,9 @@ class ResellerSales
 
         // 2. Act on the server.
         $password = null;
-        if ($package->type === 'new') {
+        if ($package->protocol === 'mikrotik') {
+            $password = $this->sellMikrotik($sale, $reseller, $package, $saleKey, $opts, $target, $actorId);
+        } elseif ($package->type === 'new') {
             $password = ($opts['password'] ?? null) ?: Provisioning::generatePassword();
             try {
                 $job = $this->provisioning->create($saleKey, [
@@ -147,6 +153,69 @@ class ResellerSales
         return ['sale' => $sale, 'password' => $sale->status === 'completed' ? $password : null];
     }
 
+    private function sellMikrotik(ResellerSale $sale, Reseller $reseller, Package $package, string $saleKey, array $opts, ?MtAccount $target, int $actorId): ?string
+    {
+        if ($package->type !== 'new') {
+            try {
+                app(MtActions::class)->applyPackage($package, $target, 'فروش همکار '.$reseller->code.' #'.$sale->id);
+                $sale->fill(['status' => 'completed'])->save();
+            } catch (Throwable $e) {
+                $this->refund($sale, $this->message($e));
+            }
+
+            return null;
+        }
+        $group = $package->mtGroup;
+        try {
+            if (! $group) {
+                throw new RuntimeException('گروه میکروتیک این بسته وجود ندارد.');
+            }
+            $a = app(MtProvisioning::class)->create($group, $saleKey, [
+                'username' => $opts['username'] ?? null, 'password' => $opts['password'] ?? null, 'days' => $package->duration_days,
+                'volume_gb' => $package->volume_gb, 'multi_login' => $package->multi_login, 'comment' => trim($reseller->code.' '.($opts['customer_name'] ?? '')),
+                'package_id' => $package->id, 'reseller_id' => $reseller->id,
+            ], $actorId);
+        } catch (Throwable $e) {
+            $this->refund($sale, $this->message($e));
+            throw new RuntimeException($this->message($e));
+        }
+        $sale->mt_account_id = $a->id;
+        $sale->save();
+        $this->applyMtOutcome($sale, $a);
+
+        return $a->isWireguard() ? null : $a->password;
+    }
+
+    private function applyMtOutcome(ResellerSale $sale, MtAccount $a): ResellerSale
+    {
+        if ($a->status === 'failed') {
+            $this->refund($sale, (string) $a->error);
+        } elseif ($a->status !== 'pending') {
+            $sale->fill(['status' => 'completed', 'error' => null])->save();
+        }
+
+        return $sale;
+    }
+
+    /** Cron: MikroTik sales whose router was unreachable at sale time. */
+    public function syncPendingMt(): int
+    {
+        $n = 0;
+        foreach (ResellerSale::query()->where('status', 'pending')->whereNotNull('mt_account_id')->limit(100)->get() as $s) {
+            $before = $s->status;
+            $a = MtAccount::withTrashed()->find($s->mt_account_id);
+            if ($a) {
+                $this->applyMtOutcome($s, $a);
+            }
+            if ($s->status !== $before) {
+                $n++;
+                app(Notifier::class)->saleChanged($s->fresh(), $before);
+            }
+        }
+
+        return $n;
+    }
+
     /** Follow up sales whose provisioning finished later (cron / page view). */
     public function syncPending(): int
     {
@@ -163,6 +232,9 @@ class ResellerSales
 
     public function syncOne(ResellerSale $sale): ResellerSale
     {
+        if ($sale->status === 'pending' && $sale->mt_account_id && ($a = MtAccount::withTrashed()->find($sale->mt_account_id))) {
+            return $this->applyMtOutcome($sale, $a);
+        }
         if (in_array($sale->status, ['pending', 'needs_review'], true) && $sale->job) {
             return $this->applyJobOutcome($sale, $sale->job);
         }

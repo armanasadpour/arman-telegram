@@ -49,6 +49,15 @@
       if (input) { input.value = out; input.focus(); input.select(); }
       return;
     }
+    var cp = e.target.closest('[data-copy]');
+    if (cp) {
+      var src = document.querySelector(cp.getAttribute('data-copy'));
+      var text = src ? (src.value !== undefined && src.tagName !== 'PRE' ? src.value : src.textContent) : '';
+      var done = function () { var old = cp.textContent; cp.textContent = 'کپی شد ✓'; setTimeout(function () { cp.textContent = old; }, 1500); };
+      if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).then(done); }
+      else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (x) {} document.body.removeChild(ta); }
+      return;
+    }
     var c = e.target.closest('[data-set]');
     if (c) {
       var t = document.querySelector(c.getAttribute('data-set'));

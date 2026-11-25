@@ -9,10 +9,14 @@ use App\Ibs\IbsNotConfiguredException;
 use App\Ibs\IbsUnavailableException;
 use App\Models\BotUser;
 use App\Models\CustomerOrder;
+use App\Models\MtAccount;
 use App\Models\Package;
 use App\Models\ProvisioningJob;
 use App\Models\VpnAccount;
 use App\Services\Ibs\Provisioning;
+use App\Services\Mikrotik\MtActions;
+use App\Services\Mikrotik\MtProvisioning;
+use App\Services\Mikrotik\WgConfig;
 use App\Services\Pricing\PackageApplier;
 use App\Services\Pricing\PackageRules;
 use App\Services\Pricing\PricingEngine;
@@ -36,7 +40,7 @@ class CustomerOrders
         private Notifier $notifier,
     ) {}
 
-    public function create(BotUser $customer, Package $package, ?VpnAccount $target = null): CustomerOrder
+    public function create(BotUser $customer, Package $package, VpnAccount|MtAccount|null $target = null): CustomerOrder
     {
         if (! $package->is_active) {
             throw new RuntimeException('این بسته فعال نیست.');
@@ -46,10 +50,12 @@ class CustomerOrders
                 throw new RuntimeException('بسته اکانت جدید روی اکانت موجود اعمال نمی‌شود.');
             }
         } else {
-            if (! $target || ! $customer->accounts()->whereKey($target->id)->exists()) {
+            $mine = $target instanceof MtAccount ? $customer->mtAccounts()->whereKey($target->id)->exists()
+                : ($target && $customer->accounts()->whereKey($target->id)->exists());
+            if (! $target || ! $mine) {
                 throw new RuntimeException('این اکانت در فهرست اکانت‌های شما نیست.');
             }
-            if ($why = PackageRules::applicability($package, $target)) {
+            if ($why = $target instanceof MtAccount ? MtActions::applicability($package, $target) : PackageRules::applicability($package, $target)) {
                 throw new RuntimeException($why);
             }
         }
@@ -57,7 +63,8 @@ class CustomerOrders
 
         return CustomerOrder::query()->create([
             'order_key' => (string) Str::uuid(), 'bot_user_id' => $customer->id, 'package_id' => $package->id, 'type' => $package->type,
-            'price_snapshot' => $q->snapshot(), 'price_rial' => $q->finalPrice, 'vpn_account_id' => $target?->id,
+            'price_snapshot' => $q->snapshot(), 'price_rial' => $q->finalPrice,
+            'vpn_account_id' => $target instanceof VpnAccount ? $target->id : null, 'mt_account_id' => $target instanceof MtAccount ? $target->id : null,
         ]);
     }
 
@@ -91,6 +98,9 @@ class CustomerOrders
             $order->status = 'pending';
             $order->save();
 
+            if ($package->protocol === 'mikrotik') {
+                return $this->fulfilMikrotik($order, $package);
+            }
             if ($order->type === 'new') {
                 $password = Provisioning::generatePassword();
                 $order->secret = $password;
@@ -128,6 +138,65 @@ class CustomerOrders
         }
     }
 
+    private function fulfilMikrotik(CustomerOrder $order, Package $package): CustomerOrder
+    {
+        if ($order->type !== 'new') {
+            try {
+                app(MtActions::class)->applyPackage($package, $order->mtAccount, 'خرید مشتری ربات — سفارش #'.$order->id);
+                $order->fill(['status' => 'completed'])->save();
+                $this->notifyDone($order);
+            } catch (Throwable $e) {
+                $this->refund($order, $this->message($e));
+            }
+
+            return $order;
+        }
+        try {
+            if (! $package->mtGroup) {
+                throw new RuntimeException('گروه میکروتیک این بسته وجود ندارد.');
+            }
+            $a = app(MtProvisioning::class)->create($package->mtGroup, $order->order_key, [
+                'days' => $package->duration_days, 'volume_gb' => $package->volume_gb, 'multi_login' => $package->multi_login,
+                'comment' => 'bot #'.$order->bot_user_id, 'package_id' => $package->id,
+            ], null);
+        } catch (Throwable $e) {
+            $this->refund($order, $this->message($e));
+
+            return $order;
+        }
+        $order->forceFill(['mt_account_id' => $a->id])->save();
+
+        return $this->applyMt($order);
+    }
+
+    private function applyMt(CustomerOrder $order): CustomerOrder
+    {
+        $a = MtAccount::withTrashed()->find($order->mt_account_id);
+        if (! $a || $order->type !== 'new') {
+            return $order;
+        }
+        if ($a->status === 'failed') {
+            $this->refund($order, (string) $a->error);
+        } elseif ($a->status !== 'pending') {
+            $order->fill(['status' => 'completed', 'error' => null])->save();
+            $order->botUser->mtAccounts()->syncWithoutDetaching([$a->id => ['created_at' => now()]]);
+            $this->notifyDone($order);
+        }
+
+        return $order;
+    }
+
+    /** Cron: MikroTik orders whose router was unreachable at purchase time. */
+    public function syncPendingMt(): int
+    {
+        $n = 0;
+        foreach (CustomerOrder::query()->where('status', 'pending')->whereNotNull('mt_account_id')->limit(100)->get() as $o) {
+            $n += (int) ($this->applyMt($o)->status !== 'pending');
+        }
+
+        return $n;
+    }
+
     /** Cron: orders whose provisioning job finished later. */
     public function syncPending(): int
     {
@@ -142,6 +211,10 @@ class CustomerOrders
 
     public function sync(CustomerOrder $order): CustomerOrder
     {
+        if ($order->status === 'pending' && $order->mt_account_id) {
+            return $this->applyMt($order);
+        }
+
         return in_array($order->status, ['pending', 'needs_review'], true) && $order->provisioning_job_id ? $this->applyJob($order) : $order;
     }
 
@@ -193,6 +266,16 @@ class CustomerOrders
         if (! Cache::add('order.done.'.$order->id, 1, now()->addDays(2))) {
             return;
         }
+        if ($order->mt_account_id) {
+            $m = MtAccount::query()->find($order->mt_account_id);
+            if ($m && $order->type === 'new') {
+                $this->notifier->toBotUser($order->bot_user_id, "✅ خرید انجام شد.\n\n".self::mtCredentials($m)."\n\nبسته: ".$order->package?->name."\nاین پیام را جای امنی نگه دارید.", true);
+            } elseif ($m) {
+                $this->notifier->toBotUser($order->bot_user_id, '✅ اکانت '.$m->username.' با بسته «'.$order->package?->name.'» به‌روزرسانی شد.');
+            }
+
+            return;
+        }
         $a = $order->account()->first();
         if ($order->type === 'new') {
             $this->notifier->toBotUser($order->bot_user_id, "✅ خرید انجام شد.\n\nنام کاربری: ".($a?->username ?? '—')."\nرمز: ".($order->secret ?? '—')
@@ -201,6 +284,21 @@ class CustomerOrders
         } else {
             $this->notifier->toBotUser($order->bot_user_id, '✅ اکانت '.($a?->username ?? '').' با بسته «'.$order->package?->name.'» به‌روزرسانی شد.');
         }
+    }
+
+    /** Connection details for a messenger (contains secrets: send as a sensitive message). */
+    public static function mtCredentials(MtAccount $m): string
+    {
+        $g = $m->group;
+        if ($m->isWireguard()) {
+            return '🔐 WireGuard — '.$m->username."\nفایل زیر را در برنامه WireGuard با «Import from text» یا ساخت فایل .conf وارد کنید:\n\n".WgConfig::build($m);
+        }
+        $lines = ['🔐 L2TP/IPsec', 'سرور: '.$g->endpoint(), 'نام کاربری: '.$m->username, 'رمز: '.$m->password];
+        if ($g->ipsec_psk) {
+            $lines[] = 'کلید IPsec (Pre-shared key): '.$g->ipsec_psk;
+        }
+
+        return implode("\n", $lines);
     }
 
     private function notifyReview(CustomerOrder $order): void

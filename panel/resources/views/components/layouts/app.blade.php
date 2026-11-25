@@ -39,16 +39,20 @@
     @can('reports.view')
       <a href="{{ route('reports.index') }}" @class(['active' => request()->routeIs('reports.*')])><x-icon name="activity"/>گزارش‌ها</a>
     @endcan
-    @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view') || auth()->user()->can('routers.view'))
+    @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view') || auth()->user()->can('routers.view') || auth()->user()->can('mt_accounts.view'))
       <div class="section">سرور</div>
       @can('accounts.view')
-        <a href="{{ route('accounts.index') }}" @class(['active' => request()->routeIs('accounts.*')])><x-icon name="user"/>اکانت‌ها</a>
+        <a href="{{ route('accounts.index') }}" @class(['active' => request()->routeIs('accounts.*')])><x-icon name="user"/>اکانت‌های OpenVPN</a>
       @endcan
       @can('ibs_groups.view')
         <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups')])><x-icon name="layers"/>گروه‌ها و تعرفه‌ها</a>
       @endcan
       @can('routers.view')
         <a href="{{ route('routers.index') }}" @class(['active' => request()->routeIs('routers.*')])><x-icon name="link"/>روترهای میکروتیک</a>
+        <a href="{{ route('mt.groups.index') }}" @class(['active' => request()->routeIs('mt.groups.*')])><x-icon name="layers"/>گروه‌های L2TP / WireGuard</a>
+      @endcan
+      @can('mt_accounts.view')
+        <a href="{{ route('mt.accounts.index') }}" @class(['active' => request()->routeIs('mt.accounts.*')])><x-icon name="key"/>اکانت‌های L2TP / WireGuard</a>
       @endcan
     @endif
     @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view') || auth()->user()->can('resellers.view') || auth()->user()->can('payments.view'))

@@ -3,6 +3,7 @@
 namespace App\Services\Pricing;
 
 use App\Models\IbsGroup;
+use App\Models\MtGroup;
 use App\Models\Package;
 use App\Models\VpnAccount;
 
@@ -16,6 +17,28 @@ class PackageRules
         $type = $d['type'] ?? null;
         $hasVolume = isset($d['volume_gb']) && (float) $d['volume_gb'] > 0;
 
+        if (($d['protocol'] ?? 'openvpn') === 'mikrotik') {
+            if ($type === 'new') {
+                $g = MtGroup::query()->find($d['mt_group_id'] ?? 0);
+                if (! $g) {
+                    $e['mt_group_id'] = 'گروه میکروتیک را انتخاب کنید.';
+                }
+                if (empty($d['duration_days']) && ! $hasVolume) {
+                    $e['duration_days'] = 'بسته باید دست‌کم مدت یا حجم داشته باشد.';
+                }
+            } elseif ($type === 'renewal' && empty($d['duration_days'])) {
+                $e['duration_days'] = 'بسته تمدید باید مدت (روز) داشته باشد.';
+            } elseif ($type === 'topup') {
+                if (! $hasVolume) {
+                    $e['volume_gb'] = 'بسته افزایش حجم باید حجم داشته باشد.';
+                }
+                if (! empty($d['duration_days'])) {
+                    $e['duration_days'] = 'بسته افزایش حجم مدت ندارد؛ برای افزودن روز از بسته تمدید استفاده کنید.';
+                }
+            }
+
+            return $e;
+        }
         if ($type === 'new') {
             if (empty($d['duration_days'])) {
                 $e['duration_days'] = 'برای بسته اکانت جدید مدت اعتبار لازم است.';
@@ -49,6 +72,9 @@ class PackageRules
     {
         if (! in_array($p->type, ['renewal', 'topup'], true)) {
             return 'فقط بسته‌های تمدید و افزایش حجم روی اکانت موجود اعمال می‌شوند.';
+        }
+        if ($p->protocol === 'mikrotik') {
+            return 'این بسته مخصوص اکانت‌های میکروتیک (L2TP/WireGuard) است.';
         }
         if ($p->hasVolume() && ! $a->isVolumeLimited()) {
             return 'این بسته حجم دارد ولی تعرفه این اکانت حجمی نیست.';

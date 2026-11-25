@@ -13,11 +13,38 @@ class RestClient implements Client
 
     public function get(string $path, array $query = []): array
     {
+        return Paths::rows($this->request('GET', Paths::check($path).($query ? '?'.http_build_query($query) : ''), null));
+    }
+
+    public function add(string $path, array $attrs): string
+    {
+        $j = $this->request('PUT', Paths::check($path), Paths::attrs($attrs));
+        $id = is_array($j) ? ($j['.id'] ?? $j['ret'] ?? null) : null;
+        if (! is_string($id)) {
+            throw new RouterOsException('روتر شناسه ردیف ساخته‌شده را برنگرداند.');
+        }
+
+        return $id;
+    }
+
+    public function set(string $path, string $id, array $attrs): void
+    {
+        $this->request('PATCH', Paths::check($path).'/'.Paths::id($id), Paths::attrs($attrs));
+    }
+
+    public function remove(string $path, string $id): void
+    {
+        $this->request('DELETE', Paths::check($path).'/'.Paths::id($id), null);
+    }
+
+    private function request(string $method, string $rel, ?array $body): mixed
+    {
         if (! preg_match('#^sha256//[A-Za-z0-9+/=]{43,44}$#', $this->pin)) {
             throw new RouterOsException('اثر انگشت گواهی روتر ثبت نشده است؛ ابتدا «دریافت اثر انگشت» را بزنید.');
         }
-        $url = 'https://'.$this->hostPart().':'.$this->port.'/rest/'.Paths::check($path).($query ? '?'.http_build_query($query) : '');
-        [$status, $body] = app(RestTransport::class)->send('GET', $url, $this->username, $this->password, $this->pin, null, $this->timeout);
+        $url = 'https://'.$this->hostPart().':'.$this->port.'/rest/'.$rel;
+        [$status, $body] = app(RestTransport::class)->send($method, $url, $this->username, $this->password, $this->pin,
+            $body === null ? null : json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $this->timeout);
         $j = json_decode($body, true);
         if ($status === 401) {
             throw new RouterOsException('نام کاربری یا رمز میکروتیک اشتباه است، یا کاربر دسترسی api/rest-api ندارد.');
@@ -27,7 +54,7 @@ class RestClient implements Client
             throw new RouterOsException('پاسخ خطا از روتر (HTTP '.$status.')'.($msg !== '' ? ': '.mb_substr($msg, 0, 200) : ''));
         }
 
-        return Paths::rows($j);
+        return $j;
     }
 
     private function hostPart(): string

@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DiscountsController;
 use App\Http\Controllers\Admin\IbsGroupsController;
 use App\Http\Controllers\Admin\IbsSettingsController;
+use App\Http\Controllers\Admin\MtAccountsController;
+use App\Http\Controllers\Admin\MtGroupsController;
 use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Admin\PaymentsController;
 use App\Http\Controllers\Admin\PaymentSettingsController;
@@ -81,6 +83,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/resellers/{reseller}/adjust', [ResellersController::class, 'adjust'])->name('resellers.adjust');
         Route::post('/resellers/{reseller}/ledger/{entry}/reverse', [ResellersController::class, 'reverse'])->name('resellers.reverse');
         Route::post('/resellers/{reseller}/sales/{sale}/refund', [ResellersController::class, 'refundSale'])->name('resellers.refund-sale');
+        Route::get('/mt/accounts/{account}/connect', [MtAccountsController::class, 'connect'])->name('mt.accounts.connect')->whereNumber('account');
+        Route::post('/mt/accounts/{account}/password', [MtAccountsController::class, 'password'])->name('mt.accounts.password');
+        Route::post('/mt/accounts/{account}/keys', [MtAccountsController::class, 'keys'])->name('mt.accounts.keys');
+        Route::delete('/mt/accounts/{account}', [MtAccountsController::class, 'destroy'])->name('mt.accounts.destroy');
         Route::post('/accounts/jobs/{job}/resolve', [ProvisioningJobsController::class, 'resolve'])->name('accounts.jobs.resolve');
     });
 
@@ -95,6 +101,27 @@ Route::middleware('auth')->group(function () {
     Route::get('/routers/{router}', [RoutersController::class, 'show'])->name('routers.show')->whereNumber('router');
     Route::post('/routers/{router}/test', [RoutersController::class, 'test'])->name('routers.test')->middleware('throttle:20,1');
     Route::post('/routers/{router}/protocol', [RoutersController::class, 'toggleProtocol'])->name('routers.protocol');
+
+    // MikroTik groups and accounts
+    Route::get('/mt/groups', [MtGroupsController::class, 'index'])->name('mt.groups.index');
+    Route::get('/mt/groups/create', [MtGroupsController::class, 'create'])->name('mt.groups.create');
+    Route::post('/mt/groups', [MtGroupsController::class, 'store'])->name('mt.groups.store')->middleware('throttle:20,1');
+    Route::get('/mt/groups/{group}/edit', [MtGroupsController::class, 'edit'])->name('mt.groups.edit');
+    Route::put('/mt/groups/{group}', [MtGroupsController::class, 'update'])->name('mt.groups.update')->middleware('throttle:20,1');
+    Route::delete('/mt/groups/{group}', [MtGroupsController::class, 'destroy'])->name('mt.groups.destroy');
+    Route::get('/mt/accounts', [MtAccountsController::class, 'index'])->name('mt.accounts.index');
+    Route::get('/mt/accounts/create', [MtAccountsController::class, 'create'])->name('mt.accounts.create');
+    Route::post('/mt/accounts', [MtAccountsController::class, 'store'])->name('mt.accounts.store')->middleware('throttle:30,1');
+    Route::post('/mt/accounts/from-package', [MtAccountsController::class, 'storeFromPackage'])->name('mt.accounts.store-package')->middleware('throttle:30,1');
+    Route::get('/mt/accounts/{account}', [MtAccountsController::class, 'show'])->name('mt.accounts.show')->whereNumber('account')->withTrashed();
+    Route::post('/mt/accounts/{account}/renew', [MtAccountsController::class, 'renew'])->name('mt.accounts.renew');
+    Route::post('/mt/accounts/{account}/volume', [MtAccountsController::class, 'volume'])->name('mt.accounts.volume');
+    Route::post('/mt/accounts/{account}/limits', [MtAccountsController::class, 'limits'])->name('mt.accounts.limits');
+    Route::post('/mt/accounts/{account}/package', [MtAccountsController::class, 'applyPackage'])->name('mt.accounts.package');
+    Route::post('/mt/accounts/{account}/reset', [MtAccountsController::class, 'resetUsage'])->name('mt.accounts.reset');
+    Route::post('/mt/accounts/{account}/toggle', [MtAccountsController::class, 'toggle'])->name('mt.accounts.toggle');
+    Route::post('/mt/accounts/{account}/retry', [MtAccountsController::class, 'retry'])->name('mt.accounts.retry')->middleware('throttle:20,1');
+    Route::post('/mt/accounts/{account}/sync', [MtAccountsController::class, 'sync'])->name('mt.accounts.sync')->middleware('throttle:20,1');
 
     // Reports
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
@@ -168,6 +195,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/sales/{sale}', [PortalController::class, 'sale'])->name('sales.show')->whereNumber('sale');
         Route::get('/accounts', [PortalController::class, 'accounts'])->name('accounts');
         Route::get('/accounts/{account}', [PortalController::class, 'account'])->name('accounts.show')->whereNumber('account');
+        Route::get('/mt/{account}', [PortalController::class, 'mtAccount'])->name('mt.show')->whereNumber('account');
         Route::get('/ledger', [PortalController::class, 'ledger'])->name('ledger');
     });
 

@@ -26,21 +26,51 @@ class RouterConnector
     /** @return list<array<string,string>> */
     public function get(Router $r, string $path, array $query = []): array
     {
+        return $this->call($r, fn (Client $c) => $c->get($path, $query));
+    }
+
+    /** @param array<string,mixed> $attrs */
+    public function add(Router $r, string $path, array $attrs): string
+    {
+        return $this->call($r, fn (Client $c) => $c->add($path, $attrs), true);
+    }
+
+    /** @param array<string,mixed> $attrs */
+    public function set(Router $r, string $path, string $id, array $attrs): void
+    {
+        $this->call($r, fn (Client $c) => $c->set($path, $id, $attrs), true);
+    }
+
+    public function remove(Router $r, string $path, string $id): void
+    {
+        $this->call($r, fn (Client $c) => $c->remove($path, $id), true);
+    }
+
+    /** Run against the router, recording health (a refused write is not a health problem); messages never contain the password. */
+    private function call(Router $r, \Closure $fn, bool $write = false): mixed
+    {
         $t = microtime(true);
         try {
-            $rows = $this->client($r)->get($path, $query);
+            $out = $fn($this->client($r));
         } catch (Throwable $e) {
             $msg = $this->clean($r, $e->getMessage());
-            if ($r->exists) {
+            if ((! $write || $e instanceof RouterOsUnreachable) && $r->exists) {
                 $r->forceFill(['last_error_at' => now(), 'last_error' => mb_substr($msg, 0, 500)])->save();
             }
+            unset($this->clients[$r->id ?? 0]);   // a failed socket is not reused
             throw $e instanceof RouterOsException ? new ($e::class)($msg) : new RouterOsException($msg);
         }
         if ($r->exists) {
             $r->forceFill(['last_ok_at' => now(), 'last_latency_ms' => (int) ((microtime(true) - $t) * 1000)])->save();
         }
 
-        return $rows;
+        return $out;
+    }
+
+    /** Forget cached clients (after the router's settings change). */
+    public function forget(Router $r): void
+    {
+        unset($this->clients[$r->id ?? 0]);
     }
 
     public function first(Router $r, string $path): array

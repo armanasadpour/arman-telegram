@@ -8,10 +8,12 @@ use App\Models\BotLinkCode;
 use App\Models\BotOutbox;
 use App\Models\BotUser;
 use App\Models\CustomerOrder;
+use App\Models\MtAccount;
 use App\Models\Payment;
 use App\Models\ProvisioningJob;
 use App\Models\Reseller;
 use App\Models\ResellerSale;
+use App\Models\Router;
 use App\Models\VpnAccount;
 use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
@@ -20,6 +22,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 /**
@@ -56,8 +59,8 @@ class Alerts
     /** @return array<string,int> what was sent */
     public function run(): array
     {
-        $out = ['server' => 0, 'customers' => 0, 'admin_report' => 0, 'digests' => 0];
-        foreach (['server' => fn () => $this->serverHealth(), 'customers' => fn () => $this->customerAlerts(),
+        $out = ['server' => 0, 'customers' => 0, 'mt_customers' => 0, 'admin_report' => 0, 'digests' => 0];
+        foreach (['server' => fn () => $this->serverHealth(), 'customers' => fn () => $this->customerAlerts(), 'mt_customers' => fn () => $this->mtCustomerAlerts(),
             'admin_report' => fn () => $this->dailyAdminReport(), 'digests' => fn () => $this->resellerDigests()] as $k => $fn) {
             try {
                 $out[$k] = $fn();
@@ -139,8 +142,37 @@ class Alerts
         return $sent;
     }
 
+    /** Same alerts for L2TP / WireGuard accounts (their data is kept fresh by the per-minute accounting). */
+    public function mtCustomerAlerts(int $limit = 400): int
+    {
+        if (! Schema::hasTable('bot_mt_links') || (! $this->on('alerts.expiry_enabled') && ! $this->on('alerts.expired_enabled') && ! $this->on('alerts.volume_enabled'))) {
+            return 0;
+        }
+        $days = collect(explode(',', $this->get('alerts.expiry_days')))->map(fn ($d) => (int) trim($d))->filter(fn ($d) => $d > 0 && $d <= 30)->sort()->values();
+        $maxDays = (int) ($days->max() ?? 0);
+        $sent = 0;
+        $q = MtAccount::query()->whereIn('status', ['active', 'expired', 'depleted'])->whereIn('id', DB::table('bot_mt_links')->select('mt_account_id'))
+            ->where(function ($q) use ($maxDays) {
+                $q->whereBetween('expires_at', [now()->subDays(2), now()->addDays($maxDays + 1)]);
+                if ($this->on('alerts.volume_enabled')) {
+                    $q->orWhereNotNull('volume_limit_bytes');
+                }
+            })->where('last_synced_at', '>=', now()->subMinutes(30))->orderBy('id')->limit($limit);
+        foreach ($q->get() as $a) {
+            foreach ($this->accountMessages($a, $days->all()) as [$kind, $marker, $text]) {
+                if ($this->once('mt_'.$kind, $a->id, $marker)) {
+                    foreach (DB::table('bot_mt_links')->where('mt_account_id', $a->id)->pluck('bot_user_id') as $bu) {
+                        $sent += $this->notifier->toBotUser((int) $bu, $text);
+                    }
+                }
+            }
+        }
+
+        return $sent;
+    }
+
     /** @return list<array{0:string,1:string,2:string}> [kind, marker, text] */
-    public function accountMessages(VpnAccount $a, array $thresholds): array
+    public function accountMessages(VpnAccount|MtAccount $a, array $thresholds): array
     {
         $out = [];
         $renew = "\n\nبرای تمدید، در ربات «🔄 تمدید اکانت من» را بزنید.";
@@ -215,6 +247,17 @@ class Alerts
         $lines[] = $review ? '⚠️ نیازمند رسیدگی: '.fa($review).' مورد (پنل را ببینید)' : '✅ موردی برای رسیدگی نیست';
         if ($h) {
             $lines[] = $h['breaker_open'] ? '🔴 سرور IBSng: قطع' : '🖥 سرور IBSng: '.($h['ok_at'] ? 'آخرین تماس موفق '.fa_ago(Carbon::parse($h['ok_at'])) : 'نامشخص');
+        }
+        if (Schema::hasTable('mt_accounts') && MtAccount::query()->exists()) {
+            $mt = MtAccount::query();
+            $lines[] = '📡 L2TP/WireGuard: '.fa((clone $mt)->whereBetween('created_at', [$from, $to])->count()).' جدید — '
+                .fa((clone $mt)->where('is_online', true)->count()).' آنلاین — مصرف دیروز '
+                .fa_bytes((int) DB::table('mt_usage_daily')->where('day', $from->setTimezone($tz)->toDateString())->sum(DB::raw('upload_bytes + download_bytes')));
+            foreach (Router::query()->where('is_active', true)->get() as $r) {
+                if (! $r->isUp()) {
+                    $lines[] = '🔴 روتر «'.$r->name.'»: قطع';
+                }
+            }
         }
 
         return implode("\n", $lines);

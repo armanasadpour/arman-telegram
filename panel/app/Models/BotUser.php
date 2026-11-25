@@ -32,6 +32,11 @@ class BotUser extends Model
         return $this->belongsToMany(VpnAccount::class, 'bot_account_links')->withPivot('created_at');
     }
 
+    public function mtAccounts(): BelongsToMany
+    {
+        return $this->belongsToMany(MtAccount::class, 'bot_mt_links')->withPivot('created_at');
+    }
+
     public function reseller(): ?Reseller
     {
         return $this->user?->isReseller() ? $this->user->reseller : null;

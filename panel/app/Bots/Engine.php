@@ -11,6 +11,7 @@ use App\Models\BotLinkCode;
 use App\Models\BotUser;
 use App\Models\CustomerOrder;
 use App\Models\LedgerEntry;
+use App\Models\MtAccount;
 use App\Models\Package;
 use App\Models\Payment;
 use App\Models\ProvisioningJob;
@@ -259,18 +260,29 @@ class Engine
 
             return;
         }
+        $mt = $username === '' ? null : MtAccount::query()->where('protocol', 'l2tp')->where('username', $username)->whereNotIn('status', ['pending', 'failed'])->get()
+            ->first(fn (MtAccount $m) => hash_equals((string) $m->password, $password));
+        if ($mt) {
+            $u->forceFill(['failed_logins' => 0])->save();
+            $u->mtAccounts()->syncWithoutDetaching([$mt->id => ['created_at' => now()]]);
+            $this->menu($u, "✅ اکانت به ربات اضافه شد.\n\n".$this->mtCard($mt));
+
+            return;
+        }
         try {
             $info = $username === '' ? null : $this->ibs->userByUsername($username);
-        } catch (IbsUnavailableException|IbsNotConfiguredException|IbsException) {
+        } catch (IbsNotConfiguredException) {
+            $this->failedLink($u);   // only MikroTik in use: the L2TP check above already failed
+
+            return;
+        } catch (IbsUnavailableException|IbsException) {
             $this->menu($u, 'ارتباط با سرور موقتاً برقرار نیست. چند دقیقه دیگر دوباره تلاش کنید.');
 
             return;
         }
         $real = $info['attrs']['normal_password'] ?? null;
         if ($info === null || $real === null || ! hash_equals((string) $real, $password)) {
-            $fails = $u->failed_logins + 1;
-            $u->forceFill($fails >= self::MAX_FAILED ? ['failed_logins' => 0, 'login_blocked_until' => now()->addMinutes(30)] : ['failed_logins' => $fails])->save();
-            $this->menu($u, 'نام کاربری یا رمز عبور درست نیست.');
+            $this->failedLink($u);
 
             return;
         }
@@ -285,10 +297,43 @@ class Engine
         $this->menu($u, "✅ اکانت به ربات اضافه شد.\n\n".$this->accountCard($account));
     }
 
+    private function failedLink(BotUser $u): void
+    {
+        $fails = $u->failed_logins + 1;
+        $u->forceFill($fails >= self::MAX_FAILED ? ['failed_logins' => 0, 'login_blocked_until' => now()->addMinutes(30)] : ['failed_logins' => $fails])->save();
+        $this->menu($u, 'نام کاربری یا رمز عبور درست نیست.');
+    }
+
+    private function mtCard(MtAccount $a): string
+    {
+        $lines = ['👤 '.$a->username.' ('.$a->protocolLabel().')', 'وضعیت: '.$a->statusLabel()[0]];
+        if ($tm = $a->timeMeter()) {
+            $lines[] = '';
+            $lines[] = '⏳ زمان: '.VpnAccount::textBar($tm['pct']).' '.fa($tm['pct']).'٪';
+            $lines[] = $tm['started']
+                ? ($tm['remaining'] > 0 ? fa_duration($tm['remaining']).' مانده — تا '.jdate($a->expires_at, 'Y/m/d') : 'منقضی شده در '.jdate($a->expires_at, 'Y/m/d'))
+                : fa_duration($tm['total']).' — از اولین اتصال شروع می‌شود';
+        }
+        $lines[] = '';
+        if ($vm = $a->volumeMeter()) {
+            $lines[] = '📶 حجم: '.VpnAccount::textBar($vm['pct']).' '.fa($vm['pct']).'٪';
+            $lines[] = fa_bytes($vm['remaining']).' مانده از '.fa_bytes($vm['total']);
+        } else {
+            $lines[] = '📶 حجم: نامحدود — مصرف '.fa_bytes($a->used_bytes);
+        }
+        if ($a->is_online) {
+            $lines[] = '';
+            $lines[] = '🟢 اکنون متصل';
+        }
+
+        return implode("\n", $lines);
+    }
+
     private function myAccounts(BotUser $u): void
     {
         $accounts = $u->accounts()->whereNull('ibs_deleted_at')->orderBy('username')->limit(10)->get();
-        if ($accounts->isEmpty()) {
+        $mts = $u->mtAccounts()->orderBy('username')->limit(10)->get();
+        if ($accounts->isEmpty() && $mts->isEmpty()) {
             $this->menu($u, 'هنوز اکانتی به ربات اضافه نکرده‌اید. از «'.self::LINK.'» استفاده کنید.');
 
             return;
@@ -301,6 +346,9 @@ class Engine
                 // show the last known data
             }
             $cards[] = $this->accountCard($a);
+        }
+        foreach ($mts as $m) {
+            $cards[] = $this->mtCard($m);
         }
         $this->menu($u, implode("\n\n➖➖➖\n\n", $cards));
     }
@@ -443,12 +491,12 @@ class Engine
         $this->choosePackage($u, $r, ['new'], 'sell_pkg', [], 'بسته را انتخاب کنید (قیمت خرید شما):');
     }
 
-    private function choosePackage(BotUser $u, Reseller $r, array $types, string $state, array $data, string $prompt): void
+    private function choosePackage(BotUser $u, Reseller $r, array $types, string $state, array $data, string $prompt, ?string $protocol = null): void
     {
         $opts = [];
         $rows = [];
-        foreach (Package::query()->where('is_active', true)->whereIn('type', $types)->orderBy('sort_order')->limit(20)->get() as $p) {
-            $label = '📦 '.$p->name.' — '.fa_money($this->resellerPricing->quote($r, $p)->finalPrice);
+        foreach (Package::query()->with('mtGroup')->where('is_active', true)->whereIn('type', $types)->when($protocol, fn ($q) => $q->where('protocol', $protocol))->orderBy('sort_order')->limit(20)->get() as $p) {
+            $label = '📦 '.$p->name.($p->isMikrotik() ? ' ('.$p->protocolLabel().')' : '').' — '.fa_money($this->resellerPricing->quote($r, $p)->finalPrice);
             $opts[$label] = $p->id;
             $rows[] = [$label];
         }
@@ -475,6 +523,11 @@ class Engine
 
             return;
         }
+        if ($p->isMikrotik() && $p->mtGroup?->isWireguard()) {
+            $this->ask($u, 'sell_user', ['package_id' => $p->id, 'no_password' => true], 'نام کاربری دلخواه (حروف کوچک انگلیسی و عدد) را بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
+
+            return;
+        }
         $this->ask($u, 'sell_user', ['package_id' => $p->id], 'نام کاربری دلخواه (حروف کوچک انگلیسی و عدد) را بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
     }
 
@@ -488,6 +541,11 @@ class Engine
                 return;
             }
             $d['username'] = $text;
+        }
+        if (! empty($d['no_password'])) {
+            $this->confirm($u, 'sell_confirm', $d);
+
+            return;
         }
         $this->ask($u, 'sell_pass', $d, 'رمز دلخواه را بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
     }
@@ -505,12 +563,15 @@ class Engine
     {
         $r = $this->reseller($u);
         $a = $r ? VpnAccount::query()->where('reseller_id', $r->id)->whereNull('ibs_deleted_at')->where('username', trim($text))->first() : null;
-        if (! $a) {
+        $m = $r && ! $a ? MtAccount::query()->where('reseller_id', $r->id)->where('username', trim($text))->whereNotIn('status', ['pending', 'failed'])->first() : null;
+        if (! $a && ! $m) {
             $this->ask($u, 'renew_acc', [], 'این اکانت در میان اکانت‌های شما پیدا نشد. نام کاربری را دوباره بفرستید:');
 
             return;
         }
-        $this->choosePackage($u, $r, ['renewal', 'topup'], 'renew_pkg', ['account_id' => $a->id], "اکانت {$a->username}\n\nبسته تمدید یا افزایش حجم را انتخاب کنید:");
+        $m
+            ? $this->choosePackage($u, $r, ['renewal', 'topup'], 'renew_pkg', ['mt_account_id' => $m->id], "اکانت {$m->username}\n\nبسته تمدید یا افزایش حجم را انتخاب کنید:", 'mikrotik')
+            : $this->choosePackage($u, $r, ['renewal', 'topup'], 'renew_pkg', ['account_id' => $a->id], "اکانت {$a->username}\n\nبسته تمدید یا افزایش حجم را انتخاب کنید:", 'openvpn');
     }
 
     private function renewPicked(BotUser $u, string $text): void
@@ -521,7 +582,7 @@ class Engine
 
             return;
         }
-        $this->confirm($u, 'renew_confirm', ['package_id' => $p->id, 'account_id' => $u->state_data['account_id'] ?? null]);
+        $this->confirm($u, 'renew_confirm', ['package_id' => $p->id, 'account_id' => $u->state_data['account_id'] ?? null, 'mt_account_id' => $u->state_data['mt_account_id'] ?? null]);
     }
 
     private function confirm(BotUser $u, string $state, array $d): void
@@ -539,9 +600,11 @@ class Engine
         $lines = ['🧾 خلاصه', 'بسته: '.$p->name.' — '.$p->summary(), 'مبلغ کسر از کیف پول: '.fa_money($q->finalPrice)];
         if (! empty($d['account_id'])) {
             $lines[] = 'اکانت: '.VpnAccount::query()->whereKey($d['account_id'])->value('username');
+        } elseif (! empty($d['mt_account_id'])) {
+            $lines[] = 'اکانت: '.MtAccount::query()->whereKey($d['mt_account_id'])->value('username');
         } else {
             $lines[] = 'نام کاربری: '.($d['username'] ?? 'خودکار');
-            $lines[] = 'رمز: '.(isset($d['password']) ? 'دلخواه شما' : 'خودکار');
+            $lines[] = ! empty($d['no_password']) ? 'نوع: WireGuard (فایل پیکربندی پس از ساخت ارسال می‌شود)' : 'رمز: '.(isset($d['password']) ? 'دلخواه شما' : 'خودکار');
         }
         $lines[] = 'موجودی فعلی: '.fa_money($this->wallets->walletFor('reseller', $r->id)->balance);
         $this->ask($u, $state, $d, implode("\n", $lines), [[self::CONFIRM]]);
@@ -559,8 +622,9 @@ class Engine
             return;
         }
         $target = null;
-        if (! empty($d['account_id'])) {
-            $target = VpnAccount::query()->where('reseller_id', $r->id)->find($d['account_id']);
+        if (! empty($d['account_id']) || ! empty($d['mt_account_id'])) {
+            $target = ! empty($d['mt_account_id']) ? MtAccount::query()->where('reseller_id', $r->id)->find($d['mt_account_id'])
+                : VpnAccount::query()->where('reseller_id', $r->id)->find($d['account_id']);
             if (! $target) {
                 $this->menu($u, 'اکانت پیدا نشد.');
 
@@ -584,7 +648,8 @@ class Engine
         $msg = match ($s->status) {
             'completed' => $target
                 ? '✅ اکانت '.$target->username.' با بسته «'.$p->name.'» به‌روزرسانی شد.'
-                : "✅ اکانت ساخته شد.\n\nنام کاربری: ".$s->account?->username."\nرمز: ".($res['password'] ?? '—')."\n\nرمز فقط همین یک بار نمایش داده می‌شود.",
+                : ($s->mtAccount ? "✅ اکانت ساخته شد.\n\n".CustomerOrders::mtCredentials($s->mtAccount)
+                    : "✅ اکانت ساخته شد.\n\nنام کاربری: ".$s->account?->username."\nرمز: ".($res['password'] ?? '—')."\n\nرمز فقط همین یک بار نمایش داده می‌شود."),
             'refunded' => '❗ انجام نشد و مبلغ به کیف پول شما برگشت.'.($s->error ? ' ('.mb_substr((string) $s->error, 0, 120).')' : ''),
             'needs_review' => '⏳ نتیجه در سرور نامشخص ماند. مبلغ نگه داشته شده و پس از بررسی مدیر، انجام یا برگشت داده می‌شود.',
             default => '⏳ در حال انجام است؛ نتیجه را همین‌جا اطلاع می‌دهیم.',
@@ -612,7 +677,8 @@ class Engine
     private function crenewStart(BotUser $u): void
     {
         $accounts = $u->accounts()->whereNull('ibs_deleted_at')->orderBy('username')->limit(10)->get();
-        if ($accounts->isEmpty()) {
+        $mts = $u->mtAccounts()->whereNotIn('status', ['pending', 'failed'])->orderBy('username')->limit(10)->get();
+        if ($accounts->isEmpty() && $mts->isEmpty()) {
             $this->menu($u, 'ابتدا اکانت خود را با «'.self::LINK.'» به ربات اضافه کنید.');
 
             return;
@@ -621,26 +687,37 @@ class Engine
         foreach ($accounts as $a) {
             $opts['👤 '.$a->username] = $a->id;
         }
+        foreach ($mts as $m) {
+            $opts['👤 '.$m->username.' ('.$m->protocolLabel().')'] = 'mt:'.$m->id;
+        }
         $this->ask($u, 'crenew_acc', ['opts' => $opts], 'کدام اکانت را تمدید یا حجمش را افزایش می‌دهید؟', array_map(fn ($l) => [$l], array_keys($opts)));
     }
 
     private function crenewAccount(BotUser $u, string $text): void
     {
         $id = ($u->state_data['opts'] ?? [])[$text] ?? null;
-        $a = $id ? $u->accounts()->whereKey($id)->first() : null;
+        if (is_string($id) && str_starts_with($id, 'mt:')) {
+            $m = $u->mtAccounts()->whereKey((int) substr($id, 3))->first();
+            if ($m) {
+                $this->publicPackages($u, ['renewal', 'topup'], 'crenew_pkg', ['mt_account_id' => $m->id], 'اکانت '.$m->username."\n\nبسته تمدید یا افزایش حجم را انتخاب کنید:", 'mikrotik');
+
+                return;
+            }
+        }
+        $a = $id && ! is_string($id) ? $u->accounts()->whereKey($id)->first() : null;
         if (! $a) {
             $this->crenewStart($u);
 
             return;
         }
-        $this->publicPackages($u, ['renewal', 'topup'], 'crenew_pkg', ['account_id' => $a->id], 'اکانت '.$a->username."\n\nبسته تمدید یا افزایش حجم را انتخاب کنید:");
+        $this->publicPackages($u, ['renewal', 'topup'], 'crenew_pkg', ['account_id' => $a->id], 'اکانت '.$a->username."\n\nبسته تمدید یا افزایش حجم را انتخاب کنید:", 'openvpn');
     }
 
-    private function publicPackages(BotUser $u, array $types, string $state, array $data, string $prompt): void
+    private function publicPackages(BotUser $u, array $types, string $state, array $data, string $prompt, ?string $protocol = null): void
     {
         $opts = [];
-        foreach (Package::query()->where('is_active', true)->whereIn('type', $types)->orderBy('sort_order')->limit(20)->get() as $p) {
-            $opts['📦 '.$p->name.' — '.fa_money($this->pricing->quote($p)->finalPrice)] = $p->id;
+        foreach (Package::query()->with('mtGroup')->where('is_active', true)->whereIn('type', $types)->when($protocol, fn ($q) => $q->where('protocol', $protocol))->orderBy('sort_order')->limit(20)->get() as $p) {
+            $opts['📦 '.$p->name.($p->isMikrotik() ? ' ('.$p->protocolLabel().')' : '').' — '.fa_money($this->pricing->quote($p)->finalPrice)] = $p->id;
         }
         if (! $opts) {
             $this->menu($u, 'فعلاً بسته‌ای برای این کار تعریف نشده است.');
@@ -658,7 +735,8 @@ class Engine
 
             return;
         }
-        $target = ! empty($u->state_data['account_id']) ? $u->accounts()->whereKey($u->state_data['account_id'])->first() : null;
+        $target = ! empty($u->state_data['mt_account_id']) ? $u->mtAccounts()->whereKey($u->state_data['mt_account_id'])->first()
+            : (! empty($u->state_data['account_id']) ? $u->accounts()->whereKey($u->state_data['account_id'])->first() : null);
         try {
             $order = $this->orders()->create($u, $p, $target);
         } catch (RuntimeException $e) {

@@ -20,15 +20,18 @@
     @else
       <div class="table-wrap">
         <table class="table stack">
-          <thead><tr><th>بسته</th><th>نوع</th><th>مشخصات</th><th>گروه سرور</th><th>قیمت امروز</th><th>وضعیت</th><th></th></tr></thead>
+          <thead><tr><th>بسته</th><th>نوع</th><th>مشخصات</th><th>پروتکل / گروه</th><th>قیمت امروز</th><th>وضعیت</th><th></th></tr></thead>
           <tbody>
           @foreach($packages as $p)
             <tr>
               <td data-label="بسته">{{ $p->name }} @if($p->category)<div class="muted small">{{ $p->category->name }}</div>@endif</td>
               <td data-label="نوع">{{ $p->typeLabel() }} <span class="badge">{{ $p->kindLabel() }}</span></td>
               <td data-label="مشخصات">{{ $p->summary() }}</td>
-              <td data-label="گروه سرور">
-                @if($p->type === 'new')
+              <td data-label="پروتکل / گروه">
+                <span @class(['badge', 'badge-primary' => $p->isMikrotik()])>{{ $p->protocolLabel() }}</span>
+                @if($p->isMikrotik())
+                  @if($p->type === 'new')<div class="muted small">{{ $p->mtGroup?->name ?? 'گروه حذف شده' }} ({{ $p->mtGroup?->router?->name }})</div>@endif
+                @elseif($p->type === 'new')
                   <bdi>{{ $p->ibs_group_name }}</bdi>
                   @if(! $p->group || ! $p->group->present)<span class="badge badge-danger">در سرور نیست</span>@endif
                 @else — @endif

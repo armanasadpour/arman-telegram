@@ -24,7 +24,7 @@ function rd($c, $n)
         } $o .= $x;
     }
 
-return $o;
+    return $o;
 }
 function rlen($c)
 {
@@ -60,7 +60,7 @@ function enc($l)
         return substr(pack('N', $l | 0xC00000), 1);
     }
 
-return pack('N', $l | 0xE0000000);
+    return pack('N', $l | 0xE0000000);
 }
 function sentence($c)
 {
@@ -82,6 +82,7 @@ function send($c, array $words)
     } fwrite($c, $b."\0");
 }
 
+$seq = 0x500;
 while ($conn = @stream_socket_accept($srv, -1)) {
     $data = json_decode(file_get_contents($fixture), true);
     if ($http) {
@@ -133,6 +134,39 @@ while ($conn = @stream_socket_accept($srv, -1)) {
             send($conn, ['!fatal', 'not logged in']);
             break;
         }
+        if (preg_match('#^/(.+)/(add|set|remove)$#', $cmd, $wm)) {
+            $menu = $wm[1];
+            if ($wm[2] === 'add') {
+                if (($attrs['name'] ?? '') === 'dup') {
+                    send($conn, ['!trap', '=message=failure: secret with the same name already exists']);
+                    send($conn, ['!done']);
+
+                    continue;
+                }
+                $id = '*'.strtoupper(dechex($seq++));
+                $data['menus'][$menu][] = ['.id' => $id] + $attrs;
+                send($conn, ['!done', '=ret='.$id]);
+            } else {
+                $found = false;
+                foreach ($data['menus'][$menu] ?? [] as $i => $row) {
+                    if (($row['.id'] ?? null) === ($attrs['.id'] ?? '')) {
+                        $found = true;
+                        if ($wm[2] === 'set') {
+                            $data['menus'][$menu][$i] = $attrs + $row;
+                        } else {
+                            array_splice($data['menus'][$menu], $i, 1);
+                        }
+                    }
+                }
+                if (! $found) {
+                    send($conn, ['!trap', '=message=no such item']);
+                }
+                send($conn, ['!done']);
+            }
+            file_put_contents($fixture, json_encode($data));
+
+            continue;
+        }
         $menu = preg_replace('#^/|/print$#', '', $cmd);
         if (! array_key_exists($menu, $data['menus'])) {
             send($conn, ['!trap', '=message=no such command prefix']);
@@ -140,7 +174,19 @@ while ($conn = @stream_socket_accept($srv, -1)) {
 
             continue;
         }
+        $q = [];
+        foreach ($s as $w) {
+            if ($w[0] === '?') {
+                [$k, $v] = explode('=', substr($w, 1), 2) + [1 => ''];
+                $q[$k] = $v;
+            }
+        }
         foreach ($data['menus'][$menu] as $row) {
+            foreach ($q as $k => $v) {
+                if (($row[$k] ?? null) !== $v) {
+                    continue 2;
+                }
+            }
             $w = ['!re'];
             foreach ($row as $k => $v) {
                 $w[] = '='.$k.'='.$v;

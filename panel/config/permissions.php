@@ -33,6 +33,7 @@ return [
         'payments' => ['title' => 'پرداخت‌ها و درگاه‌ها', 'actions' => ['view', 'sensitive']],
         'reports' => ['title' => 'گزارش‌ها و خروجی اکسل', 'actions' => ['view', 'export']],
         'routers' => ['title' => 'روترهای میکروتیک (L2TP و WireGuard)', 'actions' => ['view', 'update', 'sensitive']],
+        'mt_accounts' => ['title' => 'اکانت‌های میکروتیک (L2TP و WireGuard)', 'actions' => ['view', 'create', 'update', 'delete', 'sensitive']],
     ],
 
     // Role that bypasses all checks. Created by the installer; cannot be deleted or edited.

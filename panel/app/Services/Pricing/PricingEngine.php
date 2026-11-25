@@ -95,6 +95,7 @@ class PricingEngine
             'id' => $p->id, 'name' => $p->name, 'type' => $p->type, 'category_id' => $p->category_id,
             'volume_gb' => $p->volume_gb !== null ? (float) $p->volume_gb : null, 'duration_days' => $p->duration_days,
             'multi_login' => $p->multi_login, 'ibs_group_name' => $p->ibs_group_name, 'price_rial' => (int) $p->price_rial,
+            'protocol' => $p->protocol ?? 'openvpn', 'mt_group_id' => $p->mt_group_id,
         ];
     }
 }

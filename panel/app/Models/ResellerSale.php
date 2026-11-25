@@ -35,6 +35,11 @@ class ResellerSale extends Model
         return $this->belongsTo(VpnAccount::class, 'vpn_account_id')->withTrashed();
     }
 
+    public function mtAccount(): BelongsTo
+    {
+        return $this->belongsTo(MtAccount::class, 'mt_account_id')->withTrashed();
+    }
+
     public function job(): BelongsTo
     {
         return $this->belongsTo(ProvisioningJob::class, 'provisioning_job_id');

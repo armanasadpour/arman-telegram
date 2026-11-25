@@ -21,9 +21,11 @@ class Package extends Model
     public const TYPES = ['new' => 'اکانت جدید', 'renewal' => 'تمدید', 'topup' => 'افزایش حجم'];
 
     /** Mirror the DB defaults so freshly created models behave the same as reloaded ones. */
-    protected $attributes = ['is_active' => true, 'sort_order' => 0];
+    protected $attributes = ['is_active' => true, 'sort_order' => 0, 'protocol' => 'openvpn'];
 
-    protected $fillable = ['category_id', 'name', 'type', 'volume_gb', 'duration_days', 'multi_login', 'ibs_group_name', 'price_rial', 'description', 'is_active', 'sort_order'];
+    protected $fillable = ['category_id', 'name', 'type', 'volume_gb', 'duration_days', 'multi_login', 'ibs_group_name', 'price_rial', 'description', 'is_active', 'sort_order', 'protocol', 'mt_group_id'];
+
+    public const PROTOCOLS = ['openvpn' => 'OpenVPN', 'mikrotik' => 'میکروتیک (L2TP / WireGuard)'];
 
     protected function casts(): array
     {
@@ -38,6 +40,26 @@ class Package extends Model
     public function group(): BelongsTo
     {
         return $this->belongsTo(IbsGroup::class, 'ibs_group_name', 'name');
+    }
+
+    public function mtGroup(): BelongsTo
+    {
+        return $this->belongsTo(MtGroup::class, 'mt_group_id');
+    }
+
+    public function isMikrotik(): bool
+    {
+        return $this->protocol === 'mikrotik';
+    }
+
+    /** "OpenVPN" / "L2TP/IPsec" / "WireGuard" / "میکروتیک" */
+    public function protocolLabel(): string
+    {
+        if (! $this->isMikrotik()) {
+            return 'OpenVPN';
+        }
+
+        return $this->mtGroup ? $this->mtGroup->protocolLabel() : 'L2TP / WireGuard';
     }
 
     public function hasVolume(): bool

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Discount;
 use App\Models\IbsGroup;
+use App\Models\MtGroup;
 use App\Models\Package;
 use App\Models\PackageCategory;
 use App\Services\AuditLogger;
@@ -18,7 +19,7 @@ use Illuminate\View\View;
 
 class PackagesController extends Controller
 {
-    private const AUDITED = ['category_id', 'name', 'type', 'volume_gb', 'duration_days', 'multi_login', 'ibs_group_name', 'price_rial', 'description', 'is_active', 'sort_order'];
+    private const AUDITED = ['category_id', 'name', 'type', 'protocol', 'mt_group_id', 'volume_gb', 'duration_days', 'multi_login', 'ibs_group_name', 'price_rial', 'description', 'is_active', 'sort_order'];
 
     public function __construct(private AuditLogger $audit, private PricingEngine $pricing) {}
 
@@ -26,7 +27,7 @@ class PackagesController extends Controller
     {
         $this->authorize('packages.view');
         $type = $request->query('type');
-        $packages = Package::query()->with('category', 'group.charge')
+        $packages = Package::query()->with('category', 'group.charge', 'mtGroup.router')
             ->when(in_array($type, array_keys(Package::TYPES), true), fn ($q) => $q->where('type', $type))
             ->orderBy('type')->orderBy('sort_order')->orderBy('price_rial')->get();
         $discounts = Discount::query()->where('is_active', true)->get();
@@ -123,6 +124,7 @@ class PackagesController extends Controller
             'p' => $p,
             'categories' => PackageCategory::query()->orderBy('sort_order')->orderBy('name')->get(),
             'groups' => IbsGroup::query()->with('charge')->where('present', true)->orderBy('name')->get(),
+            'mtGroups' => MtGroup::query()->with('router')->orderBy('name')->get(),
         ];
     }
 
@@ -133,7 +135,9 @@ class PackagesController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'type' => ['required', Rule::in(array_keys(Package::TYPES))],
             'category_id' => ['nullable', 'integer', 'exists:package_categories,id'],
-            'ibs_group_name' => ['nullable', 'required_if:type,new', 'string', 'max:100'],
+            'protocol' => ['nullable', Rule::in(array_keys(Package::PROTOCOLS))],
+            'ibs_group_name' => ['nullable', 'string', 'max:100'],
+            'mt_group_id' => ['nullable', 'integer', 'exists:mt_groups,id'],
             'duration_days' => ['nullable', 'integer', 'between:1,3650'],
             'volume_gb' => ['nullable', 'numeric', 'min:0.1', 'max:100000'],
             'multi_login' => ['nullable', 'integer', 'between:1,255'],
@@ -144,8 +148,18 @@ class PackagesController extends Controller
         ], [], ['name' => 'نام بسته', 'type' => 'نوع', 'ibs_group_name' => 'گروه سرور', 'duration_days' => 'مدت', 'volume_gb' => 'حجم',
             'multi_login' => 'تعداد اتصال', 'price_toman' => 'قیمت', 'description' => 'توضیح']);
 
+        $d['protocol'] ??= 'openvpn';
+        if ($d['protocol'] === 'mikrotik') {
+            $d['ibs_group_name'] = null;
+        } else {
+            $d['mt_group_id'] = null;
+            if ($d['type'] === 'new' && empty($d['ibs_group_name'])) {
+                throw ValidationException::withMessages(['ibs_group_name' => 'برای بسته اکانت جدید، گروه سرور را انتخاب کنید.']);
+            }
+        }
         if ($d['type'] !== 'new') {
             $d['ibs_group_name'] = null;
+            $d['mt_group_id'] = null;
             $d['multi_login'] = null;
         }
         if ($errors = PackageRules::validate($d)) {

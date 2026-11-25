@@ -4,6 +4,7 @@ use App\Bots\Notifier;
 use App\Bots\Outbox;
 use App\Ibs\ErrorMessages;
 use App\Ibs\IbsConnector;
+use App\Models\MtAccount;
 use App\Models\ProvisioningJob;
 use App\Models\Role;
 use App\Models\Router;
@@ -19,6 +20,8 @@ use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
 use App\Services\Ibs\ExpiredCleanup;
 use App\Services\Ibs\Provisioning;
+use App\Services\Mikrotik\MtAccounting;
+use App\Services\Mikrotik\MtProvisioning;
 use App\Services\PermissionRegistry;
 use App\Services\Settings;
 use Illuminate\Support\Facades\Artisan;
@@ -207,3 +210,29 @@ Artisan::command('routers:health', function () {
     return 0;
 })->purpose('Check every active MikroTik router; alert on down/up');
 Schedule::command('routers:health')->everyFiveMinutes()->withoutOverlapping(10);
+
+// ---------------------------------------------------------------- MikroTik accounts (L2TP / WireGuard)
+Artisan::command('mt:accounting', function () {
+    if (! Schema::hasTable('mt_accounts')) {
+        return 0;
+    }
+    $prov = app(MtProvisioning::class);
+    foreach (MtAccount::query()->where('status', 'pending')->where('updated_at', '<', now()->subMinute())->limit(30)->get() as $a) {
+        $prov->push($a);
+    }
+    $acct = app(MtAccounting::class);
+    foreach (Router::query()->where('is_active', true)->get() as $r) {
+        try {
+            $this->line($r->name.': '.json_encode($acct->syncRouter($r)));
+        } catch (Throwable $e) {
+            $this->error($r->name.': '.$e->getMessage());
+        }
+    }
+    if (Schema::hasColumn('reseller_sales', 'mt_account_id')) {
+        app(ResellerSales::class)->syncPendingMt();
+        app(CustomerOrders::class)->syncPendingMt();
+    }
+
+    return 0;
+})->purpose('Poll MikroTik usage, enforce limits, retry pending creations');
+Schedule::command('mt:accounting')->everyMinute()->withoutOverlapping(5);
