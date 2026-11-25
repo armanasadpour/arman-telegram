@@ -65,8 +65,11 @@
         <a href="{{ route('roles.index') }}" @class(['active' => request()->routeIs('roles.*')])><x-icon name="shield"/>نقش‌ها و دسترسی‌ها</a>
       @endcan
     @endif
-    @if(auth()->user()->can('audit.view') || auth()->user()->can('settings.view') || auth()->user()->can('system.view'))
+    @if(auth()->user()->can('audit.view') || auth()->user()->can('settings.view') || auth()->user()->can('system.view') || auth()->user()->can('bots.view'))
       <div class="section">سیستم</div>
+      @can('bots.view')
+        <a href="{{ route('bots.index') }}" @class(['active' => request()->routeIs('bots.*')])><x-icon name="message"/>ربات‌ها</a>
+      @endcan
       @can('audit.view')
         <a href="{{ route('audit.index') }}" @class(['active' => request()->routeIs('audit.*')])><x-icon name="list"/>گزارش رویدادها</a>
       @endcan
@@ -79,6 +82,7 @@
       @endcan
     @endif
     <div class="section">حساب من</div>
+    <a href="{{ route('bot-link') }}" @class(['active' => request()->routeIs('bot-link*')])><x-icon name="message"/>اتصال به ربات</a>
     <a href="{{ route('profile.password') }}" @class(['active' => request()->routeIs('profile.*')])><x-icon name="key"/>تغییر رمز عبور</a>
   </nav>
   <div id="backdrop" class="backdrop"></div>

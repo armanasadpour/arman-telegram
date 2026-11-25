@@ -1,5 +1,6 @@
 <?php
 
+use App\Bots\Outbox;
 use App\Ibs\ErrorMessages;
 use App\Ibs\IbsConnector;
 use App\Models\ProvisioningJob;
@@ -14,7 +15,9 @@ use App\Services\Ibs\Provisioning;
 use App\Services\PermissionRegistry;
 use App\Services\Settings;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Schema;
 
 Artisan::command('permissions:sync', function (PermissionRegistry $registry) {
     $r = $registry->sync();
@@ -129,3 +132,15 @@ Artisan::command('wallets:reconcile', function (WalletService $w) {
 
     return $bad ? 1 : 0;
 })->purpose('Verify every wallet balance against its ledger');
+
+Artisan::command('bots:send', function () {
+    if (! Schema::hasTable('bot_outbox')) {
+        return 0;
+    }
+    $r = app(Outbox::class)->flush();
+    $this->info(json_encode($r));
+    DB::table('bot_updates')->where('created_at', '<', now()->subDays(7))->delete();
+
+    return 0;
+})->purpose('Send queued bot notifications');
+Schedule::command('bots:send')->everyMinute()->withoutOverlapping(5);

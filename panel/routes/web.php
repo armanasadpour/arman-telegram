@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AccountsController;
 use App\Http\Controllers\Admin\AuditController;
+use App\Http\Controllers\Admin\BotsController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DiscountsController;
 use App\Http\Controllers\Admin\IbsGroupsController;
@@ -15,6 +16,8 @@ use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\BotLinkController;
+use App\Http\Controllers\Bots\WebhookController;
 use App\Http\Controllers\CronController;
 use App\Http\Controllers\Portal\PortalController;
 use App\Http\Middleware\EnsureReseller;
@@ -50,6 +53,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
         Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
         Route::put('/settings/ibsng', [IbsSettingsController::class, 'update'])->name('ibs.settings.update');
+        Route::put('/bots/{platform}', [BotsController::class, 'update'])->name('bots.update');
+        Route::post('/bots/{platform}/rotate', [BotsController::class, 'rotateSecret'])->name('bots.rotate');
+        Route::get('/bots/relay/{kind}', [BotsController::class, 'relay'])->name('bots.relay');
         Route::delete('/accounts/{account}', [AccountsController::class, 'destroy'])->name('accounts.destroy');
         Route::post('/accounts/{account}/reveal', [AccountsController::class, 'reveal'])->name('accounts.reveal')->middleware('throttle:20,1');
         Route::post('/resellers/{reseller}/adjust', [ResellersController::class, 'adjust'])->name('resellers.adjust');
@@ -57,6 +63,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/resellers/{reseller}/sales/{sale}/refund', [ResellersController::class, 'refundSale'])->name('resellers.refund-sale');
         Route::post('/accounts/jobs/{job}/resolve', [ProvisioningJobsController::class, 'resolve'])->name('accounts.jobs.resolve');
     });
+
+    // Bots
+    Route::get('/bots', [BotsController::class, 'index'])->name('bots.index');
+    Route::put('/bots-texts', [BotsController::class, 'texts'])->name('bots.texts');
+    Route::post('/bots/reach', [BotsController::class, 'reach'])->name('bots.reach')->middleware('throttle:10,1');
+    Route::post('/bots/{platform}/connect', [BotsController::class, 'connect'])->name('bots.connect')->middleware('throttle:10,1');
+    Route::post('/bots/{platform}/test', [BotsController::class, 'sendTest'])->name('bots.test')->middleware('throttle:10,1');
+    Route::get('/bot-link', [BotLinkController::class, 'show'])->name('bot-link');
+    Route::post('/bot-link', [BotLinkController::class, 'create'])->name('bot-link.create')->middleware('throttle:10,1');
+    Route::delete('/bot-link/{botUser}', [BotLinkController::class, 'unlink'])->name('bot-link.unlink');
 
     // IBSng connection, groups
     Route::get('/settings/ibsng', [IbsSettingsController::class, 'edit'])->name('ibs.settings');
@@ -139,3 +155,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/system', [SystemController::class, 'status'])->name('system.status');
     Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade')->middleware('throttle:10,1');
 });
+
+// Messenger webhooks (no session auth; secured by the random path secret and platform headers)
+Route::post('/hook/{platform}/{secret}', WebhookController::class)->where('platform', 'telegram|bale|rubika')->where('secret', '[A-Za-z0-9]{20,64}')->middleware('throttle:600,1')->name('bots.hook');

@@ -2,6 +2,7 @@
 
 namespace App\Services\Finance;
 
+use App\Bots\Notifier;
 use App\Ibs\ErrorMessages;
 use App\Ibs\IbsException;
 use App\Ibs\IbsNotConfiguredException;
@@ -140,7 +141,10 @@ class ResellerSales
             'cost_rial' => [null, $sale->cost_rial], 'sale_price_rial' => [null, $sale->sale_price_rial], 'status' => [null, $sale->status],
         ]);
 
-        return ['sale' => $sale->fresh(), 'password' => $sale->status === 'completed' ? $password : null];
+        $sale = $sale->fresh();
+        app(Notifier::class)->saleChanged($sale, null);
+
+        return ['sale' => $sale, 'password' => $sale->status === 'completed' ? $password : null];
     }
 
     /** Follow up sales whose provisioning finished later (cron / page view). */
@@ -184,6 +188,16 @@ class ResellerSales
             return $sale;
         }
         $job->refresh();
+        $before = $sale->status;
+        try {
+            return $this->applyJobStatus($sale, $job);
+        } finally {
+            app(Notifier::class)->saleChanged($sale->fresh(), $before);
+        }
+    }
+
+    private function applyJobStatus(ResellerSale $sale, ProvisioningJob $job): ResellerSale
+    {
         if ($job->status === 'completed') {
             VpnAccount::query()->whereKey($job->vpn_account_id)->update(['reseller_id' => $sale->reseller_id]);
             $sale->fill(['status' => 'completed', 'vpn_account_id' => $job->vpn_account_id, 'error' => null])->save();

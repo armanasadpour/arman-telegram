@@ -13,10 +13,11 @@ class UpgradeTest extends TestCase
     private function makePending(bool $halfFinished = false): void
     {
         // Later-phase tables reference these through foreign keys (MariaDB enforces the order).
-        foreach (['reseller_sales', 'reseller_category_discounts', 'reseller_prices', 'ledger_entries', 'wallets', 'provisioning_jobs', 'vpn_accounts', 'resellers'] as $t) {
+        foreach (['bot_link_codes', 'bot_outbox', 'bot_updates', 'bot_account_links', 'bot_users', 'bots', 'reseller_sales', 'reseller_category_discounts', 'reseller_prices', 'ledger_entries', 'wallets', 'provisioning_jobs', 'vpn_accounts', 'resellers'] as $t) {
             Schema::dropIfExists($t);
         }
         DB::table('migrations')->where('migration', 'like', '%create_reseller_tables')->delete();
+        DB::table('migrations')->where('migration', 'like', '%create_bot_tables')->delete();
         if (! $halfFinished) {
             Schema::dropIfExists('ibs_groups');
             Schema::dropIfExists('ibs_charges');
@@ -55,6 +56,8 @@ class UpgradeTest extends TestCase
         $this->actingAs($admin)->from('/system')->post('/system/upgrade', ['password' => 'Password12345'])->assertSessionHas('success');
         $this->assertTrue(Schema::hasTable('provisioning_jobs'));
         $this->assertTrue(Schema::hasColumn('vpn_accounts', 'reseller_id'));
+        $this->assertTrue(Schema::hasTable('bot_account_links'));
+        $this->actingAs($admin)->get('/bots')->assertOk();
     }
 
     public function test_upgrade_from_040_adds_reseller_tables(): void

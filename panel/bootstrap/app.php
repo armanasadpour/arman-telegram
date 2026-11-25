@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(prepend: [EnsureInstalled::class], append: [ApplyDisplaySettings::class, EnsureUserIsActive::class, EnsureDatabaseUpToDate::class, SecurityHeaders::class]);
+        $middleware->validateCsrfTokens(except: ['hook/*']);
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));
     })
