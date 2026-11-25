@@ -39,13 +39,16 @@
     @can('reports.view')
       <a href="{{ route('reports.index') }}" @class(['active' => request()->routeIs('reports.*')])><x-icon name="activity"/>گزارش‌ها</a>
     @endcan
-    @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view'))
+    @if(auth()->user()->can('accounts.view') || auth()->user()->can('ibs_groups.view') || auth()->user()->can('routers.view'))
       <div class="section">سرور</div>
       @can('accounts.view')
         <a href="{{ route('accounts.index') }}" @class(['active' => request()->routeIs('accounts.*')])><x-icon name="user"/>اکانت‌ها</a>
       @endcan
       @can('ibs_groups.view')
         <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups')])><x-icon name="layers"/>گروه‌ها و تعرفه‌ها</a>
+      @endcan
+      @can('routers.view')
+        <a href="{{ route('routers.index') }}" @class(['active' => request()->routeIs('routers.*')])><x-icon name="link"/>روترهای میکروتیک</a>
       @endcan
     @endif
     @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view') || auth()->user()->can('resellers.view') || auth()->user()->can('payments.view'))

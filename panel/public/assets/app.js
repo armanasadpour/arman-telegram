@@ -56,6 +56,14 @@
       c.parentNode.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('active', x === c); });
     }
   });
+  // Router form: switching transport moves the port to that transport's default.
+  document.querySelectorAll('input[name=transport][data-port]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      var port = document.getElementById('port');
+      var defaults = Array.prototype.map.call(document.querySelectorAll('input[name=transport][data-port]'), function (x) { return x.getAttribute('data-port'); });
+      if (port && (port.value === '' || defaults.indexOf(port.value) !== -1)) port.value = r.getAttribute('data-port');
+    });
+  });
   // Restore buttons when navigating back (bfcache).
   window.addEventListener('pageshow', function () {
     document.querySelectorAll('form[data-submitted]').forEach(function (f) {

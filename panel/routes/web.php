@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\ProvisioningJobsController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\ResellersController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\RoutersController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\SystemController;
@@ -62,6 +63,13 @@ Route::middleware('auth')->group(function () {
         Route::put('/bots/{platform}', [BotsController::class, 'update'])->name('bots.update');
         Route::post('/bots/{platform}/rotate', [BotsController::class, 'rotateSecret'])->name('bots.rotate');
         Route::get('/bots/relay/{kind}', [BotsController::class, 'relay'])->name('bots.relay');
+        Route::get('/routers/create', [RoutersController::class, 'create'])->name('routers.create');
+        Route::post('/routers', [RoutersController::class, 'store'])->name('routers.store');
+        Route::get('/routers/{router}/edit', [RoutersController::class, 'edit'])->name('routers.edit');
+        Route::put('/routers/{router}', [RoutersController::class, 'update'])->name('routers.update');
+        Route::delete('/routers/{router}', [RoutersController::class, 'destroy'])->name('routers.destroy');
+        Route::post('/routers/{router}/pin', [RoutersController::class, 'fetchPin'])->name('routers.pin')->middleware('throttle:10,1');
+        Route::post('/routers/{router}/pin/trust', [RoutersController::class, 'trustPin'])->name('routers.pin.trust');
         Route::post('/payments/{payment}/approve', [PaymentsController::class, 'approve'])->name('payments.approve');
         Route::post('/payments/{payment}/reject', [PaymentsController::class, 'reject'])->name('payments.reject');
         Route::post('/customer-orders/{order}/refund', [PaymentsController::class, 'refundOrder'])->name('orders.refund');
@@ -81,6 +89,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{payment}', [PaymentsController::class, 'show'])->name('payments.show');
     Route::get('/payments/{payment}/receipt', [PaymentsController::class, 'receipt'])->name('payments.receipt');
     Route::post('/payments/{payment}/recheck', [PaymentsController::class, 'recheck'])->name('payments.recheck')->middleware('throttle:20,1');
+
+    // MikroTik routers
+    Route::get('/routers', [RoutersController::class, 'index'])->name('routers.index');
+    Route::get('/routers/{router}', [RoutersController::class, 'show'])->name('routers.show')->whereNumber('router');
+    Route::post('/routers/{router}/test', [RoutersController::class, 'test'])->name('routers.test')->middleware('throttle:20,1');
+    Route::post('/routers/{router}/protocol', [RoutersController::class, 'toggleProtocol'])->name('routers.protocol');
 
     // Reports
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');

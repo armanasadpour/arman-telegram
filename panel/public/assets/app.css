@@ -464,3 +464,25 @@ details.card.adv{background:var(--surface)}
   .picks-sm .badge{font-size:.68rem;padding:1px 8px}
   .step{padding:16px 14px 4px}
 }
+
+/* ---------- routers ---------- */
+.router-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.router-card{--st:var(--faint);position:relative;display:flex;flex-direction:column;gap:10px;padding:18px;border-radius:18px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);color:var(--text);transition:transform .18s var(--ease),box-shadow .18s var(--ease)}
+.router-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);color:var(--text)}
+.router-card.is-up{--st:#22c55e}.router-card.is-down{--st:var(--danger)}
+.router-top{display:flex;align-items:center;gap:12px}
+.router-dot{width:12px;height:12px;border-radius:50%;background:var(--st);box-shadow:0 0 0 4px color-mix(in srgb,var(--st) 20%,transparent);flex:none}
+.router-card.is-up .router-dot{animation:pulse 2s infinite}
+.router-id{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.5}
+.router-id strong{font-size:1.05rem}
+.router-facts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.84rem;color:var(--text-2)}
+.router-tags{display:flex;flex-wrap:wrap;gap:6px}
+.router-foot{padding-top:8px;border-top:1px dashed var(--border)}
+.checklist{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px}
+.chk{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--surface-2)}
+.chk-ic{flex:none;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:.8rem;color:#fff;background:var(--faint)}
+.chk-ok .chk-ic{background:var(--success)}.chk-warn .chk-ic{background:var(--warning)}.chk-fail .chk-ic{background:var(--danger)}.chk-info .chk-ic{background:var(--info)}
+.chk-fail{background:var(--danger-soft)}
+.proto-toggles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:12px}
+.proto{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px;border:1.5px solid var(--border);border-radius:14px;margin:0}
+.proto.is-on{border-color:var(--success);background:var(--success-soft)}

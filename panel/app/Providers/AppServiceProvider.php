@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Ibs\IbsConnector;
 use App\Ibs\Transport;
 use App\Models\User;
+use App\RouterOs\CurlRestTransport;
+use App\RouterOs\RestTransport;
 use App\Services\AuditLogger;
 use App\Services\Settings;
 use App\Support\DatetimeColumns;
@@ -19,6 +21,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(RestTransport::class, CurlRestTransport::class);
         $this->app->singleton(Settings::class);
         $this->app->singleton(AuditLogger::class);
         // Tests bind \App\Ibs\Transport to a fake; production builds an HttpTransport from settings.

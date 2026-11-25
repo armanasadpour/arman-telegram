@@ -6,9 +6,11 @@ use App\Ibs\ErrorMessages;
 use App\Ibs\IbsConnector;
 use App\Models\ProvisioningJob;
 use App\Models\Role;
+use App\Models\Router;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Payments\Payments;
+use App\RouterOs\RouterConnector;
 use App\Services\Alerts\Alerts;
 use App\Services\AuditLogger;
 use App\Services\Finance\CustomerOrders;
@@ -179,3 +181,29 @@ Artisan::command('alerts:run', function () {
     return 0;
 })->purpose('Customer expiry/volume alerts, reseller digests, admin daily report, server down/up');
 Schedule::command('alerts:run')->everyTenMinutes()->withoutOverlapping(15);
+
+Artisan::command('routers:health', function () {
+    if (! Schema::hasTable('routers')) {
+        return 0;
+    }
+    $ros = app(RouterConnector::class);
+    foreach (Router::query()->where('is_active', true)->get() as $r) {
+        $prev = $r->health;
+        try {
+            $ros->about($r);
+            $state = 'up';
+        } catch (Throwable $e) {
+            $state = 'down';
+            $r->forceFill(['health' => 'down'])->save();
+        }
+        $this->line($r->name.': '.$state);
+        if ($prev !== null && $prev !== $state) {
+            app(Notifier::class)->toStaff('system.view', $state === 'down'
+                ? '🔴 ارتباط پنل با روتر «'.$r->name.'» قطع شد: '.mb_substr((string) $r->fresh()->last_error, 0, 150)
+                : '🟢 ارتباط پنل با روتر «'.$r->name.'» دوباره برقرار شد.');
+        }
+    }
+
+    return 0;
+})->purpose('Check every active MikroTik router; alert on down/up');
+Schedule::command('routers:health')->everyFiveMinutes()->withoutOverlapping(10);
