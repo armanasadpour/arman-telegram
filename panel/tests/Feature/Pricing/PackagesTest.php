@@ -132,7 +132,7 @@ class PackagesTest extends IbsTestCase
         foreach (['/packages', '/packages/create', "/packages/{$p->id}/edit", '/discounts', '/discounts/create', '/accounts/create', "/accounts/{$a->id}", '/settings'] as $url) {
             $this->actingAs($admin)->get($url)->assertOk();
         }
-        $this->actingAs($admin)->get('/accounts/create')->assertSee('ساخت از روی بسته')->assertSee('۱۵۰٬۰۰۰ تومان');
+        $this->actingAs($admin)->get('/accounts/create')->assertSee('از روی بسته')->assertSee('انتخاب بسته')->assertSee('۱۵۰٬۰۰۰ تومان');
         $this->actingAs($admin)->get("/accounts/{$a->id}")->assertSee('اعمال بسته');
     }
 }

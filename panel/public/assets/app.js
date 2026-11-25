@@ -38,6 +38,24 @@
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { bar.value = target; return; }
     setTimeout(function () { requestAnimationFrame(step); }, 150);
   });
+  // Create-account helpers: random password, quick-value chips.
+  document.addEventListener('click', function (e) {
+    var g = e.target.closest('[data-gen-pass]');
+    if (g) {
+      var input = document.querySelector(g.getAttribute('data-gen-pass'));
+      var chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', out = '';
+      var rnd = new Uint32Array(10); (window.crypto || window.msCrypto).getRandomValues(rnd);
+      for (var i = 0; i < 10; i++) out += chars[rnd[i] % chars.length];
+      if (input) { input.value = out; input.focus(); input.select(); }
+      return;
+    }
+    var c = e.target.closest('[data-set]');
+    if (c) {
+      var t = document.querySelector(c.getAttribute('data-set'));
+      if (t) { t.value = c.getAttribute('data-value'); t.dispatchEvent(new Event('input', { bubbles: true })); }
+      c.parentNode.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('active', x === c); });
+    }
+  });
   // Restore buttons when navigating back (bfcache).
   window.addEventListener('pageshow', function () {
     document.querySelectorAll('form[data-submitted]').forEach(function (f) {
