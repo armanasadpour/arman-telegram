@@ -71,7 +71,10 @@
       <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانتی در پنل نیست. اکانت بسازید یا از سرور وارد کنید.' }}</div></div>
     @else
       <div class="table-wrap">
-        <table class="table stack">
+        <div class="acc-list only-mobile">
+          @foreach($accounts as $a)@include('accounts._card', ['a' => $a, 'url' => route('accounts.show', $a)])@endforeach
+        </div>
+        <table class="table only-desktop">
           <thead><tr><th>نام کاربری</th><th>گروه</th><th>وضعیت</th><th>انقضا</th><th>حجم باقی‌مانده</th><th>به‌روزرسانی</th></tr></thead>
           <tbody>
           @foreach($accounts as $a)
@@ -79,8 +82,8 @@
               <td data-label="نام کاربری"><a href="{{ route('accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a></td>
               <td data-label="گروه"><bdi>{{ $a->group_name }}</bdi></td>
               <td data-label="وضعیت">@include('accounts._status', ['a' => $a])</td>
-              <td data-label="انقضا">{{ $a->expires_at ? jdate($a->expires_at, 'Y/m/d').' ('.fa_ago($a->expires_at).')' : ($a->first_login_ibs ? '—' : 'پس از اولین اتصال') }}</td>
-              <td data-label="حجم">{{ $a->isVolumeLimited() ? fa_bytes($a->remainingBytes()) : 'بدون محدودیت' }}</td>
+              <td data-label="انقضا">{{ $a->expires_at ? jdate($a->expires_at, 'Y/m/d').' ('.fa_ago($a->expires_at).')' : ($a->first_login_ibs ? '—' : 'پس از اولین اتصال') }}@include('accounts._mini', ['m' => $a->timeMeter()])</td>
+              <td data-label="حجم">{{ $a->isVolumeLimited() ? fa_bytes($a->remainingBytes()) : 'بدون محدودیت' }}@include('accounts._mini', ['m' => $a->volumeMeter()])</td>
               <td data-label="به‌روزرسانی">
                 @if($a->isStale())<span class="badge badge-warning">{{ $a->last_synced_at ? fa_ago($a->last_synced_at) : 'هرگز' }}</span>
                 @else<span class="muted small">{{ fa_ago($a->last_synced_at) }}</span>@endif

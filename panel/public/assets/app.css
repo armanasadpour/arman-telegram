@@ -340,3 +340,43 @@ form.inline{display:inline-block;margin-inline-start:8px}
   .card{padding:16px}
   h1{font-size:1.3rem}
 }
+
+/* ---------- account cards (mobile list) ---------- */
+.only-mobile{display:none}
+@media (max-width:768px){.only-mobile{display:grid}.only-desktop{display:none!important}}
+.acc-list{grid-template-columns:1fr;gap:12px}
+@media (min-width:560px) and (max-width:768px){.acc-list{grid-template-columns:1fr 1fr}}
+.acc-card{--acc:var(--success);position:relative;display:flex;flex-direction:column;gap:12px;padding:16px 16px 14px;background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);color:var(--text);overflow:hidden;isolation:isolate;transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease);-webkit-tap-highlight-color:transparent}
+.acc-card::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:4px;background:var(--acc)}
+.acc-card::after{content:"";position:absolute;z-index:-1;inset-inline-end:-50px;top:-60px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--acc) 14%,transparent),transparent 68%)}
+.acc-card:hover,.acc-card:active{color:var(--text);transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:color-mix(in srgb,var(--acc) 35%,var(--border))}
+.acc-card:active{transform:scale(.99)}
+.acc-not_started{--acc:var(--primary)}
+.acc-expired,.acc-depleted,.acc-deleted{--acc:var(--danger)}
+.acc-locked{--acc:var(--warning)}
+.acc-top{display:flex;align-items:center;gap:12px}
+.acc-avatar{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:14px;font-weight:900;font-size:1.05rem;color:#fff;background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 85%,#fff),var(--acc));box-shadow:0 6px 14px -6px var(--acc)}
+.acc-avatar.is-online::after{content:"";position:absolute;bottom:-3px;inset-inline-end:-3px;width:14px;height:14px;border-radius:50%;background:#22c55e;border:3px solid var(--surface);animation:pulse 2s infinite}
+.acc-id{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.5}
+.acc-name{display:block;font-weight:800;font-size:1.05rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.acc-group{font-size:.8rem;color:var(--muted);direction:ltr;text-align:right}
+.acc-chevron{flex:none;width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-2);color:var(--muted);font-size:1.3rem;line-height:1;transition:background .15s,color .15s}
+.acc-card:hover .acc-chevron{background:var(--primary-soft);color:var(--primary)}
+.acc-badges{display:flex;flex-wrap:wrap;gap:6px}
+.acc-meters{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border-radius:14px;background:var(--surface-2)}
+.acc-meter-row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:.76rem;color:var(--muted);margin-bottom:6px}
+.acc-meter-row strong{color:var(--text);font-size:.82rem;font-weight:800;white-space:nowrap}
+.acc-foot{display:flex;justify-content:space-between;gap:8px;font-size:.76rem;color:var(--muted);padding-top:2px}
+.acc-stale{color:var(--warning-ink);font-weight:600}
+/* mini progress bars (cards + table cells) */
+.mini-bar{-webkit-appearance:none;appearance:none;display:block;width:100%;height:6px;border:0;border-radius:99px;overflow:hidden;background:var(--surface-3);direction:rtl;--bar:var(--primary)}
+td .mini-bar{max-width:150px;margin-top:6px}
+.mini-bar::-webkit-progress-bar{background:var(--surface-3);border-radius:99px}
+.mini-bar::-webkit-progress-value{background:var(--bar);border-radius:99px}
+.mini-bar::-moz-progress-bar{background:var(--bar);border-radius:99px}
+.mini-bar.lvl-ok{--bar:linear-gradient(90deg,#10b981,#34d399)}
+.mini-bar.lvl-warn{--bar:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.mini-bar.lvl-low{--bar:linear-gradient(90deg,#ef4444,#fb7185)}
+.mini-bar.lvl-unlimited{--bar:repeating-linear-gradient(135deg,#a5b4fc 0 6px,#c7d2fe 6px 12px)}
+.mini-bar.lvl-none{--bar:var(--surface-3)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
