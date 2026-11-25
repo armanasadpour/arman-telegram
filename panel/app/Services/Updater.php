@@ -120,7 +120,9 @@ class Updater
         foreach (glob($this->root.'/bootstrap/cache/{config,routes-v7,events}.php', GLOB_BRACE) ?: [] as $f) {
             @unlink($f);   // stale caches would hide the new code
         }
-        File::cleanDirectory(storage_path('framework/views'));
+        foreach (glob(storage_path('framework/views/*.php')) ?: [] as $f) {
+            @unlink($f);   // compiled templates only (keep .gitignore)
+        }
         if (function_exists('opcache_reset')) {
             @opcache_reset();
         }
