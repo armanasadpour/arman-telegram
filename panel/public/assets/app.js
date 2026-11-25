@@ -88,6 +88,22 @@
       try { inp.setSelectionRange(inp.value.length, inp.value.length); inp.scrollLeft = inp.scrollWidth; } catch (x) {}
     });
   });
+  // Installable app: service worker + "install" button (Android/desktop); iOS gets a hint on the settings page.
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    var swLink = document.querySelector('link[rel=manifest][data-sw]');
+    if (swLink) navigator.serviceWorker.register(swLink.getAttribute('data-sw')).catch(function () {});
+  }
+  var installBtn = document.getElementById('install-btn'), deferred = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferred = e;
+    document.querySelectorAll('#install-btn, [data-install]').forEach(function (b) { b.hidden = false; });
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('#install-btn, [data-install]');
+    if (!b || !deferred) return;
+    deferred.prompt();
+    deferred.userChoice.finally(function () { deferred = null; document.querySelectorAll('#install-btn, [data-install]').forEach(function (x) { x.hidden = true; }); });
+  });
   // "Select all" checkboxes.
   document.querySelectorAll('[data-check-all]').forEach(function (all) {
     all.addEventListener('change', function () {

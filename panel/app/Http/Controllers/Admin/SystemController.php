@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Services\AuditLogger;
 use App\Services\Settings;
 use App\Services\SystemStatus;
@@ -20,7 +21,7 @@ class SystemController extends Controller
         $this->authorize('system.view');
 
         return view('system.status', ['checks' => $status->checks(), 'checkedAt' => now(), 'pending' => SystemStatus::pendingMigrations(),
-            'recent' => request()->user()->can('audit.view') ? \App\Models\AuditLog::query()->orderByDesc('id')->limit(10)->get() : collect()]);
+            'recent' => request()->user()->can('audit.view') ? AuditLog::query()->orderByDesc('id')->limit(10)->get() : collect()]);
     }
 
     /**

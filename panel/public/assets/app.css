@@ -529,3 +529,7 @@ h2.inline{display:inline}
 @keyframes pc-pulse{50%{box-shadow:0 0 0 6px rgba(22,163,74,0)}}
 @media (max-width:380px){.pc-value{font-size:.95rem}.pc-value.pc-small{font-size:.72rem}.pc-label{font-size:.64rem}}
 @media (prefers-reduced-motion:reduce){.pc-dot{animation:none}.proto-card{transition:none}}
+.install-btn{margin-inline-start:auto;margin-inline-end:8px;white-space:nowrap}
+.pwa-preview{display:flex;align-items:center;gap:16px}
+.pwa-preview img{border-radius:22px;box-shadow:0 8px 20px -8px rgba(0,0,0,.35)}
+.input-color{height:46px;padding:4px;cursor:pointer}

@@ -29,6 +29,7 @@ use App\Http\Controllers\Bots\WebhookController;
 use App\Http\Controllers\CronController;
 use App\Http\Controllers\Pay\PayController;
 use App\Http\Controllers\Portal\PortalController;
+use App\Http\Controllers\PwaController;
 use App\Http\Middleware\EnsureReseller;
 use App\Http\Middleware\RequireRecentPasswordConfirmation;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,10 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'show'])->name('login');
     Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:20,1');
 });
+
+// Installable app (PWA): public manifest and icons
+Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
+Route::get('/pwa/icon-{size}.png', [PwaController::class, 'icon'])->whereNumber('size')->name('pwa.icon');
 
 // Web-cron for hosts without CLI cron: /cron/{key}. Key is set by the installer.
 Route::get('/cron/{key}', CronController::class)->middleware('throttle:10,1')->name('cron');
@@ -236,6 +241,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/audit/{log}', [AuditController::class, 'show'])->name('audit.show')->whereNumber('log');
     Route::post('/audit/verify', [AuditController::class, 'verify'])->name('audit.verify')->middleware('throttle:5,1');
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
+    Route::get('/settings/app', [PwaController::class, 'edit'])->name('settings.app');
+    Route::put('/settings/app', [PwaController::class, 'update'])->name('settings.app.update')->middleware('throttle:20,1');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::get('/system', [SystemController::class, 'status'])->name('system.status');
     Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade')->middleware('throttle:10,1');

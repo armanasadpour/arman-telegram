@@ -8,12 +8,22 @@
 <title>{{ $title ?? 'پنل' }} — {{ $siteName }}</title>
 @if(is_file(public_path('fonts/IRANSans-400.woff2')))<link rel="stylesheet" href="{{ asset('assets/fonts.css') }}?v={{ config('panel.version') }}">@endif
 <link rel="stylesheet" href="{{ asset('assets/app.css') }}?v={{ config('panel.version') }}">
+<link rel="manifest" href="{{ route('pwa.manifest') }}" data-sw="{{ asset('sw.js') }}">
+@php($pwaV = app(\App\Services\Settings::class)->get('pwa.icon_version', '0'))
+<meta name="theme-color" content="{{ app(\App\Services\Settings::class)->get('pwa.theme') ?? '#4f46e5' }}">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="{{ app(\App\Services\Settings::class)->get('pwa.short_name') ?? 'پنل' }}">
+<link rel="apple-touch-icon" href="{{ url('/pwa/icon-180.png') }}?v={{ $pwaV }}">
+<link rel="icon" type="image/png" sizes="192x192" href="{{ url('/pwa/icon-192.png') }}?v={{ $pwaV }}">
 </head>
 <body>
 <div class="shell">
   <header class="header">
     <button id="menu-btn" class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="منو"><x-icon name="menu" width="20" height="20"/></button>
     <div class="brand">{{ $siteName }}</div>
+    <button id="install-btn" class="btn btn-sm install-btn" type="button" hidden>📲 نصب برنامه</button>
     <div class="user">
       <a href="{{ route('profile.password') }}" title="تغییر رمز"><span class="avatar" aria-hidden="true">{{ mb_substr(auth()->user()->name, 0, 1) }}</span><span class="user-name">{{ auth()->user()->name }}</span></a>
       <form method="post" action="{{ route('logout') }}">
@@ -100,7 +110,8 @@
         <a href="{{ route('audit.index') }}" @class(['active' => request()->routeIs('audit.*')])><x-icon name="list"/>گزارش رویدادها</a>
       @endcan
       @can('settings.view')
-        <a href="{{ route('settings.edit') }}" @class(['active' => request()->routeIs('settings.*')])><x-icon name="settings"/>تنظیمات</a>
+        <a href="{{ route('settings.edit') }}" @class(['active' => request()->routeIs('settings.edit', 'settings.update')])><x-icon name="settings"/>تنظیمات</a>
+        <a href="{{ route('settings.app') }}" @class(['active' => request()->routeIs('settings.app*')])><x-icon name="box"/>برنامه نصبی (PWA)</a>
         <a href="{{ route('alerts.settings') }}" @class(['active' => request()->routeIs('alerts.*')])><x-icon name="message"/>اعلان‌ها</a>
         <a href="{{ route('ibs.settings') }}" @class(['active' => request()->routeIs('ibs.settings*')])><x-icon name="link"/>اتصال به سرور IBSng</a>
       @endcan
