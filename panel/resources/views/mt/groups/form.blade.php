@@ -43,6 +43,7 @@
           </div>
           <div class="field"><label for="rate_limit">محدودیت سرعت هر اکانت (اختیاری)</label><input id="rate_limit" name="rate_limit" class="input ltr" value="{{ old('rate_limit', $g->rate_limit) }}" placeholder="10M/20M"><div class="help">آپلود/دانلود؛ با Simple Queue روی IP هر مشتری اعمال می‌شود.</div>@error('rate_limit')<div class="error">{{ $message }}</div>@enderror</div>
           <div class="field"><label for="wg_allowed_ips">AllowedIPs در فایل مشتری</label><input id="wg_allowed_ips" name="wg_allowed_ips" class="input ltr" value="{{ old('wg_allowed_ips', $g->wg_allowed_ips) }}"><div class="help">پیش‌فرض: همه ترافیک از تونل.</div>@error('wg_allowed_ips')<div class="error">{{ $message }}</div>@enderror</div>
+          <div class="field"><label for="multi_login">تعداد دستگاه پیش‌فرض</label><input id="multi_login" name="multi_login" type="number" min="1" max="10" class="input ltr" value="{{ old('multi_login', $g->multi_login ?? 1) }}"><div class="help">هر دستگاه فایل و QR جدا می‌گیرد؛ حجم و روز بین دستگاه‌ها مشترک است.</div></div>
           <div class="field"><label for="wg_mtu">MTU (اختیاری)</label><input id="wg_mtu" name="wg_mtu" type="number" min="1280" max="1500" class="input ltr" value="{{ old('wg_mtu', $g->wg_mtu) }}" placeholder="1420"></div>
           <div class="field"><label for="wg_keepalive">PersistentKeepalive (ثانیه)</label><input id="wg_keepalive" name="wg_keepalive" type="number" min="0" max="300" class="input ltr" value="{{ old('wg_keepalive', $g->wg_keepalive) }}"></div>
         </div>

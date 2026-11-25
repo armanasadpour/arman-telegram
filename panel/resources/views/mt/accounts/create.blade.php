@@ -77,7 +77,7 @@
                   <span class="pick-specs">
                     <span><x-icon name="link"/>{{ $g->protocolLabel() }}</span>
                     <span><x-icon name="settings"/>{{ $g->router->name }}</span>
-                    @if(! $g->isWireguard() && $g->multi_login)<span><x-icon name="users"/>{{ fa($g->multi_login) }} کاربره</span>@endif
+                    @if($g->isWireguard())<span><x-icon name="users"/>{{ fa($g->multi_login ?? 1) }} دستگاه</span>@elseif($g->multi_login)<span><x-icon name="users"/>{{ fa($g->multi_login) }} کاربره</span>@endif
                   </span>
                   <span @class(['badge', 'badge-primary' => $g->isWireguard()])>{{ $g->isWireguard() ? 'فایل + QR' : 'نام کاربری + رمز' }}</span>
                 </span>
@@ -101,8 +101,9 @@
               @error('volume_gb')<div class="error">{{ $message }}</div>@enderror
             </div>
             <div class="field">
-              <label for="multi_login">اتصال همزمان (فقط L2TP)</label>
+              <label for="multi_login">تعداد کاربر / دستگاه</label>
               <div class="input-group"><input id="multi_login" name="multi_login" type="number" min="1" max="50" class="input ltr" value="{{ old('multi_login') }}" placeholder="مقدار گروه"><span class="addon">دستگاه</span></div>
+              <div class="help">L2TP: اتصال همزمان. WireGuard: هر دستگاه فایل و QR جدا (حداکثر ۱۰).</div>
               <div class="chips">@foreach([1, 2, 3, 5] as $m)<button type="button" class="chip" data-set="#multi_login" data-value="{{ $m }}">{{ fa($m) }}</button>@endforeach</div>
             </div>
           </div>

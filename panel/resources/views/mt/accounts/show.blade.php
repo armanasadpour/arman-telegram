@@ -45,7 +45,8 @@
       <h2>اطلاعات</h2>
       <dl class="kv">
         <dt>پروتکل</dt><dd>{{ $a->protocolLabel() }}</dd>
-        @if($a->isWireguard())<dt>IP داخلی</dt><dd><bdi class="ltr">{{ $a->wg_address ?? '—' }}</bdi></dd><dt>کلید عمومی</dt><dd><bdi class="ltr small">{{ $a->wg_public_key }}</bdi></dd>
+        @if($a->isWireguard())<dt>دستگاه‌ها</dt><dd>{{ fa($a->deviceCount()) }} دستگاه</dd>
+          @foreach($a->allDevices() as $dev)<dt>دستگاه {{ fa($dev->deviceNo()) }}</dt><dd><bdi class="ltr">{{ $dev->wg_address ?? '—' }}</bdi> @if($dev->is_online)<span class="badge badge-success">آنلاین</span>@elseif($dev->last_seen_at)<span class="muted small">{{ fa_ago($dev->last_seen_at) }}</span>@endif</dd>@endforeach
         @else<dt>اتصال همزمان</dt><dd>{{ ($a->multi_login ?? $a->group?->multi_login) ? fa($a->multi_login ?? $a->group->multi_login) : 'نامحدود' }}</dd>@endif
         <dt>مدت</dt><dd>{{ $a->duration_days ? fa($a->duration_days).' روز' : 'نامحدود' }}{{ $a->expires_at ? ' — تا '.jdate($a->expires_at, 'Y/m/d H:i') : ($a->duration_days ? ' (از اولین اتصال)' : '') }}</dd>
         <dt>حجم</dt><dd>{{ $a->isVolumeLimited() ? fa_bytes($a->volume_limit_bytes) : 'نامحدود' }}</dd>
@@ -115,6 +116,7 @@
             <div class="form-grid">
               <div class="field"><label for="days_left">روز باقی‌مانده (از الان)</label><input id="days_left" name="days_left" type="number" min="0" max="3650" class="input ltr" value="{{ $a->expires_at ? max(0, (int) ceil(now()->diffInSeconds($a->expires_at, false) / 86400)) : $a->duration_days }}" placeholder="نامحدود"></div>
               <div class="field"><label for="lim_gb">کل حجم (گیگابایت)</label><input id="lim_gb" name="volume_gb" type="number" step="0.1" min="0" class="input ltr" value="{{ $a->isVolumeLimited() ? round($a->volume_limit_bytes / 1073741824, 2) : '' }}" placeholder="نامحدود"></div>
+              @if($a->isWireguard())<div class="field"><label for="lim_ml">تعداد دستگاه</label><input id="lim_ml" name="multi_login" type="number" min="1" max="10" class="input ltr" value="{{ $a->deviceCount() }}"></div>@endif
               @unless($a->isWireguard())<div class="field"><label for="lim_ml">اتصال همزمان</label><input id="lim_ml" name="multi_login" type="number" min="1" max="50" class="input ltr" value="{{ $a->multi_login }}" placeholder="مقدار گروه"></div>@endunless
             </div>
             <button class="btn btn-secondary" type="submit">ذخیره</button>
@@ -139,7 +141,11 @@
           @if($a->isWireguard())
             <h2>کلید جدید</h2>
             <p class="muted small">فایل و QR قبلی از کار می‌افتد؛ برای وقتی که فایل مشتری لو رفته یا روی دستگاه دیگری استفاده می‌شود.</p>
-            <form method="post" action="{{ route('mt.accounts.keys', $a) }}" data-confirm="کلید جدید ساخته شود؟ فایل قبلی مشتری کار نخواهد کرد.">@csrf<button class="btn btn-secondary" type="submit">ساخت کلید جدید</button></form>
+            <form method="post" action="{{ route('mt.accounts.keys', $a) }}" data-confirm="کلید جدید ساخته شود؟ فایل قبلی همان دستگاه کار نخواهد کرد.">@csrf
+              @if($a->deviceCount() > 1)
+                <div class="field"><select name="device" class="input" aria-label="دستگاه">@foreach($a->allDevices() as $dev)<option value="{{ $dev->deviceNo() }}">دستگاه {{ fa($dev->deviceNo()) }}</option>@endforeach</select></div>
+              @endif
+              <button class="btn btn-secondary" type="submit">ساخت کلید جدید</button></form>
           @else
             <h2>تغییر رمز</h2>
             <form method="post" action="{{ route('mt.accounts.password', $a) }}" data-confirm="رمز تغییر کند؟">@csrf

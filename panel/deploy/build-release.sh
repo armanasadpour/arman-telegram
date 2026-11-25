@@ -27,6 +27,7 @@ storage/app/installed.lock
 bootstrap/cache/*.php
 database/database.sqlite
 deploy/build-release.sh
+deploy/build-patch.sh
 EXC
 cp .env.example "$APP/.env.example"
 

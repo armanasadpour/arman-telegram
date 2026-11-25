@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -71,6 +72,28 @@ class MtAccount extends Model
     public function botUsers(): BelongsToMany
     {
         return $this->belongsToMany(BotUser::class, 'bot_mt_links')->withPivot('created_at');
+    }
+
+    public function devices(): HasMany
+    {
+        return $this->hasMany(MtDevice::class)->orderBy('idx');
+    }
+
+    /** WireGuard devices wanted for this account (stored in multi_login; at least 1). */
+    public function deviceCount(): int
+    {
+        return $this->isWireguard() ? max(1, (int) ($this->multi_login ?? 1)) : 0;
+    }
+
+    /** Device 1 (this row) followed by the extra devices. @return list<MtAccount|MtDevice> */
+    public function allDevices(): array
+    {
+        return $this->isWireguard() ? array_merge([$this], $this->devices->all()) : [];
+    }
+
+    public function deviceNo(): int
+    {
+        return 1;
     }
 
     public function isWireguard(): bool

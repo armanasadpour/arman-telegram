@@ -3,14 +3,16 @@
 namespace App\Services\Mikrotik;
 
 use App\Models\MtAccount;
+use App\Models\MtDevice;
 
 /** Client .conf for a WireGuard account (contains the private key: shown only to authorised users). */
 final class WgConfig
 {
-    public static function build(MtAccount $a): string
+    public static function build(MtAccount $a, ?MtDevice $dev = null): string
     {
         $g = $a->group;
-        $lines = ['[Interface]', 'PrivateKey = '.$a->wg_private_key, 'Address = '.$a->wg_address.'/32'];
+        $d = $dev ?? $a;
+        $lines = ['[Interface]', 'PrivateKey = '.$d->wg_private_key, 'Address = '.$d->wg_address.'/32'];
         if ($g->dns) {
             $lines[] = 'DNS = '.$g->dns;
         }
@@ -20,8 +22,8 @@ final class WgConfig
         $lines[] = '';
         $lines[] = '[Peer]';
         $lines[] = 'PublicKey = '.$g->wg_server_public_key;
-        if ($a->wg_preshared_key) {
-            $lines[] = 'PresharedKey = '.$a->wg_preshared_key;
+        if ($d->wg_preshared_key) {
+            $lines[] = 'PresharedKey = '.$d->wg_preshared_key;
         }
         $host = $g->endpoint();
         $lines[] = 'Endpoint = '.(str_contains($host, ':') ? '['.$host.']' : $host).':'.$g->wg_listen_port;
@@ -33,8 +35,8 @@ final class WgConfig
         return implode("\n", $lines)."\n";
     }
 
-    public static function filename(MtAccount $a): string
+    public static function filename(MtAccount $a, ?MtDevice $dev = null): string
     {
-        return preg_replace('/[^A-Za-z0-9_-]/', '', $a->username).'.conf';
+        return substr(preg_replace('/[^A-Za-z0-9_-]/', '', $a->username), 0, 12).($dev ? '-'.$dev->idx : '').'.conf';
     }
 }

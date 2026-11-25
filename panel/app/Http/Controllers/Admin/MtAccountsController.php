@@ -236,11 +236,12 @@ class MtAccountsController extends Controller
         return $this->run(fn () => $this->actions->changePassword($account, $pw, 'از پنل'), 'رمز عوض شد.', reveal: $account->id);
     }
 
-    public function keys(MtAccount $account): RedirectResponse
+    public function keys(Request $request, MtAccount $account): RedirectResponse
     {
         $this->authorize('mt_accounts.sensitive');
+        $device = (int) $request->validate(['device' => ['nullable', 'integer', 'min:1', 'max:10']])['device'] ?: 1;
 
-        return $this->run(fn () => $this->actions->regenerateKeys($account, 'از پنل'), 'کلید جدید ساخته شد؛ فایل/QR جدید را برای مشتری بفرستید (فایل قبلی دیگر کار نمی‌کند).', reveal: $account->id);
+        return $this->run(fn () => $this->actions->regenerateKeys($account, 'از پنل', $device), 'کلید جدید ساخته شد؛ فایل/QR جدید را برای مشتری بفرستید (فایل قبلی دیگر کار نمی‌کند).', reveal: $account->id);
     }
 
     public function privateKey(Request $request, MtAccount $account): RedirectResponse
@@ -308,7 +309,7 @@ class MtAccountsController extends Controller
         $this->authorize('mt_accounts.delete');
         $d = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:200'], 'panel_only' => ['nullable', 'boolean']], [], ['reason' => 'دلیل']);
         try {
-            $this->actions->delete($account, $d['reason'], (bool) ($d['panel_only'] ?? false) || in_array($account->status, ['failed'], true));
+            $this->actions->delete($account, $d['reason'], (bool) ($d['panel_only'] ?? false) || ($account->status === 'failed' && ! $account->ros_id));
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage().' اگر روتر برای همیشه از دسترس خارج شده، گزینه «فقط از پنل» را بزنید.');
         }

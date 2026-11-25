@@ -35,7 +35,7 @@
               <td><strong>{{ $g->name }}</strong></td>
               <td><span class="badge {{ $g->isWireguard() ? 'badge-primary' : '' }}">{{ $g->protocolLabel() }}</span></td>
               <td class="ltr small">@if($g->isWireguard()){{ $g->wg_interface }} · {{ $g->wg_network }} · :{{ $g->wg_listen_port }}@if($g->rate_limit) · {{ $g->rate_limit }}@endif @else profile: {{ $g->ppp_profile }} @endif</td>
-              <td>{{ $g->isWireguard() ? '۱ (ذاتی)' : ($g->multi_login ? fa($g->multi_login) : 'نامحدود') }}</td>
+              <td>{{ $g->isWireguard() ? fa($g->multi_login ?? 1).' دستگاه' : ($g->multi_login ? fa($g->multi_login) : 'نامحدود') }}</td>
               <td><a href="{{ route('mt.accounts.index', ['group' => $g->id]) }}">{{ fa($g->accounts_count) }}</a></td>
               <td>@if($g->is_active)<span class="badge badge-success">فعال</span>@else<span class="badge">غیرفعال</span>@endif</td>
               <td class="actions">

@@ -3,6 +3,7 @@
 namespace App\Services\Mikrotik;
 
 use App\Models\MtAccount;
+use App\Models\MtDevice;
 use App\Models\MtGroup;
 use App\RouterOs\RouterConnector;
 use App\RouterOs\RouterOsException;
@@ -24,6 +25,8 @@ use RuntimeException;
 class MtProvisioning
 {
     public const USERNAME_RULE = '/^[a-z0-9][a-z0-9._-]{2,31}$/';
+
+    public const MAX_DEVICES = 10;
 
     public function __construct(private RouterConnector $ros, private AuditLogger $audit) {}
 
@@ -64,7 +67,9 @@ class MtProvisioning
         $row = [
             'router_id' => $router->id, 'mt_group_id' => $group->id, 'protocol' => $group->protocol, 'username' => $username, 'create_key' => $key,
             'status' => 'pending', 'duration_days' => $days, 'volume_limit_bytes' => $volGb !== null ? (int) round($volGb * 1073741824) : null,
-            'multi_login' => $group->isWireguard() ? null : (! empty($spec['multi_login']) ? (int) $spec['multi_login'] : null),
+            // L2TP: simultaneous sessions. WireGuard: number of devices (one key, IP and file each).
+            'multi_login' => $group->isWireguard() ? max(1, min(self::MAX_DEVICES, (int) ($spec['multi_login'] ?? 0) ?: (int) ($group->multi_login ?? 1)))
+                : (! empty($spec['multi_login']) ? (int) $spec['multi_login'] : null),
             'comment' => isset($spec['comment']) ? mb_substr(trim((string) $spec['comment']), 0, 150) : null,
             'package_id' => $spec['package_id'] ?? null, 'reseller_id' => $spec['reseller_id'] ?? null, 'created_by' => $actorId,
         ];
@@ -113,7 +118,13 @@ class MtProvisioning
         $g = $a->group;
         $r = $a->router;
         try {
-            $id = $a->isWireguard() ? $this->pushPeer($a, $g, $r) : $this->pushSecret($a, $g, $r);
+            if ($a->isWireguard()) {
+                $id = $this->pushPeer($a, $a, $g, $r);
+                $a->forceFill(['ros_id' => $id])->save();
+                $this->syncDevices($a);
+            } else {
+                $id = $this->pushSecret($a, $g, $r);
+            }
         } catch (RouterOsUnreachable $e) {
             $a->forceFill(['error' => mb_substr('روتر در دسترس نیست؛ ساخت به‌طور خودکار دوباره تلاش می‌شود. '.$e->getMessage(), 0, 500)])->save();
 
@@ -126,10 +137,57 @@ class MtProvisioning
         }
         $a->forceFill(['status' => 'active', 'ros_id' => $id, 'router_disabled' => false, 'error' => null, 'last_synced_at' => now()])->save();
         if ($a->isWireguard() && $g->rate_limit) {
-            $this->ensureQueue($a);
+            foreach ($a->fresh()->allDevices() as $dev) {
+                $this->ensureQueue($a, $dev);
+            }
         }
 
         return $a;
+    }
+
+    /**
+     * WireGuard: make devices 2..N exist (panel rows and router peers) for N = deviceCount(); remove devices above N.
+     * Router errors propagate (callers decide: pending / retry / message).
+     */
+    public function syncDevices(MtAccount $a): void
+    {
+        if (! $a->isWireguard()) {
+            return;
+        }
+        $g = $a->group;
+        $r = $a->router;
+        $want = $a->deviceCount();
+        foreach ($a->devices()->where('idx', '>', $want)->get() as $dev) {
+            if ($dev->ros_id) {
+                try {
+                    $this->ros->remove($r, 'interface/wireguard/peers', $dev->ros_id);
+                } catch (RouterOsUnreachable $e) {
+                    throw $e;
+                } catch (RouterOsException) {
+                    // already gone
+                }
+            }
+            $this->removeQueue($a, $dev);
+            $dev->delete();
+        }
+        for ($i = 2; $i <= $want; $i++) {
+            $dev = $a->devices()->where('idx', $i)->first();
+            if (! $dev) {
+                $k = WgKeys::pair();
+                $dev = DB::transaction(fn () => MtDevice::query()->create(['mt_account_id' => $a->id, 'router_id' => $a->router_id, 'idx' => $i,
+                    'wg_private_key' => $k['private'], 'wg_public_key' => $k['public'], 'wg_preshared_key' => WgKeys::preshared(), 'wg_address' => $this->freeAddress($g)]));
+            }
+            if (! $dev->ros_id) {
+                $dev->forceFill(['ros_id' => $this->pushPeer($a, $dev, $g, $r), 'counters' => null])->save();
+                if ($g->rate_limit) {
+                    $this->ensureQueue($a, $dev);
+                }
+                if ($a->router_disabled) {
+                    $this->ros->set($r, 'interface/wireguard/peers', $dev->ros_id, ['disabled' => 'yes']);
+                }
+            }
+        }
+        $a->unsetRelation('devices');
     }
 
     private function pushSecret(MtAccount $a, MtGroup $g, $r): string
@@ -145,46 +203,62 @@ class MtProvisioning
             'profile' => (string) $g->ppp_profile, 'comment' => $a->rosComment(), 'disabled' => 'no']);
     }
 
-    private function pushPeer(MtAccount $a, MtGroup $g, $r): string
+    private function pushPeer(MtAccount $a, MtAccount|MtDevice $dev, MtGroup $g, $r): string
     {
         $peers = $this->ros->get($r, 'interface/wireguard/peers');
         $used = [];
         foreach ($peers as $p) {
-            if (($p['public-key'] ?? '') === $a->wg_public_key) {
+            if (($p['public-key'] ?? '') === $dev->wg_public_key) {
                 return (string) $p['.id'];
             }
             foreach (explode(',', (string) ($p['allowed-address'] ?? '')) as $aa) {
                 $used[explode('/', trim($aa))[0]] = true;
             }
         }
-        if (isset($used[$a->wg_address])) {
+        if (! $dev->wg_address || isset($used[$dev->wg_address])) {
             // A peer created outside the panel already holds this address: take another one.
-            $a->forceFill(['wg_address' => $this->freeAddress($g, $used)])->save();
+            $dev->forceFill(['wg_address' => $this->freeAddress($g, $used)])->save();
         }
 
-        $attrs = ['interface' => (string) $g->wg_interface, 'public-key' => (string) $a->wg_public_key,
-            'allowed-address' => $a->wg_address.'/32', 'comment' => $a->rosComment(), 'disabled' => 'no'];
-        if ($a->wg_preshared_key) {
-            $attrs['preshared-key'] = (string) $a->wg_preshared_key;
+        $attrs = ['interface' => (string) $g->wg_interface, 'public-key' => (string) $dev->wg_public_key,
+            'allowed-address' => $dev->wg_address.'/32', 'comment' => $a->rosComment().($dev->deviceNo() > 1 ? ' #'.$dev->deviceNo() : ''), 'disabled' => 'no'];
+        if ($dev->wg_preshared_key) {
+            $attrs['preshared-key'] = (string) $dev->wg_preshared_key;
         }
 
         return $this->ros->add($r, 'interface/wireguard/peers', $attrs);
     }
 
+    public static function queueName(MtAccount $a, MtAccount|MtDevice $dev): string
+    {
+        return 'panel-'.$a->username.($dev->deviceNo() > 1 ? '-'.$dev->deviceNo() : '');
+    }
+
     /** Per-peer speed limit (simple queue). Failure is recorded, not fatal. */
-    public function ensureQueue(MtAccount $a): void
+    public function ensureQueue(MtAccount $a, MtAccount|MtDevice|null $dev = null): void
     {
         $g = $a->group;
+        $dev ??= $a;
         try {
-            $name = 'panel-'.$a->username;
+            $name = self::queueName($a, $dev);
             $rows = $this->ros->get($a->router, 'queue/simple', ['name' => $name]);
             if ($rows) {
-                $this->ros->set($a->router, 'queue/simple', (string) $rows[0]['.id'], ['target' => $a->wg_address.'/32', 'max-limit' => (string) $g->rate_limit]);
+                $this->ros->set($a->router, 'queue/simple', (string) $rows[0]['.id'], ['target' => $dev->wg_address.'/32', 'max-limit' => (string) $g->rate_limit]);
             } else {
-                $this->ros->add($a->router, 'queue/simple', ['name' => $name, 'target' => $a->wg_address.'/32', 'max-limit' => (string) $g->rate_limit, 'comment' => $a->rosComment()]);
+                $this->ros->add($a->router, 'queue/simple', ['name' => $name, 'target' => $dev->wg_address.'/32', 'max-limit' => (string) $g->rate_limit, 'comment' => $a->rosComment()]);
             }
         } catch (RouterOsException $e) {
             $a->forceFill(['error' => mb_substr('محدودیت سرعت اعمال نشد: '.$e->getMessage(), 0, 500)])->save();
+        }
+    }
+
+    public function removeQueue(MtAccount $a, MtAccount|MtDevice $dev): void
+    {
+        try {
+            foreach ($this->ros->get($a->router, 'queue/simple', ['name' => self::queueName($a, $dev)]) as $q) {
+                $this->ros->remove($a->router, 'queue/simple', (string) $q['.id']);
+            }
+        } catch (RouterOsException) {
         }
     }
 
@@ -194,6 +268,9 @@ class MtProvisioning
         $net = WgNetwork::parse((string) $g->wg_network);
         $used = $alsoUsed;
         foreach (MtAccount::withTrashed()->where('router_id', $g->router_id)->whereNotNull('wg_address')->pluck('wg_address') as $ip) {
+            $used[$ip] = true;
+        }
+        foreach (MtDevice::query()->where('router_id', $g->router_id)->whereNotNull('wg_address')->pluck('wg_address') as $ip) {
             $used[$ip] = true;
         }
         if ($g->wg_server_ip) {

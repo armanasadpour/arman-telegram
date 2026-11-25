@@ -96,11 +96,37 @@ class MtActions
             $this->recomputeStatus($a);
             $a->save();
         });
+        if ($a->isWireguard() && $multiLogin) {
+            $this->setDevices($a, $multiLogin);
+        }
         $this->audit->log('mt_accounts.limits', $a, 'ویرایش محدودیت‌های «'.$a->username.'»', AuditLogger::diff(
             array_map(fn ($v) => $v instanceof \DateTimeInterface ? $v->format(DATE_ATOM) : $v, $before),
             array_map(fn ($v) => $v instanceof \DateTimeInterface ? $v->format(DATE_ATOM) : $v, $a->only(array_keys($before)))), $reason);
 
         return $this->syncState($a);
+    }
+
+    /** WireGuard: change the number of devices (adds new keys/files, or removes the highest-numbered devices). */
+    public function setDevices(MtAccount $a, int $n): MtAccount
+    {
+        if (! $a->isWireguard()) {
+            return $a;
+        }
+        $n = max(1, min(MtProvisioning::MAX_DEVICES, $n));
+        $old = $a->deviceCount();
+        $a->forceFill(['multi_login' => $n])->save();
+        if ($a->ros_id && ! $a->trashed()) {
+            try {
+                $this->prov->syncDevices($a);
+            } catch (RouterOsException $e) {
+                $a->forceFill(['error' => mb_substr('تغییر تعداد دستگاه روی روتر کامل نشد؛ در همگام‌سازی بعدی تکرار می‌شود. '.$e->getMessage(), 0, 500)])->save();
+            }
+        }
+        if ($old !== $n) {
+            $this->audit->log('mt_accounts.devices', $a, 'تعداد دستگاه «'.$a->username.'»: '.fa($old).' ← '.fa($n), ['devices' => [$old, $n]]);
+        }
+
+        return $a;
     }
 
     public function resetUsage(MtAccount $a, string $reason): MtAccount
@@ -217,6 +243,9 @@ class MtActions
         }
         try {
             $this->ros->set($a->router, $this->menu($a), $a->ros_id, ['disabled' => $want ? 'yes' : 'no']);
+            foreach ($a->isWireguard() ? $a->devices()->whereNotNull('ros_id')->get() : [] as $dev) {
+                $this->ros->set($a->router, 'interface/wireguard/peers', $dev->ros_id, ['disabled' => $want ? 'yes' : 'no']);
+            }
             if ($want) {
                 $this->kick($a);
             }
@@ -267,17 +296,21 @@ class MtActions
         return $password;
     }
 
-    public function regenerateKeys(MtAccount $a, string $reason): MtAccount
+    public function regenerateKeys(MtAccount $a, string $reason, int $device = 1): MtAccount
     {
         if (! $a->isWireguard()) {
             throw new RuntimeException('فقط اکانت WireGuard کلید دارد.');
         }
         $this->needRouterRow($a);
+        $dev = $device > 1 ? $a->devices()->where('idx', $device)->first() : $a;
+        if (! $dev || ! $dev->ros_id) {
+            throw new RuntimeException('این دستگاه روی روتر ساخته نشده است.');
+        }
         $k = WgKeys::pair();
         $psk = WgKeys::preshared();
-        $this->ros->set($a->router, 'interface/wireguard/peers', $a->ros_id, ['public-key' => $k['public'], 'preshared-key' => $psk]);
-        $a->forceFill(['wg_private_key' => $k['private'], 'wg_public_key' => $k['public'], 'wg_preshared_key' => $psk])->save();
-        $this->audit->log('mt_accounts.keys', $a, 'ساخت کلید جدید WireGuard برای «'.$a->username.'» (فایل قبلی دیگر کار نمی‌کند)', [], $reason);
+        $this->ros->set($a->router, 'interface/wireguard/peers', $dev->ros_id, ['public-key' => $k['public'], 'preshared-key' => $psk]);
+        $dev->forceFill(['wg_private_key' => $k['private'], 'wg_public_key' => $k['public'], 'wg_preshared_key' => $psk])->save();
+        $this->audit->log('mt_accounts.keys', $a, 'ساخت کلید جدید WireGuard برای «'.$a->username.'»'.($device > 1 ? ' دستگاه '.fa($device) : '').' (فایل قبلی دیگر کار نمی‌کند)', [], $reason);
 
         return $a;
     }
@@ -309,11 +342,16 @@ class MtActions
                 // already gone on the router
             }
             if ($a->isWireguard()) {
-                try {
-                    foreach ($this->ros->get($a->router, 'queue/simple', ['name' => 'panel-'.$a->username]) as $q) {
-                        $this->ros->remove($a->router, 'queue/simple', (string) $q['.id']);
+                foreach ($a->devices as $dev) {
+                    if ($dev->ros_id) {
+                        try {
+                            $this->ros->remove($a->router, 'interface/wireguard/peers', $dev->ros_id);
+                        } catch (RouterOsException) {
+                        }
                     }
-                } catch (RouterOsException) {
+                }
+                foreach ($a->allDevices() as $dev) {
+                    $this->prov->removeQueue($a, $dev);
                 }
             } else {
                 try {
@@ -324,6 +362,7 @@ class MtActions
         }
         DB::transaction(function () use ($a) {
             // Free the name and the address for reuse; keep the row (soft-deleted) for history and sales.
+            $a->devices()->delete();
             $a->forceFill(['username' => mb_substr($a->username, 0, 40).'~'.$a->id, 'wg_address' => null, 'is_online' => false, 'online_count' => 0])->save();
             $a->delete();
         });

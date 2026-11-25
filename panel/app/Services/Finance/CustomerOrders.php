@@ -10,6 +10,7 @@ use App\Ibs\IbsUnavailableException;
 use App\Models\BotUser;
 use App\Models\CustomerOrder;
 use App\Models\MtAccount;
+use App\Models\MtDevice;
 use App\Models\Package;
 use App\Models\ProvisioningJob;
 use App\Models\VpnAccount;
@@ -291,7 +292,13 @@ class CustomerOrders
     {
         $g = $m->group;
         if ($m->isWireguard()) {
-            return '🔐 WireGuard — '.$m->username."\nفایل زیر را در برنامه WireGuard با «Import from text» یا ساخت فایل .conf وارد کنید:\n\n".WgConfig::build($m);
+            $out = '🔐 WireGuard — '.$m->username.($m->deviceCount() > 1 ? ' ('.fa($m->deviceCount()).' دستگاه؛ هر فایل فقط روی یک دستگاه)' : '')
+                ."\nفایل زیر را در برنامه WireGuard با «Import from text» یا ساخت فایل .conf وارد کنید:";
+            foreach ($m->allDevices() as $dev) {
+                $out .= "\n\n".($m->deviceCount() > 1 ? '📱 دستگاه '.fa($dev->deviceNo())."\n" : '').WgConfig::build($m, $dev instanceof MtDevice ? $dev : null);
+            }
+
+            return $out;
         }
         $lines = ['🔐 L2TP/IPsec', 'سرور: '.$g->endpoint(), 'نام کاربری: '.$m->username, 'رمز: '.$m->password];
         if ($g->ipsec_psk) {

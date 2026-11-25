@@ -3,6 +3,7 @@
 namespace App\Services\Mikrotik;
 
 use App\Models\MtAccount;
+use App\Models\MtDevice;
 use App\Models\Router;
 use App\RouterOs\RouterConnector;
 use App\RouterOs\RouterOsException;
@@ -27,7 +28,7 @@ class MtAccounting
     public function syncRouter(Router $r): array
     {
         $stats = ['accounts' => 0, 'bytes' => 0, 'disabled' => 0, 'kicked' => 0, 'missing' => 0];
-        $accounts = MtAccount::query()->where('router_id', $r->id)->whereNotIn('status', ['pending', 'failed'])->with('group')->get();
+        $accounts = MtAccount::query()->where('router_id', $r->id)->whereNotIn('status', ['pending', 'failed'])->with('group', 'devices')->get();
         if ($accounts->isEmpty()) {
             return $stats;
         }
@@ -67,6 +68,29 @@ class MtAccounting
             try {
                 $row = $a->isWireguard() ? ($peers[$a->wg_public_key] ?? null) : ($secrets[$a->username] ?? null);
                 $d = $a->isWireguard() ? $this->wgDelta($a, $row, $rebooted) : $this->l2tpDelta($a, $sessions[$a->username] ?? []);
+                $devDrift = null;
+                $devMissing = false;
+                if ($a->isWireguard()) {
+                    // devices 2..N add to the same account totals
+                    $d['devices'] = [];
+                    foreach ($a->devices as $dev) {
+                        $drow = $peers[$dev->wg_public_key] ?? null;
+                        $dd = $this->wgDelta($dev, $drow, $rebooted);
+                        $d['up'] += $dd['up'];
+                        $d['down'] += $dd['down'];
+                        $d['online'] += $dd['online'];
+                        $d['ip'] ??= $dd['ip'];
+                        if ($dd['seen'] && (! $d['seen'] || $dd['seen']->gt($d['seen']))) {
+                            $d['seen'] = $dd['seen'];
+                        }
+                        $d['devices'][] = [$dev, $dd, $drow];
+                        $devMissing = $devMissing || $drow === null;
+                        if ($drow !== null && RosValues::bool($drow['disabled'] ?? 'false') !== $a->router_disabled) {
+                            $devDrift = RosValues::bool($drow['disabled'] ?? 'false');
+                        }
+                    }
+                    $devMissing = $devMissing || $a->devices->count() !== $a->deviceCount() - 1;
+                }
                 $stats['bytes'] += $d['up'] + $d['down'];
                 $a = $this->record($a, $d, $row);
                 if ($row === null) {
@@ -75,7 +99,18 @@ class MtAccounting
 
                     continue;
                 }
+                if ($devMissing) {
+                    $stats['missing']++;
+                    try {
+                        app(MtProvisioning::class)->syncDevices($a);
+                    } catch (RouterOsException $e) {
+                        report($e);
+                    }
+                }
                 $routerDisabled = RosValues::bool($row['disabled'] ?? 'false');
+                if ($routerDisabled === $a->router_disabled && $devDrift !== null) {
+                    $routerDisabled = $devDrift;
+                }
                 if ($routerDisabled !== $a->router_disabled) {
                     $a->forceFill(['router_disabled' => $routerDisabled])->save();   // changed by hand on the router: re-apply the panel's view
                 }
@@ -135,7 +170,7 @@ class MtAccounting
             'ip' => $last['ip'] ?? null, 'seen' => $sessions ? now() : null];
     }
 
-    private function wgDelta(MtAccount $a, ?array $peer, bool $rebooted): array
+    private function wgDelta(MtAccount|MtDevice $a, ?array $peer, bool $rebooted): array
     {
         if ($peer === null) {
             return ['up' => 0, 'down' => 0, 'counters' => $a->counters ?? [], 'online' => 0, 'ip' => null, 'seen' => null];
@@ -190,6 +225,11 @@ class MtAccounting
                 'last_synced_at' => now(), 'error' => $row === null ? 'روی روتر پیدا نشد؛ دوباره ساخته می‌شود.' : $a->error]);
             $this->actions->recomputeStatus($a);
             $a->save();
+            foreach ($d['devices'] ?? [] as [$dev, $dd, $drow]) {
+                $dev->forceFill(['counters' => $dd['counters'], 'is_online' => $dd['online'] > 0, 'online_ip' => $dd['ip'],
+                    'last_seen_at' => $dd['seen'] && (! $dev->last_seen_at || $dd['seen']->gt($dev->last_seen_at)) ? $dd['seen'] : $dev->last_seen_at,
+                    'ros_id' => $drow === null ? null : ($drow['.id'] ?? $dev->ros_id)])->save();
+            }
 
             return $a;
         });

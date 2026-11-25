@@ -42,7 +42,7 @@
         <div class="field"><label for="duration_days">مدت اعتبار (روز)</label><input id="duration_days" name="duration_days" type="number" min="1" max="3650" class="input ltr" value="{{ old('duration_days', $p->duration_days) }}"><div class="help">برای اکانت جدید از اولین اتصال شمرده می‌شود.</div></div>
         <div class="field"><label for="volume_gb">حجم (گیگابایت)</label><input id="volume_gb" name="volume_gb" type="number" step="0.1" min="0.1" class="input ltr" value="{{ old('volume_gb', $p->volume_gb !== null ? (float) $p->volume_gb : '') }}"><div class="help">خالی = حجم نامحدود (برای گروه‌های بدون محدودیت حجم).</div></div>
 @error('ibs_group_name')<div class="error">{{ $message }}</div>@enderror
-        <div class="field"><label for="multi_login">تعداد اتصال همزمان (اختیاری)</label><input id="multi_login" name="multi_login" type="number" min="1" max="255" class="input ltr" value="{{ old('multi_login', $p->multi_login) }}"><div class="help">خالی = مقدار گروه سرور.</div></div>
+        <div class="field"><label for="multi_login">تعداد اتصال همزمان / دستگاه (اختیاری)</label><input id="multi_login" name="multi_login" type="number" min="1" max="255" class="input ltr" value="{{ old('multi_login', $p->multi_login) }}"><div class="help">خالی = مقدار گروه سرور.</div></div>
         <div class="field"><label for="price_toman">قیمت (تومان)</label><input id="price_toman" name="price_toman" type="number" min="0" class="input ltr" value="{{ old('price_toman', $p->exists ? intdiv((int) $p->price_rial, 10) : '') }}" required></div>
         <div class="field"><label for="sort_order">ترتیب نمایش</label><input id="sort_order" name="sort_order" type="number" min="0" class="input ltr" value="{{ old('sort_order', $p->sort_order ?? 0) }}"></div>
       </div>

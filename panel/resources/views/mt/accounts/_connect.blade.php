@@ -6,18 +6,21 @@
     <div class="alert alert-warning">این Peer از روتر وارد شده و روتر کلید خصوصی مشتری را نگه نمی‌دارد؛ مشتری با همان فایل قبلی‌اش وصل می‌شود.
       برای ساخت فایل/QR در پنل: کلید خصوصی را از فایل فعلی مشتری (خط PrivateKey) پایین همین صفحه ثبت کنید، یا «ساخت کلید جدید» بزنید و فایل جدید بدهید.</div>
   @elseif($a->isWireguard())
-    @php($conf = \App\Services\Mikrotik\WgConfig::build($a))
-    <div class="connect-grid">
-      <div class="qr-box">{!! \App\Support\QrCode::svg($conf, 4) !!}<div class="muted small">در برنامه WireGuard: ➕ → Scan from QR code</div></div>
-      <div>
-        <pre class="conf ltr" id="wgconf">{{ $conf }}</pre>
-        <div class="actions">
-          <button type="button" class="btn btn-secondary btn-sm" data-copy="#wgconf">کپی متن</button>
-          <a class="btn btn-sm" download="{{ \App\Services\Mikrotik\WgConfig::filename($a) }}" href="data:application/octet-stream;base64,{{ base64_encode($conf) }}">دانلود فایل ‎.conf</a>
+    @foreach($a->allDevices() as $dev)
+      @php($conf = \App\Services\Mikrotik\WgConfig::build($a, $dev instanceof \App\Models\MtDevice ? $dev : null))
+      @if($a->deviceCount() > 1)<h3 class="mt-8">دستگاه {{ fa($dev->deviceNo()) }} از {{ fa($a->deviceCount()) }}</h3>@endif
+      <div class="connect-grid mb-16">
+        <div class="qr-box">{!! \App\Support\QrCode::svg($conf, 4) !!}<div class="muted small">در برنامه WireGuard: ➕ → Scan from QR code</div></div>
+        <div>
+          <pre class="conf ltr" id="wgconf{{ $dev->deviceNo() }}">{{ $conf }}</pre>
+          <div class="actions">
+            <button type="button" class="btn btn-secondary btn-sm" data-copy="#wgconf{{ $dev->deviceNo() }}">کپی متن</button>
+            <a class="btn btn-sm" download="{{ \App\Services\Mikrotik\WgConfig::filename($a, $dev instanceof \App\Models\MtDevice ? $dev : null) }}" href="data:application/octet-stream;base64,{{ base64_encode($conf) }}">دانلود فایل ‎.conf</a>
+          </div>
         </div>
-        <p class="help">برنامه رسمی WireGuard برای اندروید، iOS، ویندوز و مک. فایل را Import کنید یا QR را اسکن کنید.</p>
       </div>
-    </div>
+    @endforeach
+    <p class="help">هر فایل فقط روی یک دستگاه؛ برنامه رسمی WireGuard برای اندروید، iOS، ویندوز و مک.</p>
   @else
     <dl class="kv connect-kv">
       <dt>نوع VPN</dt><dd>L2TP/IPsec PSK</dd>

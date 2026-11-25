@@ -108,7 +108,7 @@ class MtGroupsController extends Controller
             'ppp_profile' => [$wg ? 'nullable' : 'required_without:new_profile', 'nullable', 'string', 'max:100'],
             'new_profile' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9_.\-]+$/'],
             'new_profile_rate' => ['nullable', 'string', 'max:60', 'regex:/^\d+[kKmMgG]?\/\d+[kKmMgG]?$/'],
-            'multi_login' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'multi_login' => ['nullable', 'integer', 'min:1', $wg ? 'max:10' : 'max:50'],
             'ipsec_psk' => ['nullable', 'string', 'max:200'],
             'wg_interface' => [$wg ? 'required' : 'nullable', 'string', 'max:100'],
             'rate_limit' => ['nullable', 'string', 'max:60', 'regex:/^\d+[kKmMgG]?\/\d+[kKmMgG]?$/'],
@@ -144,7 +144,7 @@ class MtGroupsController extends Controller
             $g->fill(['wg_interface' => $d['wg_interface'], 'wg_server_public_key' => $iface['public-key'] ?? null, 'wg_listen_port' => (int) ($iface['listen-port'] ?? 0),
                 'wg_network' => $net->cidr(), 'wg_server_ip' => explode('/', $addr)[0], 'rate_limit' => $d['rate_limit'] ?? null,
                 'wg_allowed_ips' => isset($d['wg_allowed_ips']) && trim($d['wg_allowed_ips']) !== '' ? trim($d['wg_allowed_ips']) : '0.0.0.0/0, ::/0',
-                'wg_mtu' => $d['wg_mtu'] ?? null, 'wg_keepalive' => $d['wg_keepalive'] ?? 25]);
+                'wg_mtu' => $d['wg_mtu'] ?? null, 'wg_keepalive' => $d['wg_keepalive'] ?? 25, 'multi_login' => min(10, (int) ($d['multi_login'] ?? 1)) ?: 1]);
         } else {
             $profiles = collect($this->ros->get($router, 'ppp/profile'))->keyBy('name');
             $profile = $d['ppp_profile'] ?? null;
