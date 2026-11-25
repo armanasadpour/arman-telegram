@@ -23,6 +23,7 @@ storage/logs/*
 storage/framework/cache/data/*
 storage/framework/sessions/*
 storage/framework/views/*
+storage/framework/testing
 storage/app/installed.lock
 bootstrap/cache/*.php
 database/database.sqlite
