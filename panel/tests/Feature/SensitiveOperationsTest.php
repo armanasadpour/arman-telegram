@@ -32,7 +32,9 @@ class SensitiveOperationsTest extends TestCase
     {
         $admin = $this->superAdmin();
         $target = User::factory()->create();
-        $this->actingAs($admin)->confirmed()->post("/staff/{$target->id}/toggle-active", ['reason' => ''])->assertSessionHasErrors('reason');
+        $this->actingAs($admin)->confirmed()->post("/staff/{$target->id}/toggle-active", ['reason' => ''])->assertSessionHas('success');   // reason is optional
+        $this->assertDatabaseHas('audit_logs', ['action' => 'staff.deactivate', 'reason' => 'از پنل']);
+        $this->actingAs($admin)->confirmed()->post("/staff/{$target->id}/toggle-active", ['reason' => 'برگشت'])->assertSessionHas('success');
         $this->actingAs($admin)->confirmed()->post("/staff/{$target->id}/toggle-active", ['reason' => 'ترک همکاری'])->assertSessionHas('success');
         $this->assertFalse($target->fresh()->is_active);
         $this->assertDatabaseHas('audit_logs', ['action' => 'staff.deactivate', 'reason' => 'ترک همکاری']);

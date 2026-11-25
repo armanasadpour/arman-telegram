@@ -35,13 +35,11 @@
           @csrf
           <div class="form-grid">
             <div class="field"><label for="ref">شماره مرجع بانک (اختیاری)</label><input class="input ltr" id="ref" name="ref" maxlength="100"></div>
-            <div class="field"><label for="reason_ok">توضیح</label><input class="input" id="reason_ok" name="reason" required minlength="3" maxlength="300" placeholder="مثلاً در صورت‌حساب بانک دیده شد"></div>
           </div>
           <button class="btn" type="submit">تأیید و شارژ</button>
         </form>
         <form method="post" action="{{ route('payments.reject', $p) }}" data-confirm="این پرداخت رد شود؟">
           @csrf
-          <div class="field"><label for="reason_no">دلیل رد</label><input class="input" id="reason_no" name="reason" required minlength="3" maxlength="300"></div>
           <button class="btn btn-danger" type="submit">رد پرداخت</button>
         </form>
       </div>

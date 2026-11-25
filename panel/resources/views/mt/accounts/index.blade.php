@@ -37,6 +37,10 @@
         <select id="group" name="group" class="input"><option value="">همه</option>
           @foreach($groups as $g)<option value="{{ $g->id }}" @selected((string) ($filters['group'] ?? '') === (string) $g->id)>{{ $g->name }} ({{ $g->router?->name }})</option>@endforeach
         </select></div>
+      <div class="field"><label for="creator">ساخته‌شده توسط</label>
+        <select id="creator" name="creator" class="input"><option value="">همه مدیران</option>
+          @foreach($creators as $c)<option value="{{ $c->id }}" @selected((string) ($filters['creator'] ?? '') === (string) $c->id)>{{ $c->name }} ({{ $c->username }})</option>@endforeach
+        </select></div>
       <div class="actions"><button class="btn" type="submit">اعمال</button>@if(array_filter($filters))<a class="btn btn-secondary" href="{{ route('mt.accounts.index') }}">حذف فیلتر</a>@endif</div>
     </form>
 
@@ -48,14 +52,15 @@
           @foreach($accounts as $a)@include('mt.accounts._card', ['a' => $a, 'url' => route('mt.accounts.show', $a)])@endforeach
         </div>
         <table class="table only-desktop">
-          <thead><tr><th>نام کاربری</th><th>پروتکل / گروه</th><th>وضعیت</th><th>انقضا</th><th>حجم باقی‌مانده</th><th>مصرف</th><th>آخرین اتصال</th></tr></thead>
+          <thead><tr><th>نام کاربری</th><th>پروتکل / گروه</th><th>سازنده</th><th>وضعیت</th><th>انقضا</th><th>حجم باقی‌مانده</th><th>مصرف</th><th>آخرین اتصال</th></tr></thead>
           <tbody>
           @foreach($accounts as $a)
             @php($lbl = $a->statusLabel())
             <tr>
               <td><a href="{{ route('mt.accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a>@if($a->is_online) <span class="badge badge-success">آنلاین</span>@endif
-                @if($a->reseller)<div class="muted small">{{ $a->reseller->code }}</div>@endif</td>
+</td>
               <td>{{ $a->protocolLabel() }}<div class="muted small">{{ $a->group?->name }}</div></td>
+              <td class="small">{{ $a->creatorLabel() }}</td>
               <td><span class="badge badge-{{ $lbl[1] }}">{{ $lbl[0] }}</span></td>
               <td>{{ $a->expires_at ? jdate($a->expires_at, 'Y/m/d') : ($a->duration_days ? fa($a->duration_days).' روز از اولین اتصال' : '∞') }}
                 @include('accounts._mini', ['m' => $a->timeMeter()])</td>

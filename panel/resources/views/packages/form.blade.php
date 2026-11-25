@@ -58,7 +58,7 @@
         <p class="muted">بسته از فروش خارج می‌شود؛ سوابق و Snapshotهای قبلی حفظ می‌شوند.</p>
         <form method="post" action="{{ route('packages.destroy', $p) }}" class="actions" data-confirm="بسته حذف شود؟">
           @csrf @method('delete')
-          <input name="reason" class="input w-280" placeholder="دلیل" required minlength="3" aria-label="دلیل">
+          
           <button class="btn btn-danger" type="submit">حذف</button>
         </form>
       </div>

@@ -89,7 +89,6 @@
                 <select id="apply_pkg" name="package_id" class="input" required>
                   @foreach($applicable as $row)<option value="{{ $row['p']->id }}">{{ $row['p']->name }} — {{ $row['p']->summary() }} — {{ fa_money($row['q']->finalPrice) }}</option>@endforeach
                 </select></div>
-              <div class="field"><label for="apply_reason">دلیل / شماره سفارش</label><input id="apply_reason" name="reason" class="input" required minlength="3"></div>
               <button class="btn" type="submit">اعمال بسته</button>
             </form>
           </div>
@@ -101,7 +100,6 @@
             @csrf
             <div class="form-grid">
               <div class="field"><label for="days">تعداد روز</label><input id="days" name="days" type="number" min="1" max="3650" class="input ltr" value="30" required></div>
-              <div class="field"><label for="renew_reason">دلیل / شماره سفارش</label><input id="renew_reason" name="reason" class="input" required minlength="3"></div>
             </div>
             <button class="btn" type="submit">تمدید</button>
           </form>
@@ -113,7 +111,6 @@
               @csrf
               <div class="form-grid">
                 <div class="field"><label for="gb">گیگابایت</label><input id="gb" name="gb" type="number" step="0.1" min="0.1" class="input ltr" value="5" required></div>
-                <div class="field"><label for="vol_reason">دلیل / شماره سفارش</label><input id="vol_reason" name="reason" class="input" required minlength="3"></div>
               </div>
               <button class="btn" type="submit">افزودن حجم</button>
             </form>
@@ -124,7 +121,6 @@
           <p class="muted small">اکانت مثل روز اول می‌شود: مدت اعتبار ({{ fa_duration($a->effectiveRelExpSeconds()) }}) از اولین اتصال بعدی شروع می‌شود{{ $a->isVolumeLimited() && $a->volume_total_bytes ? ' و حجم به '.fa_bytes((int) $a->volume_total_bytes).' برمی‌گردد' : '' }}.</p>
           <form method="post" action="{{ route('accounts.reset-first', $a) }}" data-confirm="تاریخ و حجم «{{ $a->username }}» بازنشانی شود و از اولین اتصال دوباره شروع شود؟">
             @csrf
-            <div class="field"><label for="reset_first_reason">دلیل</label><input id="reset_first_reason" name="reason" class="input" required minlength="3" maxlength="200"></div>
             <button class="btn btn-secondary" type="submit">↺ بازنشانی با اولین اتصال</button>
           </form>
         </div>
@@ -132,7 +128,6 @@
           <h2>{{ $a->locked ? 'فعال‌سازی دوباره' : 'غیرفعال‌سازی (قفل)' }}</h2>
           <form method="post" action="{{ route('accounts.lock', $a) }}" data-confirm="{{ $a->locked ? 'قفل برداشته شود؟' : 'اکانت قفل شود؟ کاربر دیگر نمی‌تواند وصل شود.' }}">
             @csrf
-            <div class="field"><label for="lock_reason">دلیل</label><input id="lock_reason" name="reason" class="input" required minlength="3" maxlength="200"></div>
             <button class="btn {{ $a->locked ? '' : 'btn-danger' }}" type="submit">{{ $a->locked ? 'برداشتن قفل' : 'قفل کن' }}</button>
           </form>
         </div>
@@ -160,7 +155,6 @@
           <p class="muted">اکانت از سرور حذف می‌شود؛ سوابق اتصال در سرور باقی می‌ماند. برگشت‌پذیر نیست.</p>
           <form method="post" action="{{ route('accounts.destroy', $a) }}" data-confirm="اکانت «{{ $a->username }}» برای همیشه از سرور حذف شود؟">
             @csrf @method('delete')
-            <div class="field"><label for="del_reason">دلیل</label><input id="del_reason" name="reason" class="input" required minlength="3"></div>
             <button class="btn btn-danger" type="submit">حذف اکانت</button>
           </form>
         </div>

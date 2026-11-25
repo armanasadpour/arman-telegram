@@ -100,14 +100,12 @@
           <h2>بازنشانی تاریخ و حجم</h2>
           <p class="muted small">مصرف صفر می‌شود{{ $a->isVolumeLimited() ? ' (حجم کامل '.fa_bytes($a->volume_limit_bytes).')' : '' }}{{ $a->duration_days ? ' و '.fa($a->duration_days).' روز از اولین اتصال بعدی شروع می‌شود' : '' }}.</p>
           <form method="post" action="{{ route('mt.accounts.reset-first', $a) }}" data-confirm="تاریخ و حجم «{{ $a->username }}» بازنشانی شود و از اولین اتصال دوباره شروع شود؟">@csrf
-            <div class="field"><label for="rf_reason">دلیل</label><input id="rf_reason" name="reason" class="input" required minlength="3" maxlength="200"></div>
             <button class="btn btn-secondary" type="submit">↺ بازنشانی با اولین اتصال</button>
           </form>
         </div>
         <div class="card">
           <h2>{{ $a->status === 'disabled' ? 'فعال‌سازی' : 'غیرفعال‌سازی' }}</h2>
           <form method="post" action="{{ route('mt.accounts.toggle', $a) }}" data-confirm="{{ $a->status === 'disabled' ? 'اکانت فعال شود؟' : 'اکانت غیرفعال و اتصال‌های فعلی قطع شود؟' }}">@csrf
-            <div class="field"><label for="tg_reason">دلیل</label><input id="tg_reason" name="reason" class="input" maxlength="200"></div>
             <button class="btn {{ $a->status === 'disabled' ? '' : 'btn-danger' }}" type="submit">{{ $a->status === 'disabled' ? 'فعال کن' : 'غیرفعال کن' }}</button>
           </form>
         </div>
@@ -118,12 +116,10 @@
               <div class="field"><label for="days_left">روز باقی‌مانده (از الان)</label><input id="days_left" name="days_left" type="number" min="0" max="3650" class="input ltr" value="{{ $a->expires_at ? max(0, (int) ceil(now()->diffInSeconds($a->expires_at, false) / 86400)) : $a->duration_days }}" placeholder="نامحدود"></div>
               <div class="field"><label for="lim_gb">کل حجم (گیگابایت)</label><input id="lim_gb" name="volume_gb" type="number" step="0.1" min="0" class="input ltr" value="{{ $a->isVolumeLimited() ? round($a->volume_limit_bytes / 1073741824, 2) : '' }}" placeholder="نامحدود"></div>
               @unless($a->isWireguard())<div class="field"><label for="lim_ml">اتصال همزمان</label><input id="lim_ml" name="multi_login" type="number" min="1" max="50" class="input ltr" value="{{ $a->multi_login }}" placeholder="مقدار گروه"></div>@endunless
-              <div class="field"><label for="lim_reason">دلیل</label><input id="lim_reason" name="reason" class="input" required minlength="3" maxlength="200"></div>
             </div>
             <button class="btn btn-secondary" type="submit">ذخیره</button>
           </form>
           <form method="post" action="{{ route('mt.accounts.reset', $a) }}" class="mt-8" data-confirm="مصرف این اکانت صفر شود؟">@csrf
-            <div class="field"><label for="reset_reason">صفر کردن مصرف — دلیل</label><input id="reset_reason" name="reason" class="input" required minlength="3" maxlength="200"></div>
             <button class="btn btn-secondary" type="submit">صفر کردن مصرف</button>
           </form>
         </details>
@@ -150,7 +146,6 @@
           <h2 class="text-danger">حذف</h2>
           <p class="muted small">{{ $a->isWireguard() ? 'Peer' : 'کاربر PPP' }} از روتر حذف می‌شود و اتصال قطع می‌شود. سوابق مصرف و فروش در پنل می‌ماند.</p>
           <form method="post" action="{{ route('mt.accounts.destroy', $a) }}" data-confirm="اکانت «{{ $a->username }}» حذف شود؟">@csrf @method('delete')
-            <div class="field"><label for="del_reason">دلیل</label><input id="del_reason" name="reason" class="input" required minlength="3"></div>
             <label class="check"><input type="checkbox" name="panel_only" value="1"> فقط از پنل (روتر از دسترس خارج شده)</label>
             <button class="btn btn-danger" type="submit">حذف اکانت</button>
           </form>
@@ -162,7 +157,6 @@
       <div class="card card-danger">
         <h2 class="text-danger">حذف</h2>
         <form method="post" action="{{ route('mt.accounts.destroy', $a) }}" data-confirm="حذف شود؟">@csrf @method('delete')
-          <div class="field"><label for="del_reason">دلیل</label><input id="del_reason" name="reason" class="input" required minlength="3"></div>
           @if($a->status === 'pending')<label class="check"><input type="checkbox" name="panel_only" value="1"> فقط از پنل</label>@endif
           <button class="btn btn-danger" type="submit">حذف</button>
         </form>

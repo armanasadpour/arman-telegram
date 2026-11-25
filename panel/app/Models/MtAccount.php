@@ -63,6 +63,11 @@ class MtAccount extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function creatorLabel(): string
+    {
+        return $this->creator?->name ?? ($this->created_by ? '—' : 'ربات / خودکار');
+    }
+
     public function botUsers(): BelongsToMany
     {
         return $this->belongsToMany(BotUser::class, 'bot_mt_links')->withPivot('created_at');

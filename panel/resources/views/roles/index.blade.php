@@ -23,7 +23,7 @@
                     @if($role->users_count === 0)
                       <form method="post" action="{{ route('roles.destroy', $role) }}" data-confirm="نقش «{{ $role->title }}» حذف شود؟" class="actions">
                         @csrf @method('delete')
-                        <input name="reason" class="w-160 input-sm input" placeholder="دلیل حذف" required minlength="3" aria-label="دلیل حذف">
+                        
                         <button class="btn btn-danger btn-sm" type="submit">حذف</button>
                       </form>
                     @endif

@@ -124,6 +124,21 @@ class AccountsHttpTest extends IbsTestCase
         $this->assertSame('hamid~'.$a->id, VpnAccount::onlyTrashed()->find($a->id)->username, 'history kept under a renamed copy');
     }
 
+    public function test_creator_column_and_filter(): void
+    {
+        $this->syncCatalog();
+        $boss = $this->superAdmin(['name' => 'مدیر اصلی']);
+        $other = $this->userWith(['accounts.view', 'accounts.create'], ['name' => 'سارا']);
+        $this->ibsUser('fromsrv');
+        app(AccountSync::class)->importByUsername('fromsrv');
+        $this->actingAs($other)->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'bysara']);
+        $this->actingAs($boss)->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'byboss']);
+        $this->actingAs($boss)->get('/accounts')->assertOk()->assertSee('سارا')->assertSee('وارد‌شده از سرور');
+        $this->actingAs($boss)->get('/accounts?creator='.$other->id)->assertSee('bysara')->assertDontSee('byboss')->assertDontSee('fromsrv');
+        $this->actingAs($boss)->get('/accounts?creator=imported')->assertSee('fromsrv')->assertDontSee('bysara');
+        $this->actingAs($boss)->get('/accounts/'.VpnAccount::query()->where('username', 'byboss')->value('id'))->assertDontSee('name="reason"', false);
+    }
+
     public function test_ui_says_server_not_ibsng_except_on_connection_page(): void
     {
         $a = $this->seedAccount();

@@ -11,6 +11,7 @@ use App\Ibs\IbsUnavailableException;
 use App\Models\IbsGroup;
 use App\Models\Package;
 use App\Models\ProvisioningJob;
+use App\Models\User;
 use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Ibs\AccountActions;
@@ -39,8 +40,14 @@ class AccountsController extends Controller
             'q' => ['nullable', 'string', 'max:64'],
             'status' => ['nullable', 'in:online,active,expired,expiring,locked,not_started,deleted'],
             'group' => ['nullable', 'string', 'max:100'],
+            'creator' => ['nullable', 'string', 'max:20'],
         ]);
-        $q = VpnAccount::query()->with('group.charge');
+        $q = VpnAccount::query()->with('group.charge', 'creator');
+        if (($f['creator'] ?? '') === 'imported') {
+            $q->whereNull('created_by')->where('source', 'imported');
+        } elseif (ctype_digit((string) ($f['creator'] ?? ''))) {
+            $q->where('created_by', (int) $f['creator']);
+        }
         if ($f['q'] ?? null) {
             $q->where(fn ($w) => $w->where('username', 'like', '%'.$f['q'].'%')->orWhere('comment', 'like', '%'.$f['q'].'%'));
         }
@@ -65,6 +72,7 @@ class AccountsController extends Controller
             'accounts' => $q->orderByDesc('is_online')->orderBy('username')->paginate(25)->withQueryString(),
             'filters' => $f,
             'groups' => IbsGroup::query()->where('present', true)->orderBy('name')->pluck('name'),
+            'creators' => User::query()->whereIn('id', VpnAccount::query()->whereNotNull('created_by')->distinct()->select('created_by'))->orderBy('name')->get(['id', 'name', 'username']),
             'counts' => [
                 'total' => VpnAccount::query()->whereNull('ibs_deleted_at')->count(),
                 'online' => VpnAccount::query()->where('is_online', true)->count(),

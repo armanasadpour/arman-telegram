@@ -22,7 +22,7 @@
             <td data-label="">
               @can('payments.sensitive')
                 <form method="post" action="{{ route('orders.refund', $o) }}" class="actions" data-confirm="مبلغ این سفارش به کیف پول مشتری برگردد؟ (فقط وقتی در سرور اکانتی ساخته/تمدید نشده)">@csrf
-                  <input name="reason" class="input w-280" required minlength="3" placeholder="دلیل" aria-label="دلیل"><button class="btn btn-secondary btn-sm" type="submit">برگشت به کیف پول</button></form>
+                  <button class="btn btn-secondary btn-sm" type="submit">برگشت به کیف پول</button></form>
               @endcan
             </td>
           </tr>

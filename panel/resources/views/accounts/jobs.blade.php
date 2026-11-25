@@ -31,7 +31,7 @@
             @can('accounts.sensitive')
               <form method="post" action="{{ route('accounts.jobs.resolve', $j) }}" class="actions" data-confirm="این مورد بسته شود؟">
                 @csrf
-                <input name="reason" class="input w-280" placeholder="توضیح رسیدگی (مثلاً: کاربر خام دستی حذف شد)" required minlength="3" aria-label="توضیح">
+                
                 <button class="btn btn-secondary" type="submit">بستن دستی</button>
               </form>
             @endcan

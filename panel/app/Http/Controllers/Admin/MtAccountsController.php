@@ -7,6 +7,7 @@ use App\Models\MtAccount;
 use App\Models\MtGroup;
 use App\Models\Package;
 use App\Models\Router;
+use App\Models\User;
 use App\RouterOs\RouterOsException;
 use App\Services\Mikrotik\MtAccounting;
 use App\Services\Mikrotik\MtActions;
@@ -27,8 +28,11 @@ class MtAccountsController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('mt_accounts.view');
-        $f = $request->only(['q', 'status', 'protocol', 'router', 'group']);
-        $q = MtAccount::query()->with(['group', 'router', 'reseller']);
+        $f = $request->only(['q', 'status', 'protocol', 'router', 'group', 'creator']);
+        $q = MtAccount::query()->with(['group', 'router', 'reseller', 'creator']);
+        if (ctype_digit((string) ($f['creator'] ?? ''))) {
+            $q->where('created_by', (int) $f['creator']);
+        }
         if (! empty($f['q'])) {
             $term = '%'.str_replace(['%', '_'], ['\%', '\_'], trim($f['q'])).'%';
             $q->where(fn ($w) => $w->where('username', 'like', $term)->orWhere('comment', 'like', $term)->orWhere('wg_address', 'like', $term));
@@ -55,6 +59,7 @@ class MtAccountsController extends Controller
             'filters' => $f, 'counts' => $counts,
             'routers' => Router::query()->orderBy('name')->get(['id', 'name']),
             'groups' => MtGroup::query()->with('router:id,name')->orderBy('name')->get(),
+            'creators' => User::query()->whereIn('id', MtAccount::withTrashed()->whereNotNull('created_by')->distinct()->select('created_by'))->orderBy('name')->get(['id', 'name', 'username']),
         ]);
     }
 

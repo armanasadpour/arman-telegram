@@ -64,6 +64,11 @@
         <select id="group" name="group" class="input"><option value="">همه</option>
           @foreach($groups as $g)<option value="{{ $g }}" @selected(($filters['group'] ?? '') === $g)>{{ $g }}</option>@endforeach
         </select></div>
+      <div class="field"><label for="creator">ساخته‌شده توسط</label>
+        <select id="creator" name="creator" class="input"><option value="">همه مدیران</option>
+          @foreach($creators as $c)<option value="{{ $c->id }}" @selected((string) ($filters['creator'] ?? '') === (string) $c->id)>{{ $c->name }} ({{ $c->username }})</option>@endforeach
+          <option value="imported" @selected(($filters['creator'] ?? '') === 'imported')>وارد‌شده از سرور</option>
+        </select></div>
       <div class="actions"><button class="btn" type="submit">اعمال</button>@if(array_filter($filters))<a class="btn btn-secondary" href="{{ route('accounts.index') }}">حذف فیلتر</a>@endif</div>
     </form>
 
@@ -82,12 +87,13 @@
           @foreach($accounts as $a)@include('accounts._card', ['a' => $a, 'url' => route('accounts.show', $a)])@endforeach
         </div>
         <table class="table only-desktop">
-          <thead><tr><th>نام کاربری</th><th>گروه</th><th>وضعیت</th><th>انقضا</th><th>حجم باقی‌مانده</th><th>به‌روزرسانی</th></tr></thead>
+          <thead><tr><th>نام کاربری</th><th>گروه</th><th>سازنده</th><th>وضعیت</th><th>انقضا</th><th>حجم باقی‌مانده</th><th>به‌روزرسانی</th></tr></thead>
           <tbody>
           @foreach($accounts as $a)
             <tr>
               <td data-label="نام کاربری"><a href="{{ route('accounts.show', $a) }}"><bdi class="ltr">{{ $a->username }}</bdi></a></td>
               <td data-label="گروه"><bdi>{{ $a->group_name }}</bdi></td>
+              <td data-label="سازنده" class="small">{{ $a->creatorLabel() }}</td>
               <td data-label="وضعیت">@include('accounts._status', ['a' => $a])</td>
               <td data-label="انقضا">{{ $a->expires_at ? jdate($a->expires_at, 'Y/m/d').' ('.fa_ago($a->expires_at).')' : ($a->first_login_ibs ? '—' : 'پس از اولین اتصال') }}@include('accounts._mini', ['m' => $a->timeMeter()])</td>
               <td data-label="حجم">{{ $a->isVolumeLimited() ? fa_bytes($a->remainingBytes()) : 'بدون محدودیت' }}@include('accounts._mini', ['m' => $a->volumeMeter()])</td>

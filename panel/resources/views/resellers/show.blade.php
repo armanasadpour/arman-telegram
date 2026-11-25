@@ -22,7 +22,6 @@
             <div class="field"><label for="direction">نوع</label><select id="direction" name="direction" class="input"><option value="credit">شارژ (افزایش)</option><option value="debit">کسر (کاهش)</option></select></div>
             <div class="field"><label for="amount_toman">مبلغ (تومان)</label><input id="amount_toman" name="amount_toman" type="number" min="1" class="input ltr" required></div>
           </div>
-          <div class="field"><label for="adj_reason">دلیل (الزامی)</label><input id="adj_reason" name="reason" class="input" required minlength="3" maxlength="300" placeholder="مثلاً واریز کارت به کارت ۱۴۰۵/۰۹/۰۳"></div>
           <button class="btn" type="submit">ثبت تراکنش</button>
           <p class="help muted">عملیات حساس: تأیید مجدد رمز می‌خواهد و با نام شما، زمان و شناسه تراکنش ثبت می‌شود.</p>
         </form>
@@ -108,7 +107,7 @@
             @if($s->status === 'needs_review')
               @can('wallets.sensitive')
                 <form method="post" action="{{ route('resellers.refund-sale', [$r, $s]) }}" class="actions" data-confirm="پس از بررسی سرور، مبلغ این فروش به همکار برگردد؟">@csrf
-                  <input name="reason" class="input input-sm w-160" placeholder="دلیل" required minlength="3" aria-label="دلیل"><button class="btn btn-danger btn-sm" type="submit">بازپرداخت</button></form>
+                  <button class="btn btn-danger btn-sm" type="submit">بازپرداخت</button></form>
               @endcan
             @endif
           </td>
@@ -139,7 +138,7 @@
               @can('wallets.sensitive')
                 @if(in_array($e->type, ['manual_credit', 'manual_debit', 'topup'], true))
                   <form method="post" action="{{ route('resellers.reverse', [$r, $e]) }}" class="actions" data-confirm="یک ردیف معکوس برای اصلاح این تراکنش ثبت شود؟">@csrf
-                    <input name="reason" class="input input-sm w-160" placeholder="دلیل اصلاح" required minlength="3" aria-label="دلیل"><button class="btn btn-secondary btn-sm" type="submit">معکوس</button></form>
+                    <button class="btn btn-secondary btn-sm" type="submit">معکوس</button></form>
                 @endif
               @endcan
             </td>

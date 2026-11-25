@@ -74,10 +74,6 @@
           <p class="muted">{{ $user->is_active ? 'کاربر بلافاصله از همه نشست‌ها خارج می‌شود و نمی‌تواند وارد شود.' : 'کاربر دوباره می‌تواند وارد شود.' }}</p>
           <form method="post" action="{{ route('staff.toggle', $user) }}" data-confirm="{{ $user->is_active ? 'حساب غیرفعال شود؟' : 'حساب فعال شود؟' }}">
             @csrf
-            <div class="field">
-              <label for="reason_toggle">دلیل (در گزارش رویدادها ثبت می‌شود)</label>
-              <input id="reason_toggle" name="reason" class="input" required minlength="3" maxlength="500">
-            </div>
             <button type="submit" class="btn {{ $user->is_active ? 'btn-danger' : '' }}">{{ $user->is_active ? 'غیرفعال کن' : 'فعال کن' }}</button>
           </form>
         </div>
@@ -94,10 +90,6 @@
               <label for="npc">تکرار رمز جدید</label>
               <input id="npc" name="password_confirmation" type="password" class="input ltr" autocomplete="new-password" required>
             </div>
-            <div class="field">
-              <label for="reason_pw">دلیل</label>
-              <input id="reason_pw" name="reason" class="input" required minlength="3" maxlength="500">
-            </div>
             <button type="submit" class="btn">ثبت رمز جدید</button>
           </form>
         </div>
@@ -109,10 +101,6 @@
         <p class="muted">حساب حذف می‌شود؛ سوابق او در گزارش رویدادها با نام کاربری‌اش باقی می‌ماند. این کار برگشت‌پذیر نیست.</p>
         <form method="post" action="{{ route('staff.destroy', $user) }}" data-confirm="کاربر «{{ $user->username }}» برای همیشه حذف شود؟">
           @csrf @method('delete')
-          <div class="field">
-            <label for="reason_del">دلیل</label>
-            <input id="reason_del" name="reason" class="input" required minlength="3" maxlength="500">
-          </div>
           <button type="submit" class="btn btn-danger">حذف کاربر</button>
         </form>
       </div>

@@ -41,7 +41,6 @@
         @csrf
         <input type="hidden" name="days" value="{{ $days }}">
         <div class="form-grid">
-          <div class="field"><label for="reason">دلیل</label><input class="input" id="reason" name="reason" required minlength="3" maxlength="200" value="{{ old('reason', 'پاک‌سازی اکانت‌های منقضی') }}"></div>
           <div class="field"><label for="confirm_count">برای تأیید، عدد {{ fa($count) }} را وارد کنید</label><input class="input ltr" id="confirm_count" name="confirm_count" inputmode="numeric" required autocomplete="off"></div>
         </div>
         <button class="btn btn-danger" type="submit">حذف {{ fa($count) }} اکانت از سرور</button>

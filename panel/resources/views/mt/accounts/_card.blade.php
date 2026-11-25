@@ -8,7 +8,7 @@
     <span @class(['acc-avatar', 'is-online' => $a->is_online])>{{ $a->isWireguard() ? 'W' : 'L' }}</span>
     <div class="acc-id">
       <bdi class="acc-name ltr">{{ $a->username }}</bdi>
-      <span class="acc-group">{{ $a->protocolLabel() }} · <bdi>{{ $a->group?->name ?? '—' }}</bdi></span>
+      <span class="acc-group">{{ $a->protocolLabel() }} · <bdi>{{ $a->group?->name ?? '—' }}</bdi>@if(! request()->routeIs('portal.*')) · 👤 {{ $a->creatorLabel() }}@endif</span>
     </div>
     <span class="acc-chevron" aria-hidden="true">‹</span>
   </div>

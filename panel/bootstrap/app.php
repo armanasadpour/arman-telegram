@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\ApplyDisplaySettings;
+use App\Http\Middleware\DefaultReason;
 use App\Http\Middleware\EnsureDatabaseUpToDate;
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -18,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(prepend: [EnsureInstalled::class], append: [ApplyDisplaySettings::class, EnsureUserIsActive::class, EnsureDatabaseUpToDate::class, SecurityHeaders::class]);
+        $middleware->web(prepend: [EnsureInstalled::class], append: [ApplyDisplaySettings::class, EnsureUserIsActive::class, EnsureDatabaseUpToDate::class, SecurityHeaders::class, DefaultReason::class]);
         $middleware->alias(['throttle' => ThrottlePerRoute::class]);
         $middleware->validateCsrfTokens(except: ['hook/*', 'pay/callback/*']);
         $middleware->redirectGuestsTo(fn () => route('login'));

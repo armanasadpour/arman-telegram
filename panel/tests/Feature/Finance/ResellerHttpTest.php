@@ -44,11 +44,11 @@ class ResellerHttpTest extends ResellerTestCase
         $this->flushSession();
         $this->actingAs($admin)->from("/resellers/{$r->id}")->post("/resellers/{$r->id}/adjust", $payload)->assertRedirect('/confirm-password');
         $this->assertSame(0, $this->balance($r));
-        $this->actingAs($admin)->confirmed()->from("/resellers/{$r->id}")->post("/resellers/{$r->id}/adjust", ['reason' => ''] + $payload)->assertSessionHasErrors('reason');
+        $this->actingAs($admin)->confirmed()->from("/resellers/{$r->id}")->post("/resellers/{$r->id}/adjust", ['reason' => ''] + $payload)->assertSessionHas('success');   // reason optional
         $this->actingAs($admin)->confirmed()->from("/resellers/{$r->id}")->post("/resellers/{$r->id}/adjust", $payload)->assertSessionHas('success');
         $this->actingAs($admin)->confirmed()->from("/resellers/{$r->id}")->post("/resellers/{$r->id}/adjust", $payload)->assertSessionHas('success');
         $this->assertSame(2_500_000, $this->balance($r), 'double submit with the same op_key credits once');
-        $this->assertDatabaseHas('audit_logs', ['action' => 'wallets.adjust', 'reason' => 'واریز کارت']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'wallets.adjust', 'reason' => 'از پنل']);
 
         $this->actingAs($admin)->confirmed()->from("/resellers/{$r->id}")->post("/resellers/{$r->id}/adjust",
             ['direction' => 'debit', 'amount_toman' => 999999, 'reason' => 'too much', 'op_key' => (string) Str::uuid()])->assertSessionHas('error');

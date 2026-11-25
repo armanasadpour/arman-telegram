@@ -48,6 +48,16 @@ class VpnAccount extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /** Who made this account: the panel user (admin or reseller), or "imported". */
+    public function creatorLabel(): string
+    {
+        if ($this->creator) {
+            return $this->creator->name;
+        }
+
+        return $this->source === 'imported' ? 'وارد‌شده از سرور' : '—';
+    }
+
     public function charge(): ?IbsCharge
     {
         return $this->group?->charge;
