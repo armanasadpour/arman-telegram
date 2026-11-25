@@ -50,9 +50,6 @@ class DashboardController extends Controller
         $problems = $user->can('system.view')
             ? array_values(array_filter($status->checks(), fn ($c) => $c['status'] !== 'ok'))
             : [];
-        $recent = $user->can('audit.view')
-            ? AuditLog::query()->orderByDesc('id')->limit(8)->get()
-            : collect();
 
         $finance = null;
         if ($user->can('reports.view')) {
@@ -76,7 +73,7 @@ class DashboardController extends Controller
 
         $protocols = $this->protocolCards($user);
 
-        return view('dashboard', compact('stats', 'problems', 'recent', 'accounts', 'finance', 'attention', 'protocols') + ['generatedAt' => now()]);
+        return view('dashboard', compact('stats', 'problems', 'accounts', 'finance', 'attention', 'protocols') + ['generatedAt' => now()]);
     }
 
     /** Headline numbers per protocol: active / online / expired / data used (total and today). */

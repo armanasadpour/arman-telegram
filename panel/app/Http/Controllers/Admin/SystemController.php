@@ -19,7 +19,8 @@ class SystemController extends Controller
     {
         $this->authorize('system.view');
 
-        return view('system.status', ['checks' => $status->checks(), 'checkedAt' => now(), 'pending' => SystemStatus::pendingMigrations()]);
+        return view('system.status', ['checks' => $status->checks(), 'checkedAt' => now(), 'pending' => SystemStatus::pendingMigrations(),
+            'recent' => request()->user()->can('audit.view') ? \App\Models\AuditLog::query()->orderByDesc('id')->limit(10)->get() : collect()]);
     }
 
     /**

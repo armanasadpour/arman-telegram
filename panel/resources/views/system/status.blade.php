@@ -39,6 +39,33 @@
       </form>
     </div>
   @endif
+  @can('audit.view')
+    <div class="card">
+      <div class="card-head">
+        <h2>آخرین رویدادها</h2>
+        <a href="{{ route('audit.index') }}" class="btn btn-secondary btn-sm">همه رویدادها</a>
+      </div>
+      @if($recent->isEmpty())
+        <div class="empty"><x-icon name="inbox"/><div>هنوز رویدادی ثبت نشده است.</div></div>
+      @else
+        <div class="table-wrap">
+          <table class="table stack">
+            <thead><tr><th>زمان</th><th>کاربر</th><th>رویداد</th><th>توضیح</th></tr></thead>
+            <tbody>
+            @foreach($recent as $log)
+              <tr>
+                <td data-label="زمان">{{ jdate($log->created_at) }}</td>
+                <td data-label="کاربر"><bdi>{{ $log->actor_label }}</bdi></td>
+                <td data-label="رویداد"><a href="{{ route('audit.show', $log) }}">{{ \App\Http\Controllers\Admin\AuditController::LABELS[$log->action] ?? $log->action }}</a></td>
+                <td data-label="توضیح">{{ $log->description }}</td>
+              </tr>
+            @endforeach
+            </tbody>
+          </table>
+        </div>
+      @endif
+    </div>
+  @endcan
   <div class="card">
     <h2>تنظیم Cron در cPanel</h2>
     <p class="muted">در cPanel ← Cron Jobs، یک کار «Once Per Minute» با دستور زیر بسازید (اگر هاست بازه یک‌دقیقه‌ای اجازه نمی‌دهد، کوتاه‌ترین بازه مجاز را انتخاب کنید):</p>

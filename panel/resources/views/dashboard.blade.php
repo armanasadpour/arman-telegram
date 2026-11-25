@@ -18,7 +18,7 @@
             <div class="pc-stat"><span class="pc-label">فعال</span><span class="pc-value">{{ fa($c['active']) }}</span></div>
             <div class="pc-stat"><span class="pc-label">آنلاین</span><span class="pc-value">@if($c['online'] > 0)<i class="pc-dot"></i>@endif{{ fa($c['online']) }}</span></div>
             <div class="pc-stat"><span class="pc-label">منقضی</span><span class="pc-value">{{ fa($c['expired']) }}</span></div>
-            <div class="pc-stat"><span class="pc-label">مصرف دیتا</span><span class="pc-value pc-small">{{ fa_bytes($c['used']) }}</span>@if($c['today'] !== null)<span class="pc-sub">امروز {{ fa_bytes($c['today']) }}</span>@endif</div>
+            <div class="pc-stat"><span class="pc-label">مصرف دیتا</span><span class="pc-value pc-small">{{ fa_bytes($c['used']) }}</span>@if($c['today'] !== null)<span class="pc-sub" title="مصرف امروز">امروز {{ fa_bytes($c['today']) }}</span>@endif</div>
           </div>
         </a>
       @endforeach
@@ -85,32 +85,5 @@
     @endcan
   </div>
 
-  @can('audit.view')
-    <div class="card">
-      <div class="card-head">
-        <h2>آخرین رویدادها</h2>
-        <a href="{{ route('audit.index') }}" class="btn btn-secondary btn-sm">همه رویدادها</a>
-      </div>
-      @if($recent->isEmpty())
-        <div class="empty"><x-icon name="inbox"/><div>هنوز رویدادی ثبت نشده است.</div></div>
-      @else
-        <div class="table-wrap">
-          <table class="table stack">
-            <thead><tr><th>زمان</th><th>کاربر</th><th>رویداد</th><th>توضیح</th></tr></thead>
-            <tbody>
-            @foreach($recent as $log)
-              <tr>
-                <td data-label="زمان">{{ jdate($log->created_at) }}</td>
-                <td data-label="کاربر"><bdi>{{ $log->actor_label }}</bdi></td>
-                <td data-label="رویداد"><a href="{{ route('audit.show', $log) }}">{{ \App\Http\Controllers\Admin\AuditController::LABELS[$log->action] ?? $log->action }}</a></td>
-                <td data-label="توضیح">{{ $log->description }}</td>
-              </tr>
-            @endforeach
-            </tbody>
-          </table>
-        </div>
-      @endif
-    </div>
-  @endcan
 
 </x-layouts.app>
