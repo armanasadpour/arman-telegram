@@ -10,7 +10,7 @@ use Tests\Feature\Finance\ResellerTestCase;
 /** Walks every parameterless GET page as guest, as a user without permissions, as a reseller and as super admin. */
 class RouteSecurityTest extends ResellerTestCase
 {
-    private const PUBLIC = ['login', 'up', 'install'];
+    private const PUBLIC = ['login', 'up', 'install', 'manifest.webmanifest'];   // the app manifest is public by design (no data)
 
     /** Pages any logged-in user may open (personal pages). */
     private const PERSONAL = ['dashboard', 'profile/password', 'bot-link', 'confirm-password'];
