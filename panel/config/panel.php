@@ -2,7 +2,7 @@
 
 return [
     // Release version; bumped by the release script. Also used for cache-busting static assets.
-    'version' => '0.7.0',
+    'version' => '0.7.1',
 
     // Testing only: send all messenger API calls to this base URL instead of the real servers.
     'bots_api_override' => env('BOTS_API_OVERRIDE'),

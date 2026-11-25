@@ -149,3 +149,14 @@ details summary{cursor:pointer}
 .w-full{width:100%}.break{word-break:break-all}
 .card-inset{background:var(--surface-2);border-radius:var(--radius-sm);padding:12px}
 .stat-line{display:flex;justify-content:space-between;align-items:center;font-size:1.1rem}
+.jdp-host{position:relative}
+.jdp{position:absolute;top:100%;right:0;z-index:50;margin-top:4px;width:280px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.15);padding:10px}
+.jdp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:700}
+.jdp-nav{background:none;border:1px solid var(--border);border-radius:8px;width:34px;height:34px;font-size:1.2rem;color:var(--text);cursor:pointer}
+.jdp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.jdp-w{font-size:.75rem;color:var(--muted);padding:4px 0}
+.jdp-d{background:none;border:0;border-radius:8px;height:34px;font:inherit;color:var(--text);cursor:pointer}
+.jdp-d:hover{background:var(--surface-2)}
+.jdp-d.today{outline:1px solid var(--primary,#3b5bdb)}
+.jdp-d.sel{background:var(--primary,#3b5bdb);color:#fff}
+.jdp-foot{display:flex;justify-content:space-between;margin-top:8px}

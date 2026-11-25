@@ -103,5 +103,6 @@
   </main>
 </div>
 <script src="{{ asset('assets/app.js') }}?v={{ config('panel.version') }}"></script>
+<script src="{{ asset('assets/jdate.js') }}?v={{ config('panel.version') }}"></script>
 </body>
 </html>

@@ -66,8 +66,8 @@
         <dt>شناسه سرور</dt><dd><bdi class="ltr">{{ $a->ibs_user_id }}</bdi></dd>
         <dt>گروه</dt><dd><bdi>{{ $a->group_name }}</bdi> @if($a->group?->charge_name)<span class="muted">(تعرفه {{ $a->group->charge_name }})</span>@endif</dd>
         <dt>مدت اعتبار</dt><dd>{{ fa_duration($rel) }} @if($a->rel_exp_seconds)<span class="badge">مختص این اکانت</span>@endif</dd>
-        <dt>اولین اتصال</dt><dd>{{ $a->first_login_ibs ? fa($a->first_login_ibs).' (به ساعت سرور)' : 'هنوز وصل نشده' }}</dd>
-        <dt>ساخت در سرور</dt><dd>{{ $a->ibs_created_at ? fa($a->ibs_created_at) : '—' }}</dd>
+        <dt>اولین اتصال</dt><dd>{{ $a->first_login_ibs ? jdate_local($a->first_login_ibs).' (به ساعت سرور)' : 'هنوز وصل نشده' }}</dd>
+        <dt>ساخت در سرور</dt><dd>{{ $a->ibs_created_at ? jdate_local($a->ibs_created_at).' (به ساعت سرور)' : '—' }}</dd>
         <dt>منبع</dt><dd>{{ $a->source === 'panel' ? 'ساخته‌شده در پنل'.($a->creator ? ' توسط '.$a->creator->name : '') : 'وارد‌شده از سرور' }}</dd>
         <dt>توضیح</dt><dd>{{ $a->displayComment() ?? '—' }}</dd>
         @if($a->locked)<dt>دلیل قفل</dt><dd>{{ $a->lock_reason }}</dd>@endif

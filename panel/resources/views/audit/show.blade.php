@@ -26,8 +26,8 @@
           @foreach($log->changes as $field => $pair)
             <tr>
               <td><bdi class="ltr">{{ $field }}</bdi></td>
-              <td><pre class="code">{{ is_array($pair[0] ?? null) ? json_encode($pair[0], JSON_UNESCAPED_UNICODE) : ($pair[0] ?? '—') }}</pre></td>
-              <td><pre class="code">{{ is_array($pair[1] ?? null) ? json_encode($pair[1], JSON_UNESCAPED_UNICODE) : ($pair[1] ?? '—') }}</pre></td>
+              <td><pre class="code">{{ fa_value($pair[0] ?? null) }}</pre></td>
+              <td><pre class="code">{{ fa_value($pair[1] ?? null) }}</pre></td>
             </tr>
           @endforeach
           </tbody>

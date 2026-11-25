@@ -13,6 +13,7 @@ use App\Services\Finance\CustomerOrders;
 use App\Services\Finance\ResellerSales;
 use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
+use App\Services\Ibs\ExpiredCleanup;
 use App\Services\Ibs\Provisioning;
 use App\Services\PermissionRegistry;
 use App\Services\Settings;
@@ -101,6 +102,9 @@ $ibsCommand('ibs:import-step', function () {
 
     return json_encode($st);
 }, 'Continue a bulk import of IBSng accounts');
+$ibsCommand('accounts:cleanup-step', function () {
+    return json_encode(app(ExpiredCleanup::class)->step(microtime(true) + 45));
+}, 'Continue a bulk delete of long-expired accounts');
 $ibsCommand('ibs:retry-jobs', function () {
     $n = 0;
     foreach (ProvisioningJob::query()->whereIn('status', ['pending', 'raw_created'])->where('updated_at', '<', now()->subMinute())->limit(20)->get() as $job) {
@@ -114,6 +118,7 @@ $ibsCommand('ibs:retry-jobs', function () {
 Schedule::command('ibs:sync-onlines')->everyMinute()->withoutOverlapping(5);
 Schedule::command('ibs:retry-jobs')->everyMinute()->withoutOverlapping(5);
 Schedule::command('ibs:import-step')->everyMinute()->withoutOverlapping(5);
+Schedule::command('accounts:cleanup-step')->everyMinute()->withoutOverlapping(5);
 Schedule::command('ibs:sync-accounts')->everyFiveMinutes()->withoutOverlapping(10);
 Schedule::command('ibs:sync-catalog')->hourly()->withoutOverlapping(10);
 

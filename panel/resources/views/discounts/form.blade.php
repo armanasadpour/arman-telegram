@@ -20,8 +20,8 @@
         <div class="field"><label for="value">مقدار</label><input id="value" name="value" type="number" min="1" class="input ltr" value="{{ old('value', $d->exists ? ($d->kind === 'amount' ? intdiv($d->value, 10) : $d->value) : '') }}" required><div class="help">درصد (۱ تا ۱۰۰) یا مبلغ به تومان.</div></div>
         <div class="field"><label for="priority">اولویت (−۱۰۰ تا ۱۰۰)</label><input id="priority" name="priority" type="number" class="input ltr" value="{{ old('priority', $d->priority) }}"><div class="help">فقط بین تخفیف‌های هم‌سطح تعیین‌کننده است.</div></div>
         <div></div>
-        <div class="field"><label for="starts_at">از تاریخ (شمسی، اختیاری)</label><input id="starts_at" name="starts_at" class="input ltr" value="{{ old('starts_at', $d->starts_at ? jdate($d->starts_at, 'Y/m/d') : '') }}" placeholder="۱۴۰۵/۰۹/۱۰"><div class="help">از ابتدای این روز.</div></div>
-        <div class="field"><label for="ends_at">تا تاریخ (شمسی، اختیاری)</label><input id="ends_at" name="ends_at" class="input ltr" value="{{ old('ends_at', $d->ends_at ? jdate($d->ends_at->subSecond(), 'Y/m/d') : '') }}" placeholder="۱۴۰۵/۰۹/۳۰"><div class="help">تا پایان این روز.</div></div>
+        <div class="field"><label for="starts_at">از تاریخ (شمسی، اختیاری)</label><input id="starts_at" name="starts_at" class="input ltr" data-jdate readonly value="{{ old('starts_at', $d->starts_at ? jdate($d->starts_at, 'Y/m/d') : '') }}" placeholder="۱۴۰۵/۰۹/۱۰"><div class="help">از ابتدای این روز.</div></div>
+        <div class="field"><label for="ends_at">تا تاریخ (شمسی، اختیاری)</label><input id="ends_at" name="ends_at" class="input ltr" data-jdate readonly value="{{ old('ends_at', $d->ends_at ? jdate($d->ends_at->subSecond(), 'Y/m/d') : '') }}" placeholder="۱۴۰۵/۰۹/۳۰"><div class="help">تا پایان این روز.</div></div>
       </div>
       <label class="check mb-16"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $d->is_active))> فعال</label>
       <button class="btn" type="submit">{{ $editing ? 'ذخیره' : 'ایجاد تخفیف' }}</button>

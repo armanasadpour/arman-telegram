@@ -9,7 +9,9 @@ use App\Models\IbsGroup;
 use App\Models\VpnAccount;
 use App\Services\Settings;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Pulls data from IBSng into the local mirror. IBSng remains the source of truth;
@@ -249,7 +251,7 @@ class AccountSync
         if (! $st || empty($st['running'])) {
             return $st;
         }
-        $st += ['no_username' => 0, 'missing' => 0, 'existing' => 0];
+        $st += ['no_username' => 0, 'missing' => 0, 'existing' => 0, 'errors' => 0];
         [$total, $ids] = $this->ibs->searchUserIds((int) $st['cursor'], (int) $st['cursor'] + $page);
         $st['total'] = $total;
         foreach (array_chunk($ids, 100) as $chunk) {
@@ -259,14 +261,20 @@ class AccountSync
             $returned = 0;
             foreach ($new === [] ? [] : $this->ibs->usersByIds($new) as $info) {
                 $returned++;
-                if ($this->apply((array) $info, 'imported')) {
-                    $st['imported']++;
-                } else {
-                    $st['no_username']++;
+                try {
+                    if ($this->apply((array) $info, 'imported')) {
+                        $st['imported']++;
+                    } else {
+                        $st['no_username']++;
+                    }
+                } catch (QueryException $e) {
+                    // One unusual record must never stop the whole import: count it, log it, move on.
+                    $st['errors'] = ($st['errors'] ?? 0) + 1;
+                    Log::warning('import: account skipped', ['user_id' => $info['basic_info']['user_id'] ?? null, 'error' => mb_substr($e->getMessage(), 0, 300)]);
                 }
             }
             $st['missing'] += max(0, count($new) - $returned);
-            $st['skipped'] = $st['existing'] + $st['no_username'] + $st['missing'];
+            $st['skipped'] = $st['existing'] + $st['no_username'] + $st['missing'] + $st['errors'];
             $st['cursor'] += count($chunk);
             $st['updated_at'] = now()->toIso8601String();
             $this->settings->set('import.state', json_encode($st));

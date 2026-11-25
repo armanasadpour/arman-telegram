@@ -7,7 +7,10 @@ use App\Ibs\Transport;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Settings;
+use App\Support\DatetimeColumns;
+use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Every migrate run (install, web upgrade, tests) leaves no MySQL TIMESTAMP columns behind.
+        Event::listen(MigrationsEnded::class, fn () => DatetimeColumns::convert());
         // Every permission check goes through the user's roles; the super-admin role passes all.
         Gate::before(function (User $user, string $ability) {
             if (! $user->is_active) {

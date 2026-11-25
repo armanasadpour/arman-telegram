@@ -7,9 +7,14 @@
         — اکانت‌ها: {{ $syncedAt['accounts'] ? fa_ago(\Carbon\Carbon::parse($syncedAt['accounts'])) : 'هنوز همگام نشده' }}
       </p>
     </div>
-    @can('accounts.create')
-      @if($configured)<a class="btn" href="{{ route('accounts.create') }}">ساخت اکانت</a>@endif
-    @endcan
+    <div class="actions">
+      @can('accounts.delete')
+        @if($configured)<a class="btn btn-secondary" href="{{ route('accounts.cleanup') }}">حذف منقضی‌های قدیمی</a>@endif
+      @endcan
+      @can('accounts.create')
+        @if($configured)<a class="btn" href="{{ route('accounts.create') }}">ساخت اکانت</a>@endif
+      @endcan
+    </div>
   </div>
 
   @unless($configured)
@@ -27,6 +32,7 @@
         · {{ fa((int) ($import['existing'] ?? 0)) }} از قبل در پنل بود
         · {{ fa((int) ($import['no_username'] ?? 0)) }} کاربر بدون نام کاربری (رد شد)
         @if(($import['missing'] ?? 0) > 0) · {{ fa((int) $import['missing']) }} در سرور یافت نشد @endif
+        @if(($import['errors'] ?? 0) > 0) · {{ fa((int) $import['errors']) }} اکانت به دلیل داده نامعتبر رد شد (در لاگ) @endif
         @if($importRate && $left !== null) · سرعت {{ fa((int) $importRate) }} در دقیقه، حدود {{ fa_duration((int) ($left / max(1, $importRate) * 60)) }} مانده @endif
       </div>
       <div class="mt-8">با Cron هر دقیقه ادامه پیدا می‌کند.

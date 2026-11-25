@@ -76,3 +76,45 @@ if (! function_exists('fa_money')) {
         return $unit === 'rial' ? Jalali::number($rial).' ریال' : Jalali::number(intdiv($rial, 10)).' تومان';
     }
 }
+
+if (! function_exists('jdate_local')) {
+    /** A "Y-m-d H:i" string already in Iran local time (e.g. from the IBSng server) shown as Jalali. */
+    function jdate_local(?string $value, string $format = 'Y/m/d H:i'): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+        try {
+            $tz = config('app.display_timezone', 'Asia/Tehran');
+
+            return Jalali::format(new DateTimeImmutable($value, new DateTimeZone($tz)), $format, $tz);
+        } catch (Throwable) {
+            return Jalali::digits($value);
+        }
+    }
+}
+
+if (! function_exists('fa_value')) {
+    /** Any stored value for display: ISO / SQL date strings become Jalali, arrays JSON. */
+    function fa_value(mixed $v): string
+    {
+        if ($v === null || $v === '') {
+            return '—';
+        }
+        if (is_array($v)) {
+            return json_encode($v, JSON_UNESCAPED_UNICODE);
+        }
+        if (is_bool($v)) {
+            return $v ? 'بله' : 'خیر';
+        }
+        $s = (string) $v;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/', $s)) {
+            try {
+                return jdate(new DateTimeImmutable($s, new DateTimeZone('UTC')), strlen($s) === 10 ? 'Y/m/d' : 'Y/m/d H:i');
+            } catch (Throwable) {
+            }
+        }
+
+        return $s;
+    }
+}

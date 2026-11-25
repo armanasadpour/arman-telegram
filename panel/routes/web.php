@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AccountsController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\BotsController;
+use App\Http\Controllers\Admin\CleanupController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DiscountsController;
 use App\Http\Controllers\Admin\IbsGroupsController;
@@ -65,6 +66,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/settings/payments', [PaymentSettingsController::class, 'edit'])->name('payments.settings');
         Route::put('/settings/payments', [PaymentSettingsController::class, 'update'])->name('payments.settings.update');
         Route::delete('/accounts/{account}', [AccountsController::class, 'destroy'])->name('accounts.destroy');
+        Route::post('/accounts/cleanup', [CleanupController::class, 'start'])->name('accounts.cleanup.start');
         Route::post('/accounts/{account}/reveal', [AccountsController::class, 'reveal'])->name('accounts.reveal')->middleware('throttle:20,1');
         Route::post('/resellers/{reseller}/adjust', [ResellersController::class, 'adjust'])->name('resellers.adjust');
         Route::post('/resellers/{reseller}/ledger/{entry}/reverse', [ResellersController::class, 'reverse'])->name('resellers.reverse');
@@ -105,6 +107,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts/import-all', [AccountsController::class, 'importAll'])->name('accounts.import-all');
     Route::post('/accounts/import-continue', [AccountsController::class, 'importContinue'])->name('accounts.import-continue')->middleware('throttle:10,1');
     Route::get('/accounts/jobs', [ProvisioningJobsController::class, 'index'])->name('accounts.jobs');
+    Route::get('/accounts/cleanup', [CleanupController::class, 'show'])->name('accounts.cleanup');
+    Route::post('/accounts/cleanup/continue', [CleanupController::class, 'continue'])->name('accounts.cleanup.continue')->middleware('throttle:10,1');
+    Route::post('/accounts/cleanup/cancel', [CleanupController::class, 'cancel'])->name('accounts.cleanup.cancel');
     Route::post('/accounts/jobs/{job}/retry', [ProvisioningJobsController::class, 'retry'])->name('accounts.jobs.retry')->middleware('throttle:20,1');
     Route::get('/accounts/{account}', [AccountsController::class, 'show'])->name('accounts.show')->whereNumber('account');
     Route::post('/accounts/{account}/refresh', [AccountsController::class, 'refresh'])->name('accounts.refresh')->middleware('throttle:30,1');

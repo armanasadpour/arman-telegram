@@ -21,6 +21,7 @@ use App\Services\Pricing\PackageRules;
 use App\Services\Pricing\PricingEngine;
 use App\Services\Settings;
 use Closure;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -283,6 +284,10 @@ class AccountsController extends Controller
             while (($st['running'] ?? false) && microtime(true) < $deadline) {
                 $st = $this->sync->importStep(3000, $deadline);
             }
+        } catch (QueryException $e) {
+            report($e);
+
+            return back()->with('error', 'خطای پایگاه داده هنگام وارد کردن؛ جزئیات در لاگ ثبت شد.');
         } catch (RuntimeException $e) {
             return back()->with('error', $this->message($e));
         }
