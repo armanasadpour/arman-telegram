@@ -20,7 +20,7 @@
     if (form.dataset.submitted === '1') { e.preventDefault(); return; }
     form.dataset.submitted = '1';
     var b = form.querySelector('button[type=submit]');
-    if (b) { b.disabled = true; b.dataset.label = b.textContent; b.textContent = 'در حال انجام…'; }
+    if (b) { b.disabled = true; b.classList.add('is-loading'); b.dataset.label = b.textContent; b.textContent = 'در حال انجام…'; }
   });
   // Payment hand-off: forms marked data-autosubmit post themselves (the button stays as a fallback).
   var auto = document.querySelector('form[data-autosubmit]');
@@ -43,7 +43,7 @@
     document.querySelectorAll('form[data-submitted]').forEach(function (f) {
       delete f.dataset.submitted;
       var b = f.querySelector('button[type=submit]');
-      if (b && b.dataset.label) { b.disabled = false; b.textContent = b.dataset.label; }
+      if (b && b.dataset.label) { b.disabled = false; b.classList.remove('is-loading'); b.textContent = b.dataset.label; }
     });
   });
 })();

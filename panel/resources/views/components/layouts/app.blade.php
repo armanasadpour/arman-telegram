@@ -15,7 +15,7 @@
     <button id="menu-btn" class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="منو"><x-icon name="menu" width="20" height="20"/></button>
     <div class="brand">{{ $siteName }}</div>
     <div class="user">
-      <a href="{{ route('profile.password') }}" title="تغییر رمز">{{ auth()->user()->name }}</a>
+      <a href="{{ route('profile.password') }}" title="تغییر رمز"><span class="avatar" aria-hidden="true">{{ mb_substr(auth()->user()->name, 0, 1) }}</span><span class="user-name">{{ auth()->user()->name }}</span></a>
       <form method="post" action="{{ route('logout') }}">
         @csrf
         <button class="btn btn-secondary btn-sm" type="submit" title="خروج"><x-icon name="logout" width="16" height="16"/><span>خروج</span></button>

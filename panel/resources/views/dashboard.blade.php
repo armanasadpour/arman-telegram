@@ -18,13 +18,16 @@
     </div>
   @endif
 
-  @if(array_sum($attention) > 0)
+  @php($attn = array_values(array_filter([
+    $attention['payments_review'] && auth()->user()->can('payments.view') ? ['url' => route('payments.index', ['status' => 'review']), 'text' => fa($attention['payments_review']).' پرداخت منتظر بررسی'] : null,
+    $attention['sales_review'] && auth()->user()->can('resellers.view') ? ['url' => route('resellers.index'), 'text' => fa($attention['sales_review']).' فروش همکار'] : null,
+    $attention['orders_review'] && auth()->user()->can('payments.view') ? ['url' => route('payments.index'), 'text' => fa($attention['orders_review']).' سفارش مشتری'] : null,
+    $attention['jobs'] && auth()->user()->can('accounts.view') ? ['url' => route('accounts.jobs'), 'text' => fa($attention['jobs']).' ساخت نیمه‌کاره'] : null,
+  ])))
+  @if($attn)
     <div class="alert alert-warning">
       <strong>نیازمند رسیدگی:</strong>
-      @if($attention['payments_review'])@can('payments.view')<a href="{{ route('payments.index', ['status' => 'review']) }}">{{ fa($attention['payments_review']) }} پرداخت منتظر بررسی</a> · @endcan @endif
-      @if($attention['sales_review'])@can('resellers.view')<a href="{{ route('resellers.index') }}">{{ fa($attention['sales_review']) }} فروش همکار</a> · @endcan @endif
-      @if($attention['orders_review'])@can('payments.view')<a href="{{ route('payments.index') }}">{{ fa($attention['orders_review']) }} سفارش مشتری</a> · @endcan @endif
-      @if($attention['jobs'])@can('accounts.view')<a href="{{ route('accounts.jobs') }}">{{ fa($attention['jobs']) }} ساخت نیمه‌کاره</a>@endcan @endif
+      @foreach($attn as $i => $x)@if($i > 0) · @endif<a href="{{ $x['url'] }}">{{ $x['text'] }}</a>@endforeach
     </div>
   @endif
 
