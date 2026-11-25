@@ -5,9 +5,11 @@ namespace Tests\Feature\Ibs;
 use App\Ibs\IbsUnavailableException;
 use App\Models\AuditLog;
 use App\Models\VpnAccount;
+use App\Services\Ibs\AccountActions;
 use App\Services\Ibs\AccountSync;
 use App\Services\Settings;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AccountsHttpTest extends IbsTestCase
 {
@@ -99,6 +101,25 @@ class AccountsHttpTest extends IbsTestCase
         $r->assertRedirect(route('accounts.show', $a));
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/lock", ['reason' => 'test lock'])->assertSessionHas('success');
         $this->assertTrue($a->fresh()->locked);
+    }
+
+    public function test_deleted_username_can_be_reused_and_unimported_one_offers_import(): void
+    {
+        $this->syncCatalog();
+        $admin = $this->superAdmin();
+        $id = $this->ibsUser('hamid');
+        $this->actingAs($admin)->get('/accounts?q=hamid')->assertOk()->assertSee('جستجوی «hamid» در سرور');
+        $this->actingAs($admin)->from('/accounts/create')->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'hamid'])
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'وارد کردن یک اکانت از سرور'));
+        $this->actingAs($admin)->post('/accounts/import', ['username' => 'hamid']);
+        $a = VpnAccount::query()->where('username', 'hamid')->firstOrFail();
+        app(AccountActions::class)->delete($a, 'test');
+
+        $this->actingAs($admin)->from('/accounts/create')->post('/accounts', ['job_key' => (string) Str::uuid(), 'group' => 'test', 'username' => 'hamid']);
+        $new = VpnAccount::query()->where('username', 'hamid')->first();
+        $this->assertNotNull($new, 'the name of a deleted account is free again');
+        $this->assertNotSame($a->id, $new->id);
+        $this->assertSame('hamid~'.$a->id, VpnAccount::onlyTrashed()->find($a->id)->username, 'history kept under a renamed copy');
     }
 
     public function test_ui_says_server_not_ibsng_except_on_connection_page(): void

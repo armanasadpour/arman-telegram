@@ -101,6 +101,40 @@
       <li>در فایروال روتر (IP → Firewall)، ورودی از IP هاست پنل به این پورت را مجاز کنید.</li>
     </ul>
   </details>
+  <details class="card adv">
+    <summary class="step-head"><span class="step-no">W</span><div><h2>اسکریپت راه‌اندازی WireGuard</h2><p class="muted small">یک بار در Terminal روتر بزنید؛ بعد «تست اتصال» و ساخت گروه WireGuard.</p></div><span class="adv-toggle" aria-hidden="true">⌄</span></summary>
+<textarea class="input code" rows="14" readonly spellcheck="false">
+# اینترفیس WireGuard (کلید سرور خودکار ساخته می‌شود)
+/interface wireguard add name=wg1 listen-port=13231 mtu=1420
+# شبکه داخلی مشتری‌ها: روتر 10.66.0.1 و مشتری‌ها از 10.66.0.2 به بعد
+/ip address add address=10.66.0.1/24 interface=wg1
+# خروج مشتری‌ها به اینترنت
+/ip firewall nat add chain=srcnat src-address=10.66.0.0/24 action=masquerade comment=wg-panel
+# باز کردن پورت WireGuard (اگر فایروال قانون drop دارد، این را بالای آن ببرید)
+/ip firewall filter add chain=input protocol=udp dst-port=13231 action=accept comment=wg-panel
+/ip firewall filter add chain=forward src-address=10.66.0.0/24 action=accept comment=wg-panel
+</textarea>
+    <ul class="muted small">
+      <li>Peerها (مشتری‌ها) را پنل خودش می‌سازد؛ کلید، IP، فایل ‎.conf و QR هر مشتری در صفحه همان اکانت است.</li>
+      <li>کلید عمومی سرور، پورت و شبکه هنگام ساخت «گروه WireGuard» از روتر خوانده می‌شود؛ لازم نیست جایی کپی کنید.</li>
+      <li>اگر روتر پشت مودم/NAT است، پورت UDP ‎13231 را روی مودم به روتر Forward کنید و در گروه «آدرس اتصال مشتری» را IP یا دامنه عمومی بگذارید.</li>
+    </ul>
+  </details>
+  <details class="card adv">
+    <summary class="step-head"><span class="step-no">L</span><div><h2>اسکریپت راه‌اندازی L2TP/IPsec</h2><p class="muted small">یک بار در Terminal روتر بزنید؛ کلید IPsec را عوض کنید.</p></div><span class="adv-toggle" aria-hidden="true">⌄</span></summary>
+<textarea class="input code" rows="14" readonly spellcheck="false">
+/ip pool add name=l2tp-pool ranges=10.77.0.2-10.77.3.254
+/ppp profile add name=l2tp-profile local-address=10.77.0.1 remote-address=l2tp-pool dns-server=1.1.1.1,8.8.8.8 use-encryption=yes
+/interface l2tp-server server set enabled=yes default-profile=l2tp-profile use-ipsec=required ipsec-secret="کلید-IPsec-دلخواه" authentication=mschap2
+/ip firewall nat add chain=srcnat src-address=10.77.0.0/22 action=masquerade comment=l2tp-panel
+/ip firewall filter add chain=input protocol=udp dst-port=500,1701,4500 action=accept comment=l2tp-panel
+/ip firewall filter add chain=input protocol=ipsec-esp action=accept comment=l2tp-panel
+</textarea>
+    <ul class="muted small">
+      <li>کلید IPsec هنگام ساخت «گروه L2TP» از روتر خوانده و به مشتری نمایش داده می‌شود.</li>
+      <li>اکانت‌ها (PPP Secret) را پنل می‌سازد؛ دستی نسازید.</li>
+    </ul>
+  </details>
   <form method="post" action="{{ route('routers.destroy', $r) }}" data-confirm="این روتر از پنل حذف شود؟ (روی خود روتر چیزی تغییر نمی‌کند)" class="mb-16">@csrf @method('DELETE')<button class="btn btn-danger btn-sm" type="submit">حذف روتر از پنل</button></form>
   @endcan
 </x-layouts.app>

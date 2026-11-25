@@ -52,12 +52,17 @@ class Provisioning
         }
 
         $username = $spec['username'] ?: $this->generateUsername();
-        if (VpnAccount::withTrashed()->where('username', $username)->exists()
+        if (VpnAccount::query()->where('username', $username)->exists()
+            || VpnAccount::onlyTrashed()->where('username', $username)->whereNull('ibs_deleted_at')->exists()
             || ProvisioningJob::query()->where('username', $username)->whereIn('status', ProvisioningJob::OPEN)->exists()) {
             throw new RuntimeException('این نام کاربری در پنل استفاده شده است.');
         }
         if (! $this->ibs->usernameAvailable($username)) {
-            throw new RuntimeException('این نام کاربری در سرور وجود دارد یا کاراکتر غیرمجاز دارد.');
+            throw new RuntimeException('این نام کاربری در سرور وجود دارد (ولی هنوز در پنل نیست) یا کاراکتر غیرمجاز دارد. اگر اکانت قبلی است، از پایین صفحه اکانت‌ها «وارد کردن یک اکانت از سرور» را بزنید.');
+        }
+        // A deleted account (gone from the server) frees its name: its panel history keeps a renamed copy.
+        foreach (VpnAccount::onlyTrashed()->where('username', $username)->whereNotNull('ibs_deleted_at')->get() as $old) {
+            $old->forceFill(['username' => mb_substr($username, 0, 50).'~'.$old->id])->saveQuietly();
         }
 
         $password = $spec['password'] ?: self::generatePassword();

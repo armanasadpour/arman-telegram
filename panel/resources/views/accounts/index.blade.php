@@ -68,7 +68,14 @@
     </form>
 
     @if($accounts->isEmpty())
-      <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای یافت نشد.' : 'هنوز اکانتی در پنل نیست. اکانت بسازید یا از سرور وارد کنید.' }}</div></div>
+      <div class="empty"><x-icon name="inbox"/><div>{{ array_filter($filters) ? 'نتیجه‌ای در پنل یافت نشد.' : 'هنوز اکانتی در پنل نیست. اکانت بسازید یا از سرور وارد کنید.' }}</div>
+        @if(($filters['q'] ?? '') !== '' && $configured && preg_match('/^[A-Za-z0-9._@-]{2,64}$/', $filters['q']))
+          @can('accounts.create')
+            <p class="muted small mt-8">شاید این اکانت در سرور هست ولی هنوز به پنل وارد نشده:</p>
+            <form method="post" action="{{ route('accounts.import') }}">@csrf<input type="hidden" name="username" value="{{ $filters['q'] }}"><button class="btn btn-secondary" type="submit">جستجوی «{{ $filters['q'] }}» در سرور و وارد کردن</button></form>
+          @endcan
+        @endif
+      </div>
     @else
       <div class="table-wrap">
         <div class="acc-list only-mobile">
