@@ -237,30 +237,56 @@ class AccountSync
         return $s ? json_decode($s, true) : null;
     }
 
-    /** Process one page (<= $page ids) of the bulk import. Called by the scheduler until finished. */
-    public function importStep(int $page = 500): ?array
+    /**
+     * Continue the bulk import. One searchUser call fetches up to $page ids (IBSng allows 3000); they are
+     * then read 100 at a time and the cursor is saved after every chunk, so a run stopped by $deadline
+     * (microtime) resumes exactly where it left off without re-reading anything.
+     */
+    public function importStep(int $page = 3000, ?float $deadline = null): ?array
     {
         $st = $this->importState();
         if (! $st || empty($st['running'])) {
             return $st;
         }
+        $st += ['no_username' => 0, 'missing' => 0, 'existing' => 0];
         [$total, $ids] = $this->ibs->searchUserIds((int) $st['cursor'], (int) $st['cursor'] + $page);
         $st['total'] = $total;
-        $existing = VpnAccount::withTrashed()->whereIn('ibs_user_id', $ids ?: [0])->pluck('ibs_user_id')->all();
-        $new = array_values(array_diff($ids, $existing));
-        foreach (array_chunk($new, 100) as $chunk) {
-            foreach ($this->ibs->usersByIds($chunk) as $info) {
-                $this->apply($info, 'imported') ? $st['imported']++ : $st['skipped']++;
+        foreach (array_chunk($ids, 100) as $chunk) {
+            $existing = VpnAccount::withTrashed()->whereIn('ibs_user_id', $chunk)->pluck('ibs_user_id')->all();
+            $new = array_values(array_diff($chunk, $existing));
+            $st['existing'] += count($existing);
+            $returned = 0;
+            foreach ($new === [] ? [] : $this->ibs->usersByIds($new) as $info) {
+                $returned++;
+                if ($this->apply((array) $info, 'imported')) {
+                    $st['imported']++;
+                } else {
+                    $st['no_username']++;
+                }
+            }
+            $st['missing'] += max(0, count($new) - $returned);
+            $st['skipped'] = $st['existing'] + $st['no_username'] + $st['missing'];
+            $st['cursor'] += count($chunk);
+            $st['updated_at'] = now()->toIso8601String();
+            $this->settings->set('import.state', json_encode($st));
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                return $st;
             }
         }
-        $st['skipped'] += count($ids) - count($new);
-        $st['cursor'] += count($ids);
         if ($ids === [] || $st['cursor'] >= $total) {
             $st['running'] = false;
             $st['finished_at'] = now()->toIso8601String();
+            $this->settings->set('import.state', json_encode($st));
         }
-        $this->settings->set('import.state', json_encode($st));
 
         return $st;
+    }
+
+    /** Ids checked per minute since the import started, for the progress banner. */
+    public function importRate(array $st): ?float
+    {
+        $mins = isset($st['started_at']) ? max(1, now()->diffInMinutes(\Carbon\Carbon::parse($st['started_at']), true)) : null;
+
+        return $mins ? ((int) $st['cursor']) / $mins : null;
     }
 }

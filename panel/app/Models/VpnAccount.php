@@ -38,6 +38,11 @@ class VpnAccount extends Model
         return $this->belongsTo(IbsGroup::class, 'group_name', 'name');
     }
 
+    public function reseller(): BelongsTo
+    {
+        return $this->belongsTo(Reseller::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

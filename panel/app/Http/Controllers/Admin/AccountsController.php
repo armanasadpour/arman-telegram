@@ -71,7 +71,8 @@ class AccountsController extends Controller
                 'locked' => VpnAccount::query()->whereNull('ibs_deleted_at')->where('locked', true)->count(),
             ],
             'syncedAt' => ['onlines' => $this->settings->get('sync.onlines_at'), 'accounts' => $this->settings->get('sync.accounts_at')],
-            'import' => $this->sync->importState(),
+            'import' => $import = $this->sync->importState(),
+            'importRate' => $import ? $this->sync->importRate($import) : null,
             'openJobs' => ProvisioningJob::query()->whereIn('status', ProvisioningJob::OPEN)->count(),
             'configured' => app(IbsConnector::class)->isConfigured(),
         ]);
@@ -268,6 +269,24 @@ class AccountsController extends Controller
         app(AuditLogger::class)->log('accounts.import_all', null, 'شروع وارد کردن همه اکانت‌های سرور');
 
         return back()->with('success', 'وارد کردن همه اکانت‌ها شروع شد و در پس‌زمینه (با Cron) ادامه پیدا می‌کند.');
+    }
+
+    /** Run part of the import now from the browser (kept under typical shared-host time limits). */
+    public function importContinue(): RedirectResponse
+    {
+        $this->authorize('accounts.create');
+        $before = (int) ($this->sync->importState()['cursor'] ?? 0);
+        try {
+            $deadline = microtime(true) + 20;
+            $st = $this->sync->importState();
+            while (($st['running'] ?? false) && microtime(true) < $deadline) {
+                $st = $this->sync->importStep(3000, $deadline);
+            }
+        } catch (RuntimeException $e) {
+            return back()->with('error', $this->message($e));
+        }
+
+        return back()->with('success', fa((string) ((int) ($st['cursor'] ?? 0) - $before)).' شناسه دیگر بررسی شد.');
     }
 
     // ----------------------------------------------------------------

@@ -19,7 +19,22 @@
     <div class="alert alert-warning">{{ fa($openJobs) }} ساخت اکانت نیمه‌کاره یا نیازمند رسیدگی وجود دارد. <a href="{{ route('accounts.jobs') }}">مشاهده</a></div>
   @endif
   @if($import && ($import['running'] ?? false))
-    <div class="alert alert-warning">وارد کردن اکانت‌ها از سرور در حال انجام است: {{ fa((int) $import['cursor']) }} از {{ $import['total'] !== null ? fa((int) $import['total']) : '…' }} بررسی شد ({{ fa((int) $import['imported']) }} اکانت جدید). با Cron ادامه پیدا می‌کند.</div>
+    @php($left = $import['total'] !== null ? max(0, (int) $import['total'] - (int) $import['cursor']) : null)
+    <div class="alert alert-warning">
+      <div>وارد کردن اکانت‌ها از سرور در حال انجام است: {{ fa((int) $import['cursor']) }} از {{ $import['total'] !== null ? fa((int) $import['total']) : '…' }} شناسه بررسی شد.</div>
+      <div class="muted small mt-4">
+        {{ fa((int) $import['imported']) }} اکانت جدید وارد شد
+        · {{ fa((int) ($import['existing'] ?? 0)) }} از قبل در پنل بود
+        · {{ fa((int) ($import['no_username'] ?? 0)) }} کاربر بدون نام کاربری (رد شد)
+        @if(($import['missing'] ?? 0) > 0) · {{ fa((int) $import['missing']) }} در سرور یافت نشد @endif
+        @if($importRate && $left !== null) · سرعت {{ fa((int) $importRate) }} در دقیقه، حدود {{ fa_duration((int) ($left / max(1, $importRate) * 60)) }} مانده @endif
+      </div>
+      <div class="mt-8">با Cron هر دقیقه ادامه پیدا می‌کند.
+        @can('accounts.create')
+          <form method="post" action="{{ route('accounts.import-continue') }}" class="inline">@csrf<button class="btn btn-secondary btn-sm" type="submit">ادامه همین الان</button></form>
+        @endcan
+      </div>
+    </div>
   @endif
 
   <div class="grid stats mb-16">

@@ -53,6 +53,13 @@ class PermissionRegistry
             $super->is_system = true;
             $super->save();
 
+            $reseller = Role::query()->firstOrNew(['name' => config('permissions.reseller_role')]);
+            $reseller->title = 'همکار فروش';
+            $reseller->description = 'ورود به پنل همکار؛ بدون دسترسی مدیریتی.';
+            $reseller->is_system = true;
+            $reseller->save();
+            $reseller->permissions()->sync([]);
+
             return ['created' => $created, 'removed' => $removed];
         });
     }

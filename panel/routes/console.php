@@ -85,10 +85,10 @@ $ibsCommand('ibs:sync-accounts', fn () => 'refreshed: '.app(AccountSync::class)-
 $ibsCommand('ibs:sync-catalog', fn () => json_encode(app(AccountSync::class)->syncCatalog()), 'Refresh IBSng groups and charges');
 $ibsCommand('ibs:import-step', function () {
     $sync = app(AccountSync::class);
-    $deadline = microtime(true) + 40;
+    $deadline = microtime(true) + 50;
     $st = $sync->importState();
     while (($st['running'] ?? false) && microtime(true) < $deadline) {
-        $st = $sync->importStep();
+        $st = $sync->importStep(3000, $deadline);
     }
 
     return json_encode($st);
@@ -108,3 +108,21 @@ Schedule::command('ibs:retry-jobs')->everyMinute()->withoutOverlapping(5);
 Schedule::command('ibs:import-step')->everyMinute()->withoutOverlapping(5);
 Schedule::command('ibs:sync-accounts')->everyFiveMinutes()->withoutOverlapping(10);
 Schedule::command('ibs:sync-catalog')->hourly()->withoutOverlapping(10);
+
+// ---------------------------------------------------------------- Resellers (phase 5)
+$ibsCommand('resellers:sync-sales', fn () => 'updated: '.app(\App\Services\Finance\ResellerSales::class)->syncPending(), 'Settle reseller sales whose provisioning finished later');
+Schedule::command('resellers:sync-sales')->everyMinute()->withoutOverlapping(5);
+
+Artisan::command('wallets:reconcile', function (\App\Services\Finance\WalletService $w) {
+    $bad = 0;
+    foreach (\App\Models\Wallet::query()->cursor() as $wallet) {
+        $r = $w->reconcile($wallet);
+        if (! $r['ok']) {
+            $bad++;
+            $this->error("wallet #{$wallet->id}: cached {$r['cached']} vs ledger {$r['ledger_sum']} (chain ".($r['chain_ok'] ? 'ok' : 'BROKEN').')');
+        }
+    }
+    $bad ? $this->error("$bad wallet(s) out of balance") : $this->info('All wallets reconcile with the ledger.');
+
+    return $bad ? 1 : 0;
+})->purpose('Verify every wallet balance against its ledger');

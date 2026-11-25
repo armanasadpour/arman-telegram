@@ -21,6 +21,8 @@ return [
         'accounts' => ['title' => 'اکانت‌ها', 'actions' => ['view', 'create', 'update', 'delete', 'sensitive']],
         'packages' => ['title' => 'بسته‌ها و دسته‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
         'discounts' => ['title' => 'تخفیف‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
+        'resellers' => ['title' => 'همکاران فروش', 'actions' => ['view', 'create', 'update', 'delete']],
+        'wallets' => ['title' => 'کیف پول و دفتر کل', 'actions' => ['view', 'sensitive']],
         'ibs_groups' => ['title' => 'گروه‌ها و تعرفه‌های سرور', 'actions' => ['view', 'update']],
         'staff' => ['title' => 'کاربران پنل', 'actions' => ['view', 'create', 'update', 'delete', 'sensitive']],
         'roles' => ['title' => 'نقش‌ها و دسترسی‌ها', 'actions' => ['view', 'create', 'update', 'delete']],
@@ -31,4 +33,7 @@ return [
 
     // Role that bypasses all checks. Created by the installer; cannot be deleted or edited.
     'super_role' => 'super_admin',
+
+    // System role for reseller logins: no admin permissions; access only to the reseller portal (/r).
+    'reseller_role' => 'reseller',
 ];

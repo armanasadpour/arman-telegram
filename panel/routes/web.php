@@ -8,7 +8,9 @@ use App\Http\Controllers\Admin\IbsGroupsController;
 use App\Http\Controllers\Admin\IbsSettingsController;
 use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Admin\ProvisioningJobsController;
+use App\Http\Controllers\Admin\ResellersController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Portal\PortalController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\SystemController;
@@ -49,6 +51,9 @@ Route::middleware('auth')->group(function () {
         Route::put('/settings/ibsng', [IbsSettingsController::class, 'update'])->name('ibs.settings.update');
         Route::delete('/accounts/{account}', [AccountsController::class, 'destroy'])->name('accounts.destroy');
         Route::post('/accounts/{account}/reveal', [AccountsController::class, 'reveal'])->name('accounts.reveal')->middleware('throttle:20,1');
+        Route::post('/resellers/{reseller}/adjust', [ResellersController::class, 'adjust'])->name('resellers.adjust');
+        Route::post('/resellers/{reseller}/ledger/{entry}/reverse', [ResellersController::class, 'reverse'])->name('resellers.reverse');
+        Route::post('/resellers/{reseller}/sales/{sale}/refund', [ResellersController::class, 'refundSale'])->name('resellers.refund-sale');
         Route::post('/accounts/jobs/{job}/resolve', [ProvisioningJobsController::class, 'resolve'])->name('accounts.jobs.resolve');
     });
 
@@ -64,6 +69,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts', [AccountsController::class, 'store'])->name('accounts.store')->middleware('throttle:30,1');
     Route::post('/accounts/import', [AccountsController::class, 'importOne'])->name('accounts.import')->middleware('throttle:30,1');
     Route::post('/accounts/import-all', [AccountsController::class, 'importAll'])->name('accounts.import-all');
+    Route::post('/accounts/import-continue', [AccountsController::class, 'importContinue'])->name('accounts.import-continue')->middleware('throttle:10,1');
     Route::get('/accounts/jobs', [ProvisioningJobsController::class, 'index'])->name('accounts.jobs');
     Route::post('/accounts/jobs/{job}/retry', [ProvisioningJobsController::class, 'retry'])->name('accounts.jobs.retry')->middleware('throttle:20,1');
     Route::get('/accounts/{account}', [AccountsController::class, 'show'])->name('accounts.show')->whereNumber('account');
@@ -74,6 +80,28 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts/{account}/volume', [AccountsController::class, 'volume'])->name('accounts.volume');
     Route::post('/accounts/{account}/apply-package', [AccountsController::class, 'applyPackage'])->name('accounts.apply-package');
     Route::post('/accounts/from-package', [AccountsController::class, 'storeFromPackage'])->name('accounts.store-package')->middleware('throttle:30,1');
+
+    // Resellers (admin side)
+    Route::get('/resellers', [ResellersController::class, 'index'])->name('resellers.index');
+    Route::get('/resellers/create', [ResellersController::class, 'create'])->name('resellers.create');
+    Route::post('/resellers', [ResellersController::class, 'store'])->name('resellers.store');
+    Route::get('/resellers/{reseller}', [ResellersController::class, 'show'])->name('resellers.show')->whereNumber('reseller');
+    Route::put('/resellers/{reseller}', [ResellersController::class, 'update'])->name('resellers.update');
+    Route::post('/resellers/{reseller}/category-discount', [ResellersController::class, 'setCategoryDiscount'])->name('resellers.category-discount');
+    Route::post('/resellers/{reseller}/fixed-price', [ResellersController::class, 'setFixedPrice'])->name('resellers.fixed-price');
+
+    // Reseller portal
+    Route::prefix('r')->name('portal.')->middleware(\App\Http\Middleware\EnsureReseller::class)->group(function () {
+        Route::get('/', [PortalController::class, 'dashboard'])->name('dashboard');
+        Route::get('/prices', [PortalController::class, 'prices'])->name('prices');
+        Route::get('/sell', [PortalController::class, 'sellForm'])->name('sell');
+        Route::post('/sell', [PortalController::class, 'sell'])->name('sell.store')->middleware('throttle:30,1');
+        Route::get('/sales', [PortalController::class, 'sales'])->name('sales');
+        Route::get('/sales/{sale}', [PortalController::class, 'sale'])->name('sales.show')->whereNumber('sale');
+        Route::get('/accounts', [PortalController::class, 'accounts'])->name('accounts');
+        Route::get('/accounts/{account}', [PortalController::class, 'account'])->name('accounts.show')->whereNumber('account');
+        Route::get('/ledger', [PortalController::class, 'ledger'])->name('ledger');
+    });
 
     // Packages, categories, discounts
     Route::get('/packages', [PackagesController::class, 'index'])->name('packages.index');

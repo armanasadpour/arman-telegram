@@ -196,6 +196,7 @@ class StaffController extends Controller
     private function assignableRoles()
     {
         return Role::query()
+            ->where('name', '!=', config('permissions.reseller_role'))
             ->when(! request()->user()->isSuperAdmin(), fn ($q) => $q->where('name', '!=', config('permissions.super_role')))
             ->orderByDesc('is_system')->orderBy('title')->get();
     }

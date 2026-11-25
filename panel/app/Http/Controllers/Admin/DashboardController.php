@@ -14,8 +14,11 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, SystemStatus $status): View
+    public function __invoke(Request $request, SystemStatus $status): View|\Illuminate\Http\RedirectResponse
     {
+        if ($request->user()->isReseller()) {
+            return redirect()->route('portal.dashboard');
+        }
         $this->authorize('dashboard.view');
         $user = $request->user();
         $todayStart = now(config('app.display_timezone'))->startOfDay()->utc();

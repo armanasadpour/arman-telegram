@@ -24,6 +24,14 @@
   </header>
 
   <nav id="sidebar" class="sidebar nav" aria-label="منوی اصلی">
+    @if(auth()->user()->isReseller())
+      <a href="{{ route('portal.dashboard') }}" @class(['active' => request()->routeIs('portal.dashboard')])><x-icon name="home"/>پیشخوان</a>
+      @if(auth()->user()->reseller->isActive())<a href="{{ route('portal.sell') }}" @class(['active' => request()->routeIs('portal.sell*') && ! request()->query('account')])><x-icon name="box"/>فروش اکانت جدید</a>@endif
+      <a href="{{ route('portal.accounts') }}" @class(['active' => request()->routeIs('portal.accounts*')])><x-icon name="user"/>اکانت‌های من</a>
+      <a href="{{ route('portal.sales') }}" @class(['active' => request()->routeIs('portal.sales*')])><x-icon name="list"/>فروش‌ها</a>
+      <a href="{{ route('portal.ledger') }}" @class(['active' => request()->routeIs('portal.ledger')])><x-icon name="key"/>کیف پول</a>
+      <a href="{{ route('portal.prices') }}" @class(['active' => request()->routeIs('portal.prices')])><x-icon name="tag"/>قیمت‌های من</a>
+    @endif
     @can('dashboard.view')
       <a href="{{ route('dashboard') }}" @class(['active' => request()->routeIs('dashboard')])><x-icon name="home"/>داشبورد</a>
     @endcan
@@ -36,8 +44,11 @@
         <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups')])><x-icon name="layers"/>گروه‌ها و تعرفه‌ها</a>
       @endcan
     @endif
-    @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view'))
+    @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view') || auth()->user()->can('resellers.view'))
       <div class="section">فروش</div>
+      @can('resellers.view')
+        <a href="{{ route('resellers.index') }}" @class(['active' => request()->routeIs('resellers.*')])><x-icon name="users"/>همکاران فروش</a>
+      @endcan
       @can('packages.view')
         <a href="{{ route('packages.index') }}" @class(['active' => request()->routeIs('packages.*')])><x-icon name="box"/>بسته‌ها</a>
       @endcan

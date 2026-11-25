@@ -42,6 +42,16 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class);
     }
 
+    public function reseller(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Reseller::class);
+    }
+
+    public function isReseller(): bool
+    {
+        return $this->reseller !== null;
+    }
+
     public function isSuperAdmin(): bool
     {
         return $this->roles->contains('name', config('permissions.super_role'));

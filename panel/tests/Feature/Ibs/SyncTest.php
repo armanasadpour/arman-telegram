@@ -96,12 +96,47 @@ class SyncTest extends IbsTestCase
         }
         $this->assertSame(7, $st['imported']);
         $this->assertSame(1, $st['skipped']);
+        $this->assertSame(1, $st['no_username']);
+        $this->assertSame(0, $st['missing']);
         $this->assertSame(7, VpnAccount::query()->count());
 
         // Running again imports nothing new.
         $sync->startImport();
         while (($st = $sync->importStep(3))['running']);
         $this->assertSame(0, $st['imported']);
+        $this->assertSame(7, $st['existing']);
+    }
+
+    public function test_import_stops_at_deadline_and_resumes_without_rereading(): void
+    {
+        $this->syncCatalog();
+        for ($i = 0; $i < 250; $i++) {
+            $this->ibsUser("many$i");
+        }
+        $sync = app(AccountSync::class);
+        $sync->startImport();
+        $st = $sync->importStep(3000, microtime(true) - 1);   // deadline already passed: one chunk only
+        $this->assertTrue($st['running']);
+        $this->assertSame(100, $st['cursor']);
+        $this->assertSame(100, $sync->importState()['cursor'], 'progress saved after each chunk');
+        $st = $sync->importStep(3000);
+        $this->assertFalse($st['running']);
+        $this->assertSame(250, $st['imported']);
+        $this->assertSame(0, $st['existing'], 'nothing fetched twice');
+    }
+
+    public function test_import_banner_and_continue_button(): void
+    {
+        $this->syncCatalog();
+        for ($i = 0; $i < 5; $i++) {
+            $this->ibsUser("web$i");
+        }
+        app(AccountSync::class)->startImport();
+        $admin = $this->superAdmin();
+        $this->actingAs($admin)->get('/accounts')->assertOk()->assertSee('ادامه همین الان');
+        $this->actingAs($admin)->from('/accounts')->post('/accounts/import-continue')->assertSessionHas('success');
+        $this->assertFalse(app(AccountSync::class)->importState()['running']);
+        $this->assertSame(5, VpnAccount::query()->count());
     }
 
     public function test_artisan_sync_commands_are_noops_when_not_configured(): void
