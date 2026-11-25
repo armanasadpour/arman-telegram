@@ -84,15 +84,18 @@
 /user group add name=panel policy=read,write,api,rest-api,test
 /user add name={{ $r->username }} group=panel address={{ $ip }}/32 password="رمز-که-در-پنل-وارد-کردید"
 @if($svc !== 'api')
-# 2) گواهی خودامضا برای HTTPS / API-SSL
+# 2) گواهی برای HTTPS / API-SSL (با یک CA کوچک؛ امضای مستقیم روی برخی نسخه‌ها خطای CA not found می‌دهد)
+/certificate add name=panel-ca common-name=panel-ca days-valid=3650 key-usage=key-cert-sign,crl-sign
+/certificate sign panel-ca
 /certificate add name=panel-cert common-name=panel-cert days-valid=3650 key-usage=digital-signature,key-encipherment,tls-server
-/certificate sign panel-cert
+/certificate sign panel-cert ca=panel-ca
 @endif
 # {{ $svc !== 'api' ? '3' : '2' }}) فعال‌سازی سرویس فقط برای IP هاست پنل
 /ip service set {{ $svc }} disabled=no port={{ $r->port }} address={{ $ip }}/32{{ $svc !== 'api' ? ' certificate=panel-cert' : '' }}
 </textarea>
     <ul class="muted small">
       <li>اگر خطای «rest-api» گرفتید (RouterOS قدیمی‌تر)، آن را از policy حذف کنید.</li>
+      <li>دستورها را در Terminal (Winbox → New Terminal) بزنید؛ فرم گواهی Winbox و اپ موبایل روی RouterOS 7.7 هنگام امضا خطای «CA not found» می‌دهد.</li>
       <li>اگر SSTP یا سرویس دیگری روی پورت {{ fa($r->port) }} است، پورت دیگری (مثلاً ۸۴۴۳) انتخاب و در پنل هم همان را وارد کنید.</li>
       <li>IP هاست پنل {{ $panelIp ? 'به‌طور خودکار تشخیص داده شد؛ ' : '' }}آن را با IP خروجی هاست (در cPanel: «Shared IP Address» یا Server Information) مقایسه کنید.</li>
       <li>در فایروال روتر (IP → Firewall)، ورودی از IP هاست پنل به این پورت را مجاز کنید.</li>
