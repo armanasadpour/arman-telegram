@@ -33,7 +33,8 @@
   @endif
 
   <div class="grid stats mb-16">
-    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? ($a->isWireguard() ? 'آنلاین' : fa($a->online_count).' نشست آنلاین') : 'آفلاین',
+    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? 'آنلاین' : 'آفلاین',
+      'hint2' => $a->isWireguard() ? null : 'نشست‌های آنلاین: '.fa((int) $a->online_count).' — حداکثر همزمان: '.(($a->multi_login ?? $a->group?->multi_login) ? fa($a->multi_login ?? $a->group->multi_login) : 'نامحدود'),
       'hint' => $a->online_ip ? 'از IP '.$a->online_ip : ($a->last_seen_at ? 'آخرین فعالیت '.fa_ago($a->last_seen_at) : 'هنوز وصل نشده'),
       'kickUrl' => ! $a->isWireguard() && ! $a->trashed() && auth()->user()->can('mt_accounts.update') ? route('mt.accounts.kick', $a) : null])
     <div class="card stat"><div class="label">مصرف کل</div><div class="value small">{{ fa_bytes($a->used_bytes) }}</div>

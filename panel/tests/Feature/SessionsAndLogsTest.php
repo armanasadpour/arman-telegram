@@ -47,7 +47,7 @@ class SessionsAndLogsTest extends IbsTestCase
         app(MtAccounting::class)->syncRouter($this->router->fresh());
         $admin = $this->superAdmin();
         $this->actingAs($admin)->get('/mt/accounts/'.$l->id)->assertSee('91.92.93.94')->assertSee('منصرف شدم');
-        $this->actingAs($admin)->get('/mt/accounts/'.$w->id)->assertSee('7.7.7.7')->assertDontSee('برای قطع همه نشست‌ها');
+        $this->actingAs($admin)->get('/mt/accounts/'.$w->id)->assertSee('7.7.7.7')->assertDontSee('همه نشست‌های فعال این اکانت آفلاین می‌شوند');
         $this->actingAs($admin)->get('/l2tp/accounts')->assertDontSee('قطع همه نشست‌ها');
         $this->actingAs($admin)->from('/mt/accounts/'.$l->id)->post('/mt/accounts/'.$l->id.'/kick')->assertSessionHas('success');
         $this->assertEmpty($this->ros->menus['ppp/active']);

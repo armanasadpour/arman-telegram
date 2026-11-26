@@ -7,7 +7,7 @@
       <span class="label">اتصال <span class="conn-pulse" aria-hidden="true"></span></span>
       <span class="value small">{{ $main }}</span>
       <span class="hint"><bdi>{{ $hint }}</bdi></span>
-      <span class="conn-tap">⛔ برای قطع همه نشست‌ها بزنید</span>
+      @if(! empty($hint2))<span class="hint"><bdi>{{ $hint2 }}</bdi></span>@endif
     </button>
   </form>
 @else
@@ -15,5 +15,6 @@
     <div class="label">اتصال @if($online)<span class="conn-pulse" aria-hidden="true"></span>@endif</div>
     <div class="value small">{{ $main }}</div>
     <div class="hint"><bdi>{{ $hint }}</bdi></div>
+    @if(! empty($hint2))<div class="hint"><bdi>{{ $hint2 }}</bdi></div>@endif
   </div>
 @endif

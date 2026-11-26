@@ -32,8 +32,9 @@
   @endphp
   <div class="grid stats mb-16">
     <div class="card stat"><div class="label">وضعیت</div><div class="value small">@include('accounts._status', ['a' => $a])</div></div>
-    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? fa($a->online_sessions).' نشست آنلاین' : 'آفلاین',
+    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? 'آنلاین' : 'آفلاین',
       'hint' => 'حداکثر همزمان: '.($a->effectiveMultiLogin() !== null ? fa($a->effectiveMultiLogin()) : '—'),
+      'hint2' => 'نشست‌های آنلاین: '.fa((int) $a->online_sessions),
       'kickUrl' => ! $a->ibs_deleted_at && auth()->user()->can('accounts.update') ? route('accounts.kick', $a) : null])
   </div>
   @include('accounts._meters', ['a' => $a, 'class' => 'mb-16'])
