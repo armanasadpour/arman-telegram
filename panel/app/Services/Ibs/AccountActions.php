@@ -3,8 +3,12 @@
 namespace App\Services\Ibs;
 
 use App\Ibs\IbsConnector;
+use App\Ibs\IbsException;
 use App\Models\IbsGroup;
+use App\Models\Router;
 use App\Models\VpnAccount;
+use App\RouterOs\RouterConnector;
+use App\RouterOs\RouterOsException;
 use App\Services\AuditLogger;
 use App\Services\Settings;
 use RuntimeException;
@@ -207,19 +211,48 @@ class AccountActions
     }
 
     /** Disconnect the account's live OpenVPN sessions. @return int sessions disconnected */
-    public function kick(VpnAccount $a): int
+    /**
+     * Disconnect the account's live OpenVPN sessions:
+     *   1. ask IBSng (user.killUser) — IBSng itself reaches the RAS, which may not work with RouterOS 7;
+     *   2. remove the user's /ppp/active entries directly on every MikroTik connected to the panel;
+     *   3. check IBSng's online list again and report what is still connected.
+     *
+     * @return array{killed:int, router:int, still:int, errors:list<string>}
+     */
+    public function kick(VpnAccount $a): array
     {
-        $n = 0;
+        $r = ['killed' => 0, 'router' => 0, 'still' => 0, 'errors' => []];
         foreach ($this->ibs->onlineUsers() as $s) {
             if ((int) ($s['user_id'] ?? 0) === $a->ibs_user_id || ($s['normal_username'] ?? null) === $a->username) {
-                $this->ibs->killUser($a->ibs_user_id, (string) ($s['ras_ip'] ?? ''), (string) ($s['unique_id_val'] ?? ''));
-                $n++;
+                try {
+                    $this->ibs->killUser($a->ibs_user_id, (string) ($s['ras_ip'] ?? ''), (string) ($s['unique_id_val'] ?? ''));
+                    $r['killed']++;
+                } catch (IbsException $e) {
+                    $r['errors'][] = 'IBSng: '.mb_substr($e->getMessage(), 0, 120);
+                }
             }
         }
-        $a->forceFill(['is_online' => false, 'online_sessions' => 0, 'sessions' => null])->save();
-        $this->audit->log('accounts.kick', $a, 'قطع '.fa($n).' نشست آنلاین «'.$a->username.'»');
+        $ros = app(RouterConnector::class);
+        foreach (Router::query()->where('is_active', true)->get() as $router) {
+            try {
+                foreach ($ros->get($router, 'ppp/active', ['name' => $a->username]) as $row) {
+                    $ros->remove($router, 'ppp/active', (string) $row['.id']);
+                    $r['router']++;
+                }
+            } catch (RouterOsException $e) {
+                $r['errors'][] = $router->name.': '.mb_substr($e->getMessage(), 0, 120);
+            }
+        }
+        usleep(app()->runningUnitTests() ? 0 : 1_500_000);   // give IBSng a moment to see the RAS drop the session
+        try {
+            $a = $this->sync->refreshOnline($a);
+            $r['still'] = (int) $a->online_sessions;
+        } catch (\Throwable) {
+            $a->forceFill(['is_online' => false, 'online_sessions' => 0, 'sessions' => null])->save();
+        }
+        $this->audit->log('accounts.kick', $a, 'قطع نشست‌های «'.$a->username.'»: IBSng '.fa($r['killed']).'، روتر '.fa($r['router']).($r['still'] ? '، هنوز وصل: '.fa($r['still']) : ''));
 
-        return $n;
+        return $r;
     }
 
     public function delete(VpnAccount $a, string $reason): void

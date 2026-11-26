@@ -256,11 +256,18 @@ class AccountsController extends Controller
     public function kick(VpnAccount $account): RedirectResponse
     {
         $this->authorize('accounts.update');
-        $n = 0;
+        try {
+            $r = $this->actions->kick($account);
+        } catch (RuntimeException $e) {
+            return back()->with('error', $this->message($e));
+        }
+        if ($r['still'] > 0) {
+            return back()->with('error', 'کاربر هنوز وصل است ('.fa($r['still']).' نشست). سرور IBSng نتوانست اتصال را روی سرور OpenVPN قطع کند'
+                .($r['router'] === 0 ? '؛ روتر میکروتیکی که OpenVPN روی آن است را در «روترهای میکروتیک» اضافه کنید تا پنل خودش مستقیم قطع کند.' : '.')
+                .($r['errors'] ? ' ('.implode(' | ', $r['errors']).')' : ''));
+        }
 
-        return $this->attempt(function () use ($account, &$n) {
-            $n = $this->actions->kick($account);
-        }, 'نشست‌های آنلاین قطع شد.');
+        return back()->with('success', 'نشست‌های آنلاین قطع شد'.($r['router'] ? ' (از روی روتر)' : '').'.');
     }
 
     public function resetFirstLogin(Request $request, VpnAccount $account): RedirectResponse

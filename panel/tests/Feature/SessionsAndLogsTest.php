@@ -78,4 +78,24 @@ class SessionsAndLogsTest extends IbsTestCase
         $this->actingAs($this->superAdmin())->get('/mt/accounts/'.$l->id)->assertSee('conn-card is-online', false)->assertSee('8.8.4.4');
         $this->assertSame(300, $l->fresh()->used_bytes, 'bytes found by interface name');
     }
+
+    public function test_openvpn_kick_falls_back_to_the_router_and_reports_when_still_connected(): void
+    {
+        $this->syncCatalog();
+        $this->ibsUser('stuck');
+        $a = app(AccountSync::class)->importByUsername('stuck');
+        $this->fake->connect('stuck');
+        $this->fake->killDoesNothing = true;
+        $admin = $this->superAdmin();
+        // no OpenVPN session on the connected router: the panel must say it is still connected
+        $this->actingAs($admin)->from('/accounts/'.$a->id)->post('/accounts/'.$a->id.'/kick')
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'هنوز وصل است'));
+        $this->assertTrue($a->fresh()->is_online);
+
+        // the session exists on the router: removed there directly
+        $this->ros->menus['ppp/active'][] = ['.id' => '*AA', 'name' => 'stuck', 'service' => 'ovpn', 'caller-id' => '1.2.3.4', 'uptime' => '5m'];
+        $this->fake->killDoesNothing = false;
+        $this->actingAs($admin)->from('/accounts/'.$a->id)->post('/accounts/'.$a->id.'/kick')->assertSessionHas('success');
+        $this->assertSame([], array_values(array_filter($this->ros->menus['ppp/active'], fn ($x) => $x['name'] === 'stuck')));
+    }
 }

@@ -20,6 +20,9 @@ class FakeIbs implements Transport
 
     public array $charges = [];
 
+    /** Simulate an IBSng whose killUser is accepted but does not reach the RAS. */
+    public bool $killDoesNothing = false;
+
     /** Simulate an IBSng that ignores deleting first_login. */
     public bool $keepFirstLogin = false;
 
@@ -293,7 +296,9 @@ class FakeIbs implements Transport
         if (! isset($this->onlines[$id]) || $this->onlines[$id]['unique_id_val'] !== $p['unique_id_val']) {
             $this->fault('USER_NOT_ONLINE', 'User is not online');
         }
-        unset($this->onlines[$id]);
+        if (! $this->killDoesNothing) {
+            unset($this->onlines[$id]);
+        }
 
         return true;
     }
