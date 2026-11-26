@@ -60,12 +60,12 @@ class FakeIbs implements Transport
     }
 
     /** Simulate the user connecting for the first time (and being online now). */
-    public function connect(string $username, int $inBytes = 1000, int $outBytes = 5000): void
+    public function connect(string $username, int $inBytes = 1000, int $outBytes = 5000, ?string $stationIp = null): void
     {
         $id = $this->idByUsername($username) ?? throw new \LogicException('no such user');
         $this->users[$id]['first_login'] ??= $this->now();
         $this->onlines[$id] = ['ras_ip' => '10.0.0.1', 'in_bytes' => $inBytes, 'out_bytes' => $outBytes,
-            'login_time_epoch' => $this->now(), 'unique_id_val' => 'ovpn-'.$id];
+            'login_time_epoch' => $this->now(), 'unique_id_val' => 'ovpn-'.$id] + ($stationIp ? ['station_ip' => $stationIp] : []);
     }
 
     public function call(string $method, array $params): mixed
@@ -280,6 +280,18 @@ class FakeIbs implements Transport
             }
             unset($u);
         }
+    }
+
+    private function m_user_killUser(array $p): bool
+    {
+        $this->need($p, 'user_id', 'ras_ip', 'unique_id_val', 'kill');
+        $id = (int) $p['user_id'];
+        if (! isset($this->onlines[$id]) || $this->onlines[$id]['unique_id_val'] !== $p['unique_id_val']) {
+            $this->fault('USER_NOT_ONLINE', 'User is not online');
+        }
+        unset($this->onlines[$id]);
+
+        return true;
     }
 
     private function m_user_getUserInfo(array $p): array

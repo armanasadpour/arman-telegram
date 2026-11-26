@@ -132,6 +132,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/mt/accounts/{account}/package', [MtAccountsController::class, 'applyPackage'])->name('mt.accounts.package');
     Route::post('/mt/accounts/{account}/reset', [MtAccountsController::class, 'resetUsage'])->name('mt.accounts.reset');
     Route::post('/mt/accounts/{account}/reset-first-use', [MtAccountsController::class, 'resetFirstUse'])->name('mt.accounts.reset-first');
+    Route::post('/mt/accounts/{account}/kick', [MtAccountsController::class, 'kick'])->name('mt.accounts.kick')->middleware('throttle:20,1');
+    Route::post('/mt/l2tp/kick-all', [MtAccountsController::class, 'kickAll'])->name('mt.kick-all')->middleware('throttle:5,1');
     Route::post('/mt/accounts/{account}/toggle', [MtAccountsController::class, 'toggle'])->name('mt.accounts.toggle');
     Route::post('/mt/accounts/{account}/retry', [MtAccountsController::class, 'retry'])->name('mt.accounts.retry')->middleware('throttle:20,1');
     Route::post('/mt/accounts/{account}/sync', [MtAccountsController::class, 'sync'])->name('mt.accounts.sync')->middleware('throttle:20,1');
@@ -181,6 +183,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/accounts/{account}/refresh', [AccountsController::class, 'refresh'])->name('accounts.refresh')->middleware('throttle:30,1');
     Route::post('/accounts/{account}/lock', [AccountsController::class, 'lock'])->name('accounts.lock');
     Route::post('/accounts/{account}/password', [AccountsController::class, 'password'])->name('accounts.password');
+    Route::post('/accounts/{account}/kick', [AccountsController::class, 'kick'])->name('accounts.kick')->middleware('throttle:20,1');
+    Route::post('/accounts/kick-all', [AccountsController::class, 'kickAll'])->name('accounts.kick-all')->middleware('throttle:5,1');
     Route::post('/accounts/{account}/renew', [AccountsController::class, 'renew'])->name('accounts.renew');
     Route::post('/accounts/{account}/reset-first-login', [AccountsController::class, 'resetFirstLogin'])->name('accounts.reset-first');
     Route::post('/accounts/{account}/volume', [AccountsController::class, 'volume'])->name('accounts.volume');

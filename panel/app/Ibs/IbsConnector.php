@@ -185,6 +185,12 @@ class IbsConnector
         $this->write('user.changeCredit', ['user_id' => (string) $userId, 'credit' => $credit, 'credit_comment' => $comment]);
     }
 
+    /** Disconnect one online session (user.killUser; kill=true removes it on the RAS). */
+    public function killUser(int $userId, string $rasIp, string $uniqueIdVal): void
+    {
+        $this->write('user.killUser', ['user_id' => (string) $userId, 'ras_ip' => $rasIp, 'unique_id_val' => $uniqueIdVal, 'kill' => true]);
+    }
+
     public function deleteUser(int $userId, string $comment): void
     {
         $this->write('user.delUser', [

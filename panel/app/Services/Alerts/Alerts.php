@@ -15,6 +15,7 @@ use App\Models\Reseller;
 use App\Models\ResellerSale;
 use App\Models\Router;
 use App\Models\VpnAccount;
+use App\Services\ConnectionLog;
 use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
 use App\Services\Settings;
@@ -313,5 +314,6 @@ class Alerts
         BotOutbox::query()->where('status', 'sent')->where('sent_at', '<', now()->subDays(30))->delete();
         BotLinkCode::query()->where('expires_at', '<', now()->subDay())->delete();
         DB::table('alert_log')->where('created_at', '<', now()->subDays(120))->delete();
+        app(ConnectionLog::class)->prune(180);
     }
 }

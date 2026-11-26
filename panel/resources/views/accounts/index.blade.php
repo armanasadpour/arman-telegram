@@ -11,6 +11,9 @@
       @can('accounts.delete')
         @if($configured)<a class="btn btn-secondary" href="{{ route('accounts.cleanup') }}">حذف منقضی‌های قدیمی</a>@endif
       @endcan
+      @can('accounts.update')
+        @if($configured && $counts['online'] > 0)<form method="post" action="{{ route('accounts.kick-all') }}" data-confirm="همه {{ fa($counts['online']) }} کاربر آنلاین OpenVPN قطع شوند؟">@csrf<button class="btn btn-danger" type="submit">⛔ قطع همه نشست‌ها</button></form>@endif
+      @endcan
       @can('accounts.create')
         @if($configured)<a class="btn" href="{{ route('accounts.create') }}">ساخت اکانت</a>@endif
       @endcan

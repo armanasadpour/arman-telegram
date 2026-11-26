@@ -3,6 +3,7 @@
 namespace App\Services\Ibs;
 
 use App\Ibs\IbsConnector;
+use App\Ibs\IbsException;
 use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Settings;
@@ -169,6 +170,40 @@ class AccountActions
         ], $reason);
 
         return [$a, implode('، ', $notes).'.'];
+    }
+
+    /** Disconnect the account's live OpenVPN sessions. @return int sessions disconnected */
+    public function kick(VpnAccount $a): int
+    {
+        $n = 0;
+        foreach ($this->ibs->onlineUsers() as $s) {
+            if ((int) ($s['user_id'] ?? 0) === $a->ibs_user_id || ($s['normal_username'] ?? null) === $a->username) {
+                $this->ibs->killUser($a->ibs_user_id, (string) ($s['ras_ip'] ?? ''), (string) ($s['unique_id_val'] ?? ''));
+                $n++;
+            }
+        }
+        $a->forceFill(['is_online' => false, 'online_sessions' => 0, 'sessions' => null])->save();
+        $this->audit->log('accounts.kick', $a, 'قطع '.fa($n).' نشست آنلاین «'.$a->username.'»');
+
+        return $n;
+    }
+
+    /** Disconnect every live OpenVPN session on the server. @return array{done:int, failed:int} */
+    public function kickAll(): array
+    {
+        $r = ['done' => 0, 'failed' => 0];
+        foreach ($this->ibs->onlineUsers() as $s) {
+            try {
+                $this->ibs->killUser((int) ($s['user_id'] ?? 0), (string) ($s['ras_ip'] ?? ''), (string) ($s['unique_id_val'] ?? ''));
+                $r['done']++;
+            } catch (IbsException) {
+                $r['failed']++;
+            }
+        }
+        VpnAccount::query()->where('is_online', true)->update(['is_online' => false, 'online_sessions' => 0, 'sessions' => null]);
+        $this->audit->log('accounts.kick_all', null, 'قطع همه نشست‌های آنلاین OpenVPN ('.fa($r['done']).' نشست)');
+
+        return $r;
     }
 
     public function delete(VpnAccount $a, string $reason): void

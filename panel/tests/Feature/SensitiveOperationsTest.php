@@ -81,4 +81,13 @@ class SensitiveOperationsTest extends TestCase
         $this->assertDatabaseMissing('users', ['id' => $target->id]);
         $this->assertDatabaseHas('audit_logs', ['action' => 'auth.login', 'actor_label' => 'leaver', 'user_id' => null]);
     }
+
+    public function test_by_default_no_password_re_confirmation_is_asked(): void
+    {
+        config(['panel.require_password_confirmation' => false]);
+        $admin = $this->superAdmin();
+        $target = $this->userWith(['dashboard.view']);
+        $this->actingAs($admin)->from('/staff')->post("/staff/{$target->id}/toggle-active")->assertSessionHas('success');
+        $this->actingAs($admin)->get('/routers/create')->assertOk();
+    }
 }

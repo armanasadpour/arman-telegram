@@ -56,6 +56,9 @@
     </div>
     <div class="card">
       <h2>نشست‌های آنلاین</h2>
+      @can('accounts.update')@if($a->is_online && ! $a->ibs_deleted_at)
+        <form method="post" action="{{ route('accounts.kick', $a) }}" class="mb-8" data-confirm="همه نشست‌های آنلاین «{{ $a->username }}» قطع شود؟">@csrf<button class="btn btn-danger btn-sm" type="submit">⛔ قطع همه نشست‌های آنلاین</button></form>
+      @endif @endcan
       @if(! $a->is_online || empty($a->sessions))
         <div class="empty"><div>در حال حاضر آنلاین نیست.</div></div>
       @else
@@ -76,6 +79,8 @@
       @endif
     </div>
   </div>
+
+  @include('accounts._connlog', ['key' => 'v:'.$a->id])
 
   @unless($a->ibs_deleted_at)
     @can('accounts.update')

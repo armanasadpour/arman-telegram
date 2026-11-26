@@ -4,6 +4,7 @@ namespace App\Services\Mikrotik;
 
 use App\Models\MtAccount;
 use App\Models\Package;
+use App\Models\Router;
 use App\RouterOs\RouterConnector;
 use App\RouterOs\RouterOsException;
 use App\RouterOs\RouterOsUnreachable;
@@ -273,6 +274,37 @@ class MtActions
             $this->ros->remove($a->router, 'ppp/active', (string) $row['.id']);
             $n++;
         }
+
+        return $n;
+    }
+
+    /** Disconnect every live L2TP session on all active routers. @return int sessions disconnected */
+    public function kickAllL2tp(): int
+    {
+        $n = 0;
+        $names = MtAccount::query()->where('protocol', 'l2tp')->pluck('username')->flip();
+        foreach (Router::query()->where('is_active', true)->where('l2tp_enabled', true)->get() as $r) {
+            foreach ($this->ros->get($r, 'ppp/active', ['service' => 'l2tp']) as $row) {
+                if (isset($names[$row['name'] ?? ''])) {
+                    $this->ros->remove($r, 'ppp/active', (string) $row['.id']);
+                    $n++;
+                }
+            }
+        }
+        MtAccount::query()->where('protocol', 'l2tp')->update(['is_online' => false, 'online_count' => 0]);
+        $this->audit->log('mt_accounts.kick_all', null, 'قطع همه نشست‌های آنلاین L2TP ('.fa($n).' نشست)');
+
+        return $n;
+    }
+
+    public function kickOne(MtAccount $a): int
+    {
+        if ($a->isWireguard()) {
+            throw new RuntimeException('WireGuard نشست ندارد؛ برای قطع، اکانت را غیرفعال کنید.');
+        }
+        $n = $this->kick($a);
+        $a->forceFill(['is_online' => false, 'online_count' => 0])->save();
+        $this->audit->log('mt_accounts.kick', $a, 'قطع '.fa($n).' نشست آنلاین «'.$a->username.'»');
 
         return $n;
     }

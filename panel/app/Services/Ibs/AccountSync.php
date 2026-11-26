@@ -7,6 +7,7 @@ use App\Ibs\IbsException;
 use App\Models\IbsCharge;
 use App\Models\IbsGroup;
 use App\Models\VpnAccount;
+use App\Services\ConnectionLog;
 use App\Services\Settings;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -217,6 +218,7 @@ class AccountSync
                 'in_bytes' => $s['in_bytes'] ?? null,
                 'out_bytes' => $s['out_bytes'] ?? null,
                 'unique_id_val' => $s['unique_id_val'] ?? null,
+                'client_ip' => ConnectionLog::ibsClientIp($s),
             ];
         }
 
@@ -230,6 +232,12 @@ class AccountSync
             }
         });
 
+        $log = app(ConnectionLog::class);
+        foreach (VpnAccount::query()->whereIn('username', array_keys($byUser) ?: ['__none__'])->get(['id', 'username']) as $acc) {
+            foreach ($byUser[$acc->username] as $sess) {
+                $log->seen('openvpn', 'v:'.$acc->id, $sess['client_ip'] ?? null);
+            }
+        }
         $known = VpnAccount::query()->whereIn('username', array_keys($byUser) ?: ['__none__'])->pluck('username')->all();
         foreach (array_slice(array_diff(array_keys($byUser), $known), 0, $importLimit) as $username) {
             if ($acc = $this->importByUsername($username)) {

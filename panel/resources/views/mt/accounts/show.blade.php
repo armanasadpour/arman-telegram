@@ -39,6 +39,11 @@
       <div class="hint">دانلود {{ fa_bytes($a->download_bytes) }} · آپلود {{ fa_bytes($a->upload_bytes) }}</div></div>
   </div>
   @include('mt.accounts._meters', ['a' => $a, 'class' => 'mb-16'])
+  @can('mt_accounts.update')
+    @if(! $a->isWireguard() && $a->is_online && ! $a->trashed())
+      <form method="post" action="{{ route('mt.accounts.kick', $a) }}" class="mb-16" data-confirm="همه نشست‌های آنلاین «{{ $a->username }}» قطع شود؟">@csrf<button class="btn btn-danger" type="submit">⛔ قطع همه نشست‌های آنلاین ({{ fa($a->online_count) }})</button></form>
+    @endif
+  @endcan
 
   <div class="grid two">
     <div class="card">
@@ -62,6 +67,8 @@
       @if($usage->isEmpty())<div class="empty"><div>هنوز مصرفی ثبت نشده است.</div></div>@else<x-chart :values="$usageDays"/><p class="help muted">بر حسب مگابایت در روز.</p>@endif
     </div>
   </div>
+
+  @include('accounts._connlog', ['key' => 'm:'.$a->id])
 
   @if(! $a->trashed() && ! in_array($a->status, ['pending', 'failed'], true))
     @can('mt_accounts.update')

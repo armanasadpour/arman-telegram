@@ -7,6 +7,7 @@ use App\Models\MtDevice;
 use App\Models\Router;
 use App\RouterOs\RouterConnector;
 use App\RouterOs\RouterOsException;
+use App\Services\ConnectionLog;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -68,6 +69,7 @@ class MtAccounting
             try {
                 $row = $a->isWireguard() ? ($peers[$a->wg_public_key] ?? null) : ($secrets[$a->username] ?? null);
                 $d = $a->isWireguard() ? $this->wgDelta($a, $row, $rebooted) : $this->l2tpDelta($a, $sessions[$a->username] ?? []);
+                $d['peer_ip'] = $a->isWireguard() ? $d['ip'] : null;
                 $devDrift = null;
                 $devMissing = false;
                 if ($a->isWireguard()) {
@@ -92,6 +94,7 @@ class MtAccounting
                     $devMissing = $devMissing || $a->devices->count() !== $a->deviceCount() - 1;
                 }
                 $stats['bytes'] += $d['up'] + $d['down'];
+                $this->logIps($a, $d, $sessions[$a->username] ?? []);
                 $a = $this->record($a, $d, $row);
                 if ($row === null) {
                     $stats['missing']++;
@@ -149,6 +152,27 @@ class MtAccounting
         }
         foreach (MtAccount::query()->whereKey($ids)->get() as $a) {
             $a->forceFill(['counters' => ['sessions' => $byUser[$a->username] ?? []]])->save();
+        }
+    }
+
+    private function logIps(MtAccount $a, array $d, array $l2tpSessions): void
+    {
+        $log = app(ConnectionLog::class);
+        $key = 'm:'.$a->id;
+        if (! $a->isWireguard()) {
+            foreach ($l2tpSessions as $s) {
+                $log->seen('l2tp', $key, $s['ip'] ?? null);
+            }
+
+            return;
+        }
+        if ($d['peer_ip'] ?? null) {
+            $log->seen('wireguard', $key, $d['peer_ip'], 1);
+        }
+        foreach ($d['devices'] ?? [] as [$dev, $dd]) {
+            if ($dd['ip'] ?? null) {
+                $log->seen('wireguard', $key, $dd['ip'], $dev->idx);
+            }
         }
     }
 

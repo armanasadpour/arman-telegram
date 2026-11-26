@@ -15,6 +15,10 @@ class RequireRecentPasswordConfirmation
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Turned off at the owner's request: logged-in users with the permission act without re-entering their password.
+        if (! config('panel.require_password_confirmation', false)) {
+            return $next($request);
+        }
         $confirmedAt = (int) $request->session()->get('auth.password_confirmed_at', 0);
         if (time() - $confirmedAt > (int) config('auth.password_timeout', 900)) {
             $request->session()->put('url.intended', url()->previous());

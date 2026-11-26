@@ -233,6 +233,28 @@ class AccountsController extends Controller
         return $this->attempt(fn () => $this->actions->addVolume($account, $mb, $d['reason']), 'حجم اکانت '.fa((string) $d['gb']).' گیگابایت افزایش یافت.');
     }
 
+    public function kick(VpnAccount $account): RedirectResponse
+    {
+        $this->authorize('accounts.update');
+        $n = 0;
+
+        return $this->attempt(function () use ($account, &$n) {
+            $n = $this->actions->kick($account);
+        }, 'نشست‌های آنلاین قطع شد.');
+    }
+
+    public function kickAll(): RedirectResponse
+    {
+        $this->authorize('accounts.update');
+        try {
+            $r = $this->actions->kickAll();
+        } catch (RuntimeException $e) {
+            return back()->with('error', $this->message($e));
+        }
+
+        return back()->with($r['failed'] ? 'warning' : 'success', fa($r['done']).' نشست قطع شد'.($r['failed'] ? '؛ '.fa($r['failed']).' مورد را سرور نپذیرفت.' : '.'));
+    }
+
     public function resetFirstLogin(Request $request, VpnAccount $account): RedirectResponse
     {
         $this->authorize('accounts.update');
