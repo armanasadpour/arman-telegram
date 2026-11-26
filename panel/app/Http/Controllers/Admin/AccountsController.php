@@ -233,6 +233,14 @@ class AccountsController extends Controller
         return $this->attempt(fn () => $this->actions->addVolume($account, $mb, $d['reason']), 'حجم اکانت '.fa((string) $d['gb']).' گیگابایت افزایش یافت.');
     }
 
+    public function updateInfo(Request $request, VpnAccount $account): RedirectResponse
+    {
+        $this->authorize('accounts.update');
+        $name = $request->validate(['comment' => ['required', 'string', 'max:100']], [], ['comment' => 'نام کاربر'])['comment'];
+
+        return $this->attempt(fn () => $this->actions->setCustomerName($account, $name), 'اطلاعات حساب ذخیره شد.');
+    }
+
     public function kick(VpnAccount $account): RedirectResponse
     {
         $this->authorize('accounts.update');

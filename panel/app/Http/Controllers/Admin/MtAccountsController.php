@@ -223,6 +223,14 @@ class MtAccountsController extends Controller
             'بازنشانی شد: مصرف صفر شد'.($account->duration_days ? ' و '.fa($account->duration_days).' روز از اولین اتصال بعدی شروع می‌شود' : '').'.');
     }
 
+    public function updateInfo(Request $request, MtAccount $account): RedirectResponse
+    {
+        $this->authorize('mt_accounts.update');
+        $name = $request->validate(['comment' => ['required', 'string', 'max:100']], [], ['comment' => 'نام کاربر'])['comment'];
+
+        return $this->run(fn () => $this->actions->setCustomerName($account, $name), 'اطلاعات حساب ذخیره شد.');
+    }
+
     public function kick(MtAccount $account): RedirectResponse
     {
         $this->authorize('mt_accounts.update');

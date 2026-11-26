@@ -83,6 +83,9 @@ class MtHttpTest extends MikrotikTestCase
     {
         $admin = $this->superAdmin();
         $a = app(MtProvisioning::class)->create($this->l2tp, (string) Str::uuid(), ['username' => 'act1', 'days' => 30, 'volume_gb' => 5], null);
+        $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.info', $a), ['comment' => 'حسین کریمی'])->assertSessionHas('success');
+        $this->assertSame('حسین کریمی', $a->fresh()->comment);
+        $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertSee('ویرایش اطلاعات حساب');
         $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.volume', $a), ['gb' => 5])->assertSessionHas('success');
         $this->assertSame(10 * 1073741824, $a->fresh()->volume_limit_bytes);
         $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.toggle', $a), ['reason' => 'بدهی'])->assertSessionHas('success');

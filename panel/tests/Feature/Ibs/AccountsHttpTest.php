@@ -101,7 +101,10 @@ class AccountsHttpTest extends IbsTestCase
         $r->assertRedirect(route('accounts.show', $a));
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/lock", ['reason' => 'test lock'])->assertSessionHas('success');
         $this->assertTrue($a->fresh()->locked);
-        $this->actingAs($admin)->get("/accounts/{$a->id}")->assertSee('بازنشانی با اولین اتصال');
+        $this->actingAs($admin)->get("/accounts/{$a->id}")->assertSee('بازنشانی با اولین اتصال')->assertSee('ویرایش اطلاعات حساب');
+        $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/info", ['comment' => 'مریم'])->assertSessionHas('success');
+        $this->assertSame('مریم', $a->fresh()->displayComment());
+        $this->assertSame('مریم', $this->fake->users[$a->ibs_user_id]['attrs']['comment']);
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/reset-first-login", ['reason' => 'فروش مجدد'])->assertSessionHas('success');
     }
 

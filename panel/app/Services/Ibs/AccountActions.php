@@ -171,6 +171,20 @@ class AccountActions
         return [$a, implode('، ', $notes).'.'];
     }
 
+    /** Change the customer name (IBSng comment; the panel's tracking prefix is kept). */
+    public function setCustomerName(VpnAccount $a, string $name): VpnAccount
+    {
+        $a = $this->live($a);
+        $old = $a->displayComment();
+        $prefix = preg_match('/^(panel:[0-9a-f-]{36})/', (string) $a->comment, $m) ? $m[1].' ' : '';
+        $comment = mb_substr($prefix.trim($name), 0, 250);
+        $this->ibs->updateAttrs($a->ibs_user_id, ['comment' => $comment]);
+        $a->forceFill(['comment' => $comment])->save();
+        $this->audit->log('accounts.edit', $a, 'ویرایش اطلاعات «'.$a->username.'»', ['customer' => [$old, trim($name)]]);
+
+        return $a;
+    }
+
     /** Disconnect the account's live OpenVPN sessions. @return int sessions disconnected */
     public function kick(VpnAccount $a): int
     {

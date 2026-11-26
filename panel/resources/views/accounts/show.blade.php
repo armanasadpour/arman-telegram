@@ -81,6 +81,13 @@
   @unless($a->ibs_deleted_at)
     @can('accounts.update')
       <div class="grid two">
+        <div class="card" data-sheet="ویرایش اطلاعات حساب" data-sheet-icon="✏️">
+          <h2>ویرایش اطلاعات حساب</h2>
+          <form method="post" action="{{ route('accounts.info', $a) }}">@csrf
+            <div class="field"><label for="edit_customer">👤 نام کاربر</label><input id="edit_customer" name="comment" class="input" required maxlength="100" value="{{ $a->displayComment() }}" autocomplete="off"></div>
+            <button class="btn" type="submit">ذخیره</button>
+          </form>
+        </div>
         @if($applicable->isNotEmpty())
           <div class="card" data-sheet="اعمال بسته" data-sheet-icon="📦">
             <h2>اعمال بسته</h2>

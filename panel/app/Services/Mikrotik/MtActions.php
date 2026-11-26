@@ -107,6 +107,15 @@ class MtActions
         return $this->syncState($a);
     }
 
+    public function setCustomerName(MtAccount $a, string $name): MtAccount
+    {
+        $old = $a->comment;
+        $a->forceFill(['comment' => mb_substr(trim($name), 0, 150)])->save();
+        $this->audit->log('mt_accounts.edit', $a, 'ویرایش اطلاعات «'.$a->username.'»', ['customer' => [$old, $a->comment]]);
+
+        return $a;
+    }
+
     /** WireGuard: change the number of devices (adds new keys/files, or removes the highest-numbered devices). */
     public function setDevices(MtAccount $a, int $n): MtAccount
     {
