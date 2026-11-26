@@ -213,7 +213,7 @@ class AccountsController extends Controller
         $pw = $request->validate(['password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/']])['password']
             ?: Provisioning::generatePassword();
 
-        return $this->attempt(fn () => $this->actions->changePassword($account, $pw), 'رمز اکانت تغییر کرد.', ['new_password' => $pw]);
+        return $this->attempt(fn () => $this->actions->changePassword($account, $pw), 'رمز اکانت تغییر کرد.', ['changed_password' => $pw]);
     }
 
     public function renew(Request $request, VpnAccount $account): RedirectResponse

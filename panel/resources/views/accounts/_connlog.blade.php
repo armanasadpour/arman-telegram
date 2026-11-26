@@ -1,6 +1,6 @@
 {{-- Connection log: IPs this account connected from. $key = 'v:<id>' | 'm:<id>' --}}
 @php($logs = app(\App\Services\ConnectionLog::class)->forAccount($key))
-<div class="card">
+<div class="card" data-sheet="لاگ اتصال (IP)" data-sheet-icon="🌐">
   <h2>لاگ اتصال (IP)</h2>
   @if($logs->isEmpty())
     <div class="empty"><div>هنوز اتصالی ثبت نشده است. IPها از زمان نصب این نسخه، هنگام آنلاین بودن ثبت می‌شوند.</div></div>

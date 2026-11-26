@@ -245,7 +245,13 @@ class MtAccountsController extends Controller
         $this->authorize('mt_accounts.sensitive');
         $pw = $request->validate(['password' => ['nullable', 'string', 'max:64']])['password'] ?? null;
 
-        return $this->run(fn () => $this->actions->changePassword($account, $pw, 'از پنل'), 'رمز عوض شد.', reveal: $account->id);
+        try {
+            $new = $this->actions->changePassword($account, $pw, 'از پنل');
+        } catch (RuntimeException|RouterOsException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'رمز عوض شد.')->with('changed_password', $new);
     }
 
     public function keys(Request $request, MtAccount $account): RedirectResponse

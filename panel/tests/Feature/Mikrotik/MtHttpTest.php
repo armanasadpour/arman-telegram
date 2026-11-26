@@ -89,7 +89,8 @@ class MtHttpTest extends MikrotikTestCase
         $this->assertSame('true', $this->ros->find('ppp/secret', 'name', 'act1')['disabled']);
         $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.toggle', $a))->assertSessionHas('success');
         $this->assertSame('false', $this->ros->find('ppp/secret', 'name', 'act1')['disabled']);
-        $this->actingAs($admin)->confirmed()->from(route('mt.accounts.show', $a))->post(route('mt.accounts.password', $a), ['password' => 'neu-pass'])->assertSessionHas('success');
+        $this->followingRedirects()->actingAs($admin)->confirmed()->from(route('mt.accounts.show', $a))->post(route('mt.accounts.password', $a), ['password' => 'neu-pass'])
+            ->assertSee('data-sheet-pw="neu-pass"', false)->assertSee('data-sheet-tiles', false);
         $this->assertSame('neu-pass', $this->ros->find('ppp/secret', 'name', 'act1')['password']);
         $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertOk()->assertSee('بازنشانی با اولین اتصال');
         $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.reset-first', $a), ['reason' => 'فروش مجدد'])->assertSessionHas('success');

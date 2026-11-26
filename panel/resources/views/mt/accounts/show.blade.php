@@ -40,9 +40,10 @@
       <div class="hint">دانلود {{ fa_bytes($a->download_bytes) }} · آپلود {{ fa_bytes($a->upload_bytes) }}</div></div>
   </div>
   @include('mt.accounts._meters', ['a' => $a, 'class' => 'mb-16'])
+  <div class="sheet-tiles" data-sheet-tiles></div>
 
   <div class="grid two">
-    <div class="card">
+    <div class="card" data-sheet="اطلاعات حساب" data-sheet-icon="ℹ️">
       <h2>اطلاعات</h2>
       <dl class="kv">
         <dt>پروتکل</dt><dd>{{ $a->protocolLabel() }}</dd>
@@ -58,7 +59,7 @@
         <dt>👤 نام کاربر</dt><dd>{{ $a->comment ?: '—' }}</dd>
       </dl>
     </div>
-    <div class="card">
+    <div class="card" data-sheet="مصرف ۳۰ روز اخیر" data-sheet-icon="📊">
       <h2>مصرف ۳۰ روز اخیر</h2>
       @if($usage->isEmpty())<div class="empty"><div>هنوز مصرفی ثبت نشده است.</div></div>@else<x-chart :values="$usageDays"/><p class="help muted">بر حسب مگابایت در روز.</p>@endif
     </div>
@@ -70,7 +71,7 @@
     @can('mt_accounts.update')
       <div class="grid two">
         @if($renewals->isNotEmpty())
-          <div class="card">
+          <div class="card" data-sheet="اعمال بسته" data-sheet-icon="📦">
             <h2>اعمال بسته</h2>
             <form method="post" action="{{ route('mt.accounts.package', $a) }}" data-confirm="بسته روی این اکانت اعمال شود؟">@csrf
               <div class="field"><label for="pkg">بسته تمدید / افزایش حجم</label><select id="pkg" name="package_id" class="input">
@@ -80,7 +81,7 @@
           </div>
         @endif
         @if($a->duration_days || $a->expires_at)
-          <div class="card">
+          <div class="card" data-sheet="تمدید دستی" data-sheet-icon="📅">
             <h2>تمدید</h2>
             <p class="muted small">اگر منقضی شده از الان، وگرنه به انتهای مدت فعلی اضافه می‌شود.</p>
             <form method="post" action="{{ route('mt.accounts.renew', $a) }}" data-confirm="تمدید شود؟">@csrf
@@ -91,7 +92,7 @@
           </div>
         @endif
         @if($a->isVolumeLimited())
-          <div class="card">
+          <div class="card" data-sheet="افزایش حجم" data-sheet-icon="📶">
             <h2>افزایش حجم</h2>
             <form method="post" action="{{ route('mt.accounts.volume', $a) }}" data-confirm="حجم اضافه شود؟">@csrf
               <div class="field"><div class="input-group"><input id="add_gb" name="gb" type="number" step="0.1" min="0.1" class="input ltr" value="10" required><span class="addon">گیگابایت</span></div>
@@ -100,21 +101,21 @@
             </form>
           </div>
         @endif
-        <div class="card">
+        <div class="card" data-sheet="بازنشانی تاریخ و حجم" data-sheet-icon="↺">
           <h2>بازنشانی تاریخ و حجم</h2>
           <p class="muted small">مصرف صفر می‌شود{{ $a->isVolumeLimited() ? ' (حجم کامل '.fa_bytes($a->volume_limit_bytes).')' : '' }}{{ $a->duration_days ? ' و '.fa($a->duration_days).' روز از اولین اتصال بعدی شروع می‌شود' : '' }}.</p>
           <form method="post" action="{{ route('mt.accounts.reset-first', $a) }}" data-confirm="تاریخ و حجم «{{ $a->username }}» بازنشانی شود و از اولین اتصال دوباره شروع شود؟">@csrf
             <button class="btn btn-secondary" type="submit">↺ بازنشانی با اولین اتصال</button>
           </form>
         </div>
-        <div class="card">
+        <div class="card" data-sheet="{{ $a->status === 'disabled' ? 'فعال‌سازی' : 'غیرفعال‌سازی' }}" data-sheet-icon="⛔" data-sheet-tone="danger">
           <h2>{{ $a->status === 'disabled' ? 'فعال‌سازی' : 'غیرفعال‌سازی' }}</h2>
           <form method="post" action="{{ route('mt.accounts.toggle', $a) }}" data-confirm="{{ $a->status === 'disabled' ? 'اکانت فعال شود؟' : 'اکانت غیرفعال و اتصال‌های فعلی قطع شود؟' }}">@csrf
             <button class="btn {{ $a->status === 'disabled' ? '' : 'btn-danger' }}" type="submit">{{ $a->status === 'disabled' ? 'فعال کن' : 'غیرفعال کن' }}</button>
           </form>
         </div>
-        <details class="card adv">
-          <summary><h2 class="inline">ویرایش دستی محدودیت‌ها</h2></summary>
+        <div class="card" data-sheet="ویرایش محدودیت‌ها" data-sheet-icon="⚙️">
+          <h2>ویرایش دستی محدودیت‌ها</h2>
           <form method="post" action="{{ route('mt.accounts.limits', $a) }}" class="mt-8" data-confirm="محدودیت‌ها تغییر کند؟">@csrf
             <div class="form-grid">
               <div class="field"><label for="days_left">روز باقی‌مانده (از الان)</label><input id="days_left" name="days_left" type="number" min="0" max="3650" class="input ltr" value="{{ $a->expires_at ? max(0, (int) ceil(now()->diffInSeconds($a->expires_at, false) / 86400)) : $a->duration_days }}" placeholder="نامحدود"></div>
@@ -127,12 +128,12 @@
           <form method="post" action="{{ route('mt.accounts.reset', $a) }}" class="mt-8" data-confirm="مصرف این اکانت صفر شود؟">@csrf
             <button class="btn btn-secondary" type="submit">صفر کردن مصرف</button>
           </form>
-        </details>
+        </div>
       </div>
     @endcan
     <div class="grid two">
       @can('mt_accounts.sensitive')
-        <div class="card">
+        <div class="card" data-sheet="{{ $a->isWireguard() ? 'کلید جدید' : 'تغییر رمز' }}" data-sheet-icon="{{ $a->isWireguard() ? '🗝' : '🔑' }}" @if(session('changed_password')) data-sheet-pw="{{ session('changed_password') }}" @endif>
           @if($a->isWireguard() && ! $a->wg_private_key)
             <h2>ثبت کلید خصوصی مشتری</h2>
             <p class="muted small">خط «PrivateKey» از فایل WireGuard فعلی مشتری؛ با کلید عمومی روی روتر چک می‌شود.</p>
@@ -159,7 +160,7 @@
         </div>
       @endcan
       @can('mt_accounts.delete')
-        <div class="card card-danger">
+        <div class="card card-danger" data-sheet="حذف" data-sheet-icon="🗑" data-sheet-tone="danger">
           <h2 class="text-danger">حذف</h2>
           <p class="muted small">{{ $a->isWireguard() ? 'Peer' : 'کاربر PPP' }} از روتر حذف می‌شود و اتصال قطع می‌شود. سوابق مصرف و فروش در پنل می‌ماند.</p>
           <form method="post" action="{{ route('mt.accounts.destroy', $a) }}" data-confirm="اکانت «{{ $a->username }}» حذف شود؟">@csrf @method('delete')
@@ -171,7 +172,7 @@
     </div>
   @elseif(in_array($a->status, ['failed', 'pending'], true) && ! $a->trashed())
     @can('mt_accounts.delete')
-      <div class="card card-danger">
+      <div class="card card-danger" data-sheet="حذف" data-sheet-icon="🗑" data-sheet-tone="danger">
         <h2 class="text-danger">حذف</h2>
         <form method="post" action="{{ route('mt.accounts.destroy', $a) }}" data-confirm="حذف شود؟">@csrf @method('delete')
           @if($a->status === 'pending')<label class="check"><input type="checkbox" name="panel_only" value="1"> فقط از پنل</label>@endif

@@ -12,7 +12,7 @@
     </div>
   </div>
 
-  @if(session('new_password'))
+  @if(session('new_password') && ! session('changed_password'))
     <div class="alert alert-success">رمز اکانت: <strong><bdi class="ltr">{{ session('new_password') }}</bdi></strong> — این رمز فقط همین یک بار نمایش داده می‌شود؛ آن را به مشتری تحویل دهید.</div>
   @endif
   @if(session('revealed_password'))
@@ -37,9 +37,10 @@
       'kickUrl' => ! $a->ibs_deleted_at && auth()->user()->can('accounts.update') ? route('accounts.kick', $a) : null])
   </div>
   @include('accounts._meters', ['a' => $a, 'class' => 'mb-16'])
+  <div class="sheet-tiles" data-sheet-tiles></div>
 
   <div class="grid two">
-    <div class="card">
+    <div class="card" data-sheet="اطلاعات حساب" data-sheet-icon="ℹ️">
       <h2>اطلاعات</h2>
       <dl class="kv">
         <dt>شناسه سرور</dt><dd><bdi class="ltr">{{ $a->ibs_user_id }}</bdi></dd>
@@ -52,7 +53,7 @@
         @if($a->locked)<dt>دلیل قفل</dt><dd>{{ $a->lock_reason }}</dd>@endif
       </dl>
     </div>
-    <div class="card">
+    <div class="card" data-sheet="نشست‌های آنلاین" data-sheet-icon="🟢">
       <h2>نشست‌های آنلاین</h2>
       @if(! $a->is_online || empty($a->sessions))
         <div class="empty"><div>در حال حاضر آنلاین نیست.</div></div>
@@ -81,7 +82,7 @@
     @can('accounts.update')
       <div class="grid two">
         @if($applicable->isNotEmpty())
-          <div class="card">
+          <div class="card" data-sheet="اعمال بسته" data-sheet-icon="📦">
             <h2>اعمال بسته</h2>
             <form method="post" action="{{ route('accounts.apply-package', $a) }}" data-confirm="بسته روی این اکانت اعمال شود؟">
               @csrf
@@ -93,7 +94,7 @@
             </form>
           </div>
         @endif
-        <div class="card">
+        <div class="card" data-sheet="تمدید دستی" data-sheet-icon="📅">
           <h2>تمدید دستی</h2>
           <p class="muted">سیاست فعلی: {{ $renewalMode === 'smart' ? 'اگر فعال است از انقضای فعلی، اگر منقضی شده از الان' : 'همیشه از تاریخ انقضای فعلی' }}.</p>
           <form method="post" action="{{ route('accounts.renew', $a) }}" data-confirm="اکانت تمدید شود؟">
@@ -105,7 +106,7 @@
           </form>
         </div>
         @if($a->isVolumeLimited())
-          <div class="card">
+          <div class="card" data-sheet="افزایش حجم" data-sheet-icon="📶">
             <h2>افزایش حجم دستی</h2>
             <form method="post" action="{{ route('accounts.volume', $a) }}" data-confirm="حجم اضافه شود؟">
               @csrf
@@ -116,7 +117,7 @@
             </form>
           </div>
         @endif
-        <div class="card">
+        <div class="card" data-sheet="بازنشانی تاریخ و حجم" data-sheet-icon="↺">
           <h2>بازنشانی تاریخ و حجم</h2>
           <p class="muted small">اکانت مثل روز اول می‌شود: مدت اعتبار ({{ fa_duration($a->effectiveRelExpSeconds()) }}) از اولین اتصال بعدی شروع می‌شود{{ $a->isVolumeLimited() && $a->volume_total_bytes ? ' و حجم به '.fa_bytes((int) $a->volume_total_bytes).' برمی‌گردد' : '' }}.</p>
           <form method="post" action="{{ route('accounts.reset-first', $a) }}" data-confirm="تاریخ و حجم «{{ $a->username }}» بازنشانی شود و از اولین اتصال دوباره شروع شود؟">
@@ -124,14 +125,14 @@
             <button class="btn btn-secondary" type="submit">↺ بازنشانی با اولین اتصال</button>
           </form>
         </div>
-        <div class="card">
+        <div class="card" data-sheet="{{ $a->locked ? 'فعال‌سازی دوباره' : 'غیرفعال‌سازی (قفل)' }}" data-sheet-icon="⛔" data-sheet-tone="danger">
           <h2>{{ $a->locked ? 'فعال‌سازی دوباره' : 'غیرفعال‌سازی (قفل)' }}</h2>
           <form method="post" action="{{ route('accounts.lock', $a) }}" data-confirm="{{ $a->locked ? 'قفل برداشته شود؟' : 'اکانت قفل شود؟ کاربر دیگر نمی‌تواند وصل شود.' }}">
             @csrf
             <button class="btn {{ $a->locked ? '' : 'btn-danger' }}" type="submit">{{ $a->locked ? 'برداشتن قفل' : 'قفل کن' }}</button>
           </form>
         </div>
-        <div class="card">
+        <div class="card" data-sheet="تغییر رمز" data-sheet-icon="🔑" @if(session('changed_password')) data-sheet-pw="{{ session('changed_password') }}" @endif>
           <h2>تغییر رمز</h2>
           <form method="post" action="{{ route('accounts.password', $a) }}" data-confirm="رمز اکانت تغییر کند؟">
             @csrf
@@ -143,14 +144,14 @@
     @endcan
     <div class="grid two">
       @can('accounts.sensitive')
-        <div class="card">
+        <div class="card" data-sheet="مشاهده رمز فعلی" data-sheet-icon="👁">
           <h2>مشاهده رمز فعلی</h2>
           <p class="muted">رمز از سرور خوانده می‌شود (پنل آن را ذخیره نمی‌کند). عملیات حساس است و ثبت می‌شود.</p>
           <form method="post" action="{{ route('accounts.reveal', $a) }}">@csrf<button class="btn btn-secondary" type="submit">نمایش رمز</button></form>
         </div>
       @endcan
       @can('accounts.delete')
-        <div class="card card-danger">
+        <div class="card card-danger" data-sheet="حذف از سرور" data-sheet-icon="🗑" data-sheet-tone="danger">
           <h2 class="text-danger">حذف از سرور</h2>
           <p class="muted">اکانت از سرور حذف می‌شود؛ سوابق اتصال در سرور باقی می‌ماند. برگشت‌پذیر نیست.</p>
           <form method="post" action="{{ route('accounts.destroy', $a) }}" data-confirm="اکانت «{{ $a->username }}» برای همیشه از سرور حذف شود؟">

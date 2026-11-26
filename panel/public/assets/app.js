@@ -130,6 +130,72 @@
     deferred.prompt();
     deferred.userChoice.finally(function () { deferred = null; document.querySelectorAll('#install-btn, [data-install]').forEach(function (x) { x.hidden = true; }); });
   });
+  // Account pages: every [data-sheet] card becomes a tile; tapping it opens the card in a bottom sheet.
+  (function () {
+    var holder = document.querySelector('[data-sheet-tiles]');
+    if (!holder) return;
+    var cards = Array.prototype.slice.call(document.querySelectorAll('[data-sheet]'));
+    if (!cards.length) return;
+    var backdrop = document.createElement('div'); backdrop.className = 'bs-backdrop';
+    var sheet = document.createElement('div'); sheet.className = 'bs'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-modal', 'true');
+    sheet.innerHTML = '<div class="bs-grip" aria-hidden="true"></div><div class="bs-head"><span class="bs-icon"></span><h2 class="bs-title"></h2>'
+      + '<button type="button" class="bs-close" aria-label="بستن">✕</button></div><div class="bs-body"></div>';
+    document.body.appendChild(backdrop); document.body.appendChild(sheet);
+    var body = sheet.querySelector('.bs-body'), current = null, home = null;
+    function close() {
+      if (!current) return;
+      sheet.classList.remove('open'); backdrop.classList.remove('open'); document.documentElement.classList.remove('bs-lock');
+      var c = current; current = null;
+      setTimeout(function () { if (!current) { home.appendChild(c); c.hidden = true; } }, 220);
+    }
+    function open(card) {
+      if (current) { home.appendChild(current); current.hidden = true; }
+      current = card; home = card.parentNode;
+      sheet.querySelector('.bs-title').textContent = card.getAttribute('data-sheet');
+      sheet.querySelector('.bs-icon').textContent = card.getAttribute('data-sheet-icon') || '';
+      sheet.classList.toggle('bs-danger', card.getAttribute('data-sheet-tone') === 'danger');
+      card.hidden = false; body.innerHTML = ''; body.appendChild(card);
+      document.documentElement.classList.add('bs-lock');
+      requestAnimationFrame(function () { backdrop.classList.add('open'); sheet.classList.add('open'); });
+    }
+    backdrop.addEventListener('click', close);
+    sheet.querySelector('.bs-close').addEventListener('click', close);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && current && !document.querySelector('.cfm-backdrop')) close(); });
+    var y0 = null;
+    sheet.addEventListener('touchstart', function (e) { y0 = body.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+    sheet.addEventListener('touchmove', function (e) { if (y0 !== null && e.touches[0].clientY - y0 > 0) sheet.style.transform = 'translateY(' + (e.touches[0].clientY - y0) + 'px)'; }, { passive: true });
+    sheet.addEventListener('touchend', function (e) {
+      var d = y0 !== null ? e.changedTouches[0].clientY - y0 : 0; sheet.style.transform = ''; y0 = null;
+      if (d > 90) close();
+    });
+    cards.forEach(function (card) {
+      var t = document.createElement('button'); t.type = 'button';
+      t.className = 'tile' + (card.getAttribute('data-sheet-tone') === 'danger' ? ' tile-danger' : '');
+      var pw = card.getAttribute('data-sheet-pw');
+      t.innerHTML = '<span class="tile-icon"></span><span class="tile-title"></span>';
+      t.querySelector('.tile-icon').textContent = card.getAttribute('data-sheet-icon') || '•';
+      t.querySelector('.tile-title').textContent = card.getAttribute('data-sheet');
+      if (pw) {
+        t.classList.add('tile-pw');
+        t.innerHTML = '<span class="tile-icon">🔑</span><span class="tile-title">رمز جدید</span><span class="tile-pw-row"><bdi class="tile-pw-val"></bdi>'
+          + '<span class="tile-copy" role="button" tabindex="0" aria-label="کپی رمز">⧉ کپی</span></span>';
+        t.querySelector('.tile-pw-val').textContent = pw;
+        t.querySelector('.tile-copy').addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          var el = ev.currentTarget, done = function () { el.textContent = '✓ کپی شد'; setTimeout(function () { el.textContent = '⧉ کپی'; }, 1500); };
+          if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(pw).then(done);
+          else { var ta = document.createElement('textarea'); ta.value = pw; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (x) {} ta.remove(); }
+        });
+      }
+      t.addEventListener('click', function () { open(card); });
+      holder.appendChild(t);
+      card.hidden = true;
+    });
+    // hide wrappers that only held moved cards
+    document.querySelectorAll('.grid.two').forEach(function (g) {
+      if (!Array.prototype.some.call(g.children, function (c) { return !c.hidden; })) g.hidden = true;
+    });
+  })();
   // "Select all" checkboxes.
   document.querySelectorAll('[data-check-all]').forEach(function (all) {
     all.addEventListener('change', function () {
