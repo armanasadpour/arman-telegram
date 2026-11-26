@@ -230,18 +230,6 @@ class MtAccountsController extends Controller
         return $this->run(fn () => $this->actions->kickOne($account), 'نشست‌های آنلاین قطع شد.');
     }
 
-    public function kickAll(): RedirectResponse
-    {
-        $this->authorize('mt_accounts.update');
-        try {
-            $n = $this->actions->kickAllL2tp();
-        } catch (RouterOsException|RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
-        }
-
-        return back()->with('success', fa($n).' نشست L2TP قطع شد.');
-    }
-
     public function toggle(Request $request, MtAccount $account): RedirectResponse
     {
         $this->authorize('mt_accounts.update');

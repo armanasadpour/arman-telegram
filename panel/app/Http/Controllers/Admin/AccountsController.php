@@ -243,18 +243,6 @@ class AccountsController extends Controller
         }, 'نشست‌های آنلاین قطع شد.');
     }
 
-    public function kickAll(): RedirectResponse
-    {
-        $this->authorize('accounts.update');
-        try {
-            $r = $this->actions->kickAll();
-        } catch (RuntimeException $e) {
-            return back()->with('error', $this->message($e));
-        }
-
-        return back()->with($r['failed'] ? 'warning' : 'success', fa($r['done']).' نشست قطع شد'.($r['failed'] ? '؛ '.fa($r['failed']).' مورد را سرور نپذیرفت.' : '.'));
-    }
-
     public function resetFirstLogin(Request $request, VpnAccount $account): RedirectResponse
     {
         $this->authorize('accounts.update');

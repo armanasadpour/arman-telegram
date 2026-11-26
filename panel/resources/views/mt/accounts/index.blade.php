@@ -7,9 +7,6 @@
     </div>
     <div class="actions">
       @can('routers.view')<a class="btn btn-secondary" href="{{ route($proto === 'wireguard' ? 'wg.groups' : ($proto === 'l2tp' ? 'l2tp.groups' : 'mt.groups.index')) }}">گروه و تعرفه</a>@endcan
-      @can('mt_accounts.update')
-        @if($proto === 'l2tp' && (int) $counts->online > 0)<form method="post" action="{{ route('mt.kick-all') }}" data-confirm="همه {{ fa((int) $counts->online) }} کاربر آنلاین L2TP قطع شوند؟">@csrf<button class="btn btn-danger" type="submit">⛔ قطع همه نشست‌ها</button></form>@endif
-      @endcan
       @can('mt_accounts.create')<a class="btn" href="{{ route('mt.accounts.create', $proto ? ['protocol' => $proto] : []) }}">ساخت اکانت {{ $proto ? $pl : '' }}</a>@endcan
     </div>
   </div>

@@ -188,24 +188,6 @@ class AccountActions
         return $n;
     }
 
-    /** Disconnect every live OpenVPN session on the server. @return array{done:int, failed:int} */
-    public function kickAll(): array
-    {
-        $r = ['done' => 0, 'failed' => 0];
-        foreach ($this->ibs->onlineUsers() as $s) {
-            try {
-                $this->ibs->killUser((int) ($s['user_id'] ?? 0), (string) ($s['ras_ip'] ?? ''), (string) ($s['unique_id_val'] ?? ''));
-                $r['done']++;
-            } catch (IbsException) {
-                $r['failed']++;
-            }
-        }
-        VpnAccount::query()->where('is_online', true)->update(['is_online' => false, 'online_sessions' => 0, 'sessions' => null]);
-        $this->audit->log('accounts.kick_all', null, 'قطع همه نشست‌های آنلاین OpenVPN ('.fa($r['done']).' نشست)');
-
-        return $r;
-    }
-
     public function delete(VpnAccount $a, string $reason): void
     {
         $a = $this->live($a);
