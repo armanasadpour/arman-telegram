@@ -3,7 +3,6 @@
 namespace App\Services\Ibs;
 
 use App\Ibs\IbsConnector;
-use App\Ibs\IbsException;
 use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Settings;

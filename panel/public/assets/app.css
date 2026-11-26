@@ -533,3 +533,27 @@ h2.inline{display:inline}
 .pwa-preview{display:flex;align-items:center;gap:16px}
 .pwa-preview img{border-radius:22px;box-shadow:0 8px 20px -8px rgba(0,0,0,.35)}
 .input-color{height:46px;padding:4px;cursor:pointer}
+
+/* ---------- connection card + confirm popup ---------- */
+.conn-form{margin:0;display:contents}
+.conn-card{border:0;color:#fff;text-align:inherit;font:inherit;width:100%;position:relative;overflow:hidden}
+.conn-card .label,.conn-card .hint,.conn-card .value{color:#fff;display:block}
+.conn-card .label{display:flex}
+.conn-card .label{opacity:.9;display:flex;align-items:center;gap:8px}
+.conn-card .hint{opacity:.85}
+.conn-card.is-online{background:linear-gradient(135deg,#16a34a,#0f7a37);box-shadow:0 10px 24px -12px rgba(22,163,74,.7)}
+.conn-card.is-offline{background:linear-gradient(135deg,#ef4444,#b91c1c);box-shadow:0 10px 24px -12px rgba(220,38,38,.6)}
+button.conn-card{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+button.conn-card:hover{transform:translateY(-2px)}
+button.conn-card:active{transform:scale(.98)}
+.conn-tap{display:inline-block;margin-top:6px;font-size:.7rem;font-weight:700;background:rgba(255,255,255,.18);border-radius:999px;padding:3px 10px;max-width:100%;line-height:1.6}
+.conn-pulse{width:9px;height:9px;border-radius:50%;background:#bbf7d0;box-shadow:0 0 0 0 rgba(187,247,208,.8);animation:conn-p 1.6s infinite}
+@keyframes conn-p{70%{box-shadow:0 0 0 8px rgba(187,247,208,0)}100%{box-shadow:0 0 0 0 rgba(187,247,208,0)}}
+.cfm-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);opacity:0;transition:opacity .15s ease}
+.cfm-backdrop.open{opacity:1}
+.cfm{width:min(380px,100%);background:var(--surface,#fff);color:var(--text,#111);border-radius:22px;padding:22px 20px 18px;text-align:center;box-shadow:0 24px 60px -20px rgba(0,0,0,.45);transform:translateY(10px) scale(.97);transition:transform .18s ease}
+.cfm-backdrop.open .cfm{transform:none}
+.cfm-icon{width:52px;height:52px;margin:0 auto 10px;border-radius:50%;display:grid;place-items:center;font-size:1.6rem;font-weight:900;color:#b91c1c;background:#fee2e2}
+.cfm-msg{font-size:1rem;font-weight:700;line-height:1.9;margin:0 0 16px}
+.cfm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (prefers-reduced-motion:reduce){.conn-pulse{animation:none}.cfm,.cfm-backdrop{transition:none}}

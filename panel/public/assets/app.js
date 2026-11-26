@@ -12,10 +12,36 @@
   if (btn) btn.addEventListener('click', function () { toggle(!sidebar.classList.contains('open')); });
   if (backdrop) backdrop.addEventListener('click', function () { toggle(false); });
 
+  // Confirm popup (instead of the browser's dialog): data-confirm, optional data-confirm-ok / data-confirm-cancel.
+  function askConfirm(msg, okText, cancelText, done) {
+    var wrap = document.createElement('div');
+    wrap.className = 'cfm-backdrop';
+    wrap.innerHTML = '<div class="cfm" role="alertdialog" aria-modal="true"><div class="cfm-icon">!</div><p class="cfm-msg"></p>'
+      + '<div class="cfm-actions"><button type="button" class="btn cfm-ok"></button><button type="button" class="btn btn-secondary cfm-cancel"></button></div></div>';
+    wrap.querySelector('.cfm-msg').textContent = msg;
+    wrap.querySelector('.cfm-ok').textContent = okText || 'باشه';
+    wrap.querySelector('.cfm-cancel').textContent = cancelText || 'منصرف شدم';
+    function close(ok) { document.removeEventListener('keydown', onKey); wrap.remove(); done(ok); }
+    function onKey(ev) { if (ev.key === 'Escape') close(false); }
+    wrap.addEventListener('click', function (ev) { if (ev.target === wrap) close(false); });
+    wrap.querySelector('.cfm-ok').addEventListener('click', function () { close(true); });
+    wrap.querySelector('.cfm-cancel').addEventListener('click', function () { close(false); });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(wrap);
+    requestAnimationFrame(function () { wrap.classList.add('open'); wrap.querySelector('.cfm-ok').focus(); });
+  }
   document.addEventListener('submit', function (e) {
     var form = e.target;
     var msg = form.getAttribute('data-confirm');
-    if (msg && !window.confirm(msg)) { e.preventDefault(); return; }
+    if (msg && form.dataset.confirmed !== '1') {
+      e.preventDefault();
+      askConfirm(msg, form.getAttribute('data-confirm-ok'), form.getAttribute('data-confirm-cancel'), function (ok) {
+        if (!ok) return;
+        form.dataset.confirmed = '1';
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      });
+      return;
+    }
     // Prevent double submission (duplicate operations).
     if (form.dataset.submitted === '1') { e.preventDefault(); return; }
     form.dataset.submitted = '1';

@@ -33,17 +33,13 @@
   @endif
 
   <div class="grid stats mb-16">
-    <div class="card stat"><div class="label">اتصال</div><div class="value small">{{ $a->is_online ? ($a->isWireguard() ? 'آنلاین' : fa($a->online_count).' نشست آنلاین') : 'آفلاین' }}</div>
-      <div class="hint">{{ $a->online_ip ? 'از '.$a->online_ip : ($a->last_seen_at ? 'آخرین فعالیت '.fa_ago($a->last_seen_at) : 'هنوز وصل نشده') }}</div></div>
+    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? ($a->isWireguard() ? 'آنلاین' : fa($a->online_count).' نشست آنلاین') : 'آفلاین',
+      'hint' => $a->online_ip ? 'از IP '.$a->online_ip : ($a->last_seen_at ? 'آخرین فعالیت '.fa_ago($a->last_seen_at) : 'هنوز وصل نشده'),
+      'kickUrl' => ! $a->isWireguard() && ! $a->trashed() && auth()->user()->can('mt_accounts.update') ? route('mt.accounts.kick', $a) : null])
     <div class="card stat"><div class="label">مصرف کل</div><div class="value small">{{ fa_bytes($a->used_bytes) }}</div>
       <div class="hint">دانلود {{ fa_bytes($a->download_bytes) }} · آپلود {{ fa_bytes($a->upload_bytes) }}</div></div>
   </div>
   @include('mt.accounts._meters', ['a' => $a, 'class' => 'mb-16'])
-  @can('mt_accounts.update')
-    @if(! $a->isWireguard() && $a->is_online && ! $a->trashed())
-      <form method="post" action="{{ route('mt.accounts.kick', $a) }}" class="mb-16" data-confirm="همه نشست‌های آنلاین «{{ $a->username }}» قطع شود؟">@csrf<button class="btn btn-danger" type="submit">⛔ قطع همه نشست‌های آنلاین ({{ fa($a->online_count) }})</button></form>
-    @endif
-  @endcan
 
   <div class="grid two">
     <div class="card">

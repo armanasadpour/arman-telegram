@@ -30,10 +30,11 @@ class SessionsAndLogsTest extends IbsTestCase
         $this->fake->connect('ovp2', stationIp: '37.1.1.1');
         app(AccountSync::class)->syncOnlines();
         $admin = $this->superAdmin();
-        $this->actingAs($admin)->get('/accounts/'.$a->id)->assertSee('5.120.1.2')->assertSee('قطع همه نشست‌های آنلاین');
+        $this->actingAs($admin)->get('/accounts/'.$a->id)->assertSee('5.120.1.2')->assertSee('همه نشست‌های فعال این اکانت آفلاین می‌شوند')->assertSee('conn-card is-online', false);
         $this->actingAs($admin)->from('/accounts/'.$a->id)->post('/accounts/'.$a->id.'/kick')->assertSessionHas('success');
         $this->assertFalse($a->fresh()->is_online);
         $this->assertCount(1, $this->fake->onlines, 'only this account was disconnected');
+        $this->actingAs($admin)->get('/accounts/'.$a->id)->assertSee('conn-card is-offline', false);
         $this->actingAs($admin)->get('/accounts')->assertDontSee('قطع همه نشست‌ها');
     }
 
@@ -45,8 +46,8 @@ class SessionsAndLogsTest extends IbsTestCase
         $this->ros->trafficWg($w->wg_public_key, 10, 10);   // endpoint 7.7.7.7
         app(MtAccounting::class)->syncRouter($this->router->fresh());
         $admin = $this->superAdmin();
-        $this->actingAs($admin)->get('/mt/accounts/'.$l->id)->assertSee('91.92.93.94')->assertSee('قطع همه نشست‌های آنلاین');
-        $this->actingAs($admin)->get('/mt/accounts/'.$w->id)->assertSee('7.7.7.7')->assertDontSee('قطع همه نشست‌های آنلاین');
+        $this->actingAs($admin)->get('/mt/accounts/'.$l->id)->assertSee('91.92.93.94')->assertSee('منصرف شدم');
+        $this->actingAs($admin)->get('/mt/accounts/'.$w->id)->assertSee('7.7.7.7')->assertDontSee('برای قطع همه نشست‌ها');
         $this->actingAs($admin)->get('/l2tp/accounts')->assertDontSee('قطع همه نشست‌ها');
         $this->actingAs($admin)->from('/mt/accounts/'.$l->id)->post('/mt/accounts/'.$l->id.'/kick')->assertSessionHas('success');
         $this->assertEmpty($this->ros->menus['ppp/active']);

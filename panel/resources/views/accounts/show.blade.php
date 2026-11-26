@@ -32,11 +32,9 @@
   @endphp
   <div class="grid stats mb-16">
     <div class="card stat"><div class="label">وضعیت</div><div class="value small">@include('accounts._status', ['a' => $a])</div></div>
-    <div class="card stat">
-      <div class="label">اتصال</div>
-      <div class="value small">{{ $a->is_online ? fa($a->online_sessions).' نشست آنلاین' : 'آفلاین' }}</div>
-      <div class="hint">حداکثر همزمان: {{ $a->effectiveMultiLogin() !== null ? fa($a->effectiveMultiLogin()) : '—' }}</div>
-    </div>
+    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? fa($a->online_sessions).' نشست آنلاین' : 'آفلاین',
+      'hint' => 'حداکثر همزمان: '.($a->effectiveMultiLogin() !== null ? fa($a->effectiveMultiLogin()) : '—'),
+      'kickUrl' => ! $a->ibs_deleted_at && auth()->user()->can('accounts.update') ? route('accounts.kick', $a) : null])
   </div>
   @include('accounts._meters', ['a' => $a, 'class' => 'mb-16'])
 
@@ -56,9 +54,6 @@
     </div>
     <div class="card">
       <h2>نشست‌های آنلاین</h2>
-      @can('accounts.update')@if($a->is_online && ! $a->ibs_deleted_at)
-        <form method="post" action="{{ route('accounts.kick', $a) }}" class="mb-8" data-confirm="همه نشست‌های آنلاین «{{ $a->username }}» قطع شود؟">@csrf<button class="btn btn-danger btn-sm" type="submit">⛔ قطع همه نشست‌های آنلاین</button></form>
-      @endif @endcan
       @if(! $a->is_online || empty($a->sessions))
         <div class="empty"><div>در حال حاضر آنلاین نیست.</div></div>
       @else
