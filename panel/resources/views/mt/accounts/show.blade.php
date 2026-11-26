@@ -74,6 +74,13 @@
           <h2>ویرایش اطلاعات حساب</h2>
           <form method="post" action="{{ route('mt.accounts.info', $a) }}">@csrf
             <div class="field"><label for="edit_customer">👤 نام کاربر</label><input id="edit_customer" name="comment" class="input" required maxlength="100" value="{{ $a->comment }}" autocomplete="off"></div>
+            @php($sameGroups = \App\Models\MtGroup::query()->where('router_id', $a->router_id)->where('protocol', $a->protocol)->when($a->isWireguard(), fn ($q) => $q->where('wg_interface', $a->group?->wg_interface))->orderBy('name')->get())
+            <div class="field"><label for="edit_group">گروه</label>
+              <select id="edit_group" name="mt_group_id" class="input">
+                @foreach($sameGroups as $g)<option value="{{ $g->id }}" @selected($g->id === $a->mt_group_id)>{{ $g->name }}{{ $g->isWireguard() ? ($g->rate_limit ? ' — سرعت '.$g->rate_limit : '') : ' — پروفایل '.$g->ppp_profile }}</option>@endforeach
+              </select>
+              <div class="help">{{ $a->isWireguard() ? 'گروه‌های همین اینترفیس؛ محدودیت سرعت گروه جدید اعمال می‌شود.' : 'پروفایل PPP (سرعت، آدرس) از اتصال بعدی اعمال می‌شود.' }}</div>
+            </div>
             <button class="btn" type="submit">ذخیره</button>
           </form>
         </div>

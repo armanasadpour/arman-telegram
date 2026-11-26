@@ -3,6 +3,7 @@
 namespace App\Services\Ibs;
 
 use App\Ibs\IbsConnector;
+use App\Models\IbsGroup;
 use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Settings;
@@ -181,6 +182,26 @@ class AccountActions
         $this->ibs->updateAttrs($a->ibs_user_id, ['comment' => $comment]);
         $a->forceFill(['comment' => $comment])->save();
         $this->audit->log('accounts.edit', $a, 'ویرایش اطلاعات «'.$a->username.'»', ['customer' => [$old, trim($name)]]);
+
+        return $a;
+    }
+
+    /** Move the account to another IBSng group (same charge type, so credit keeps its meaning). */
+    public function setGroup(VpnAccount $a, string $group): VpnAccount
+    {
+        $a = $this->live($a);
+        if ($a->group_name === $group) {
+            return $a;
+        }
+        $new = IbsGroup::query()->with('charge')->where('name', $group)->where('present', true)->first()
+            ?? throw new RuntimeException('این گروه در سرور وجود ندارد.');
+        if ((bool) $new->charge?->isVolume() !== $a->isVolumeLimited()) {
+            throw new RuntimeException('تعرفه گروه جدید '.($new->charge?->isVolume() ? 'حجمی' : 'بدون محدودیت حجم').' است و با تعرفه فعلی اکانت فرق دارد؛ فقط بین گروه‌های هم‌نوع می‌شود جابه‌جا کرد.');
+        }
+        $old = $a->group_name;
+        $this->ibs->updateAttrs($a->ibs_user_id, ['group_name' => $group]);
+        $a = $this->sync->refresh($a);
+        $this->audit->log('accounts.group', $a, 'تغییر گروه «'.$a->username.'»: '.$old.' ← '.$group, ['group_name' => [$old, $a->group_name]]);
 
         return $a;
     }

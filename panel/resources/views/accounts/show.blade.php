@@ -85,6 +85,13 @@
           <h2>ویرایش اطلاعات حساب</h2>
           <form method="post" action="{{ route('accounts.info', $a) }}">@csrf
             <div class="field"><label for="edit_customer">👤 نام کاربر</label><input id="edit_customer" name="comment" class="input" required maxlength="100" value="{{ $a->displayComment() }}" autocomplete="off"></div>
+            @php($sameKind = \App\Models\IbsGroup::query()->with('charge')->where('present', true)->orderBy('name')->get()->filter(fn ($g) => (bool) $g->charge?->isVolume() === $a->isVolumeLimited()))
+            <div class="field"><label for="edit_group">گروه</label>
+              <select id="edit_group" name="group" class="input">
+                @foreach($sameKind as $g)<option value="{{ $g->name }}" @selected($g->name === $a->group_name)>{{ $g->name }}{{ $g->rel_exp_seconds ? ' — '.fa_duration($g->rel_exp_seconds) : '' }}</option>@endforeach
+              </select>
+              <div class="help">فقط گروه‌های هم‌نوع ({{ $a->isVolumeLimited() ? 'حجمی' : 'بدون محدودیت حجم' }}). مدت و تعداد اتصال از گروه جدید گرفته می‌شود مگر برای اکانت جدا تعیین شده باشد.</div>
+            </div>
             <button class="btn" type="submit">ذخیره</button>
           </form>
         </div>

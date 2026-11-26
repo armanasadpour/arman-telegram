@@ -226,9 +226,14 @@ class MtAccountsController extends Controller
     public function updateInfo(Request $request, MtAccount $account): RedirectResponse
     {
         $this->authorize('mt_accounts.update');
-        $name = $request->validate(['comment' => ['required', 'string', 'max:100']], [], ['comment' => 'نام کاربر'])['comment'];
+        $d = $request->validate(['comment' => ['required', 'string', 'max:100'], 'mt_group_id' => ['nullable', 'integer', 'exists:mt_groups,id']], [], ['comment' => 'نام کاربر', 'mt_group_id' => 'گروه']);
 
-        return $this->run(fn () => $this->actions->setCustomerName($account, $name), 'اطلاعات حساب ذخیره شد.');
+        return $this->run(function () use ($account, $d) {
+            $this->actions->setCustomerName($account, $d['comment']);
+            if (! empty($d['mt_group_id']) && (int) $d['mt_group_id'] !== $account->mt_group_id) {
+                $this->actions->setGroup($account->fresh(), MtGroup::query()->findOrFail($d['mt_group_id']));
+            }
+        }, 'اطلاعات حساب ذخیره شد.');
     }
 
     public function kick(MtAccount $account): RedirectResponse

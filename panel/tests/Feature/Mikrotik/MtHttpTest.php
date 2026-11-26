@@ -85,6 +85,11 @@ class MtHttpTest extends MikrotikTestCase
         $a = app(MtProvisioning::class)->create($this->l2tp, (string) Str::uuid(), ['username' => 'act1', 'days' => 30, 'volume_gb' => 5], null);
         $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.info', $a), ['comment' => 'حسین کریمی'])->assertSessionHas('success');
         $this->assertSame('حسین کریمی', $a->fresh()->comment);
+        $fast = MtGroup::query()->create(['router_id' => $this->router->id, 'protocol' => 'l2tp', 'name' => 'سریع', 'ppp_profile' => 'fast-profile']);
+        $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.info', $a), ['comment' => 'حسین کریمی', 'mt_group_id' => $fast->id])->assertSessionHas('success');
+        $this->assertSame($fast->id, $a->fresh()->mt_group_id);
+        $this->assertSame('fast-profile', $this->ros->find('ppp/secret', 'name', 'act1')['profile']);
+        $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.info', $a), ['comment' => 'x', 'mt_group_id' => $this->wg->id])->assertSessionHas('error');
         $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertSee('ویرایش اطلاعات حساب');
         $this->actingAs($admin)->from(route('mt.accounts.show', $a))->post(route('mt.accounts.volume', $a), ['gb' => 5])->assertSessionHas('success');
         $this->assertSame(10 * 1073741824, $a->fresh()->volume_limit_bytes);

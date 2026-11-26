@@ -236,9 +236,14 @@ class AccountsController extends Controller
     public function updateInfo(Request $request, VpnAccount $account): RedirectResponse
     {
         $this->authorize('accounts.update');
-        $name = $request->validate(['comment' => ['required', 'string', 'max:100']], [], ['comment' => 'نام کاربر'])['comment'];
+        $d = $request->validate(['comment' => ['required', 'string', 'max:100'], 'group' => ['nullable', 'string', 'max:100']], [], ['comment' => 'نام کاربر', 'group' => 'گروه']);
 
-        return $this->attempt(fn () => $this->actions->setCustomerName($account, $name), 'اطلاعات حساب ذخیره شد.');
+        return $this->attempt(function () use ($account, $d) {
+            $a = $this->actions->setCustomerName($account, $d['comment']);
+            if (! empty($d['group']) && $d['group'] !== $a->group_name) {
+                $this->actions->setGroup($a, $d['group']);
+            }
+        }, 'اطلاعات حساب ذخیره شد.');
     }
 
     public function kick(VpnAccount $account): RedirectResponse

@@ -3,6 +3,7 @@
 namespace App\Services\Mikrotik;
 
 use App\Models\MtAccount;
+use App\Models\MtGroup;
 use App\Models\Package;
 use App\Models\Router;
 use App\RouterOs\RouterConnector;
@@ -112,6 +113,34 @@ class MtActions
         $old = $a->comment;
         $a->forceFill(['comment' => mb_substr(trim($name), 0, 150)])->save();
         $this->audit->log('mt_accounts.edit', $a, 'ویرایش اطلاعات «'.$a->username.'»', ['customer' => [$old, $a->comment]]);
+
+        return $a;
+    }
+
+    /** Move to another group of the same router and protocol (L2TP: PPP profile; WireGuard: same interface only). */
+    public function setGroup(MtAccount $a, MtGroup $g): MtAccount
+    {
+        if ($g->id === $a->mt_group_id) {
+            return $a;
+        }
+        if ($g->router_id !== $a->router_id || $g->protocol !== $a->protocol) {
+            throw new RuntimeException('فقط گروه‌های همین روتر و همین پروتکل قابل انتخاب است.');
+        }
+        if ($a->isWireguard() && $g->wg_interface !== $a->group?->wg_interface) {
+            throw new RuntimeException('گروه جدید اینترفیس WireGuard دیگری دارد؛ برای انتقال، اکانت جدید بسازید.');
+        }
+        if ($a->ros_id && ! $a->isWireguard()) {
+            $this->ros->set($a->router, 'ppp/secret', $a->ros_id, ['profile' => (string) $g->ppp_profile]);
+        }
+        $old = $a->group?->name;
+        $a->forceFill(['mt_group_id' => $g->id])->save();
+        $a->setRelation('group', $g);
+        if ($a->isWireguard() && $a->ros_id) {
+            foreach ($a->allDevices() as $dev) {
+                $g->rate_limit ? $this->prov->ensureQueue($a, $dev) : $this->prov->removeQueue($a, $dev);
+            }
+        }
+        $this->audit->log('mt_accounts.group', $a, 'تغییر گروه «'.$a->username.'»: '.$old.' ← '.$g->name, ['group' => [$old, $g->name]]);
 
         return $a;
     }

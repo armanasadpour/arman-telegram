@@ -267,6 +267,10 @@ class FakeIbs implements Transport
             if (array_key_exists('rel_exp_date', $a)) {
                 $u['attrs']['rel_exp_date'] = (int) $a['rel_exp_date'] * ['Hours' => 3600, 'Days' => 86400, 'Months' => 2592000, 'Years' => 31536000][$a['rel_exp_date_unit']];
             }
+            if (array_key_exists('group_name', $a)) {
+                isset($this->groups[$a['group_name']]) || $this->fault('GROUP_NAME_INVALID', 'Group name '.$a['group_name'].' is invalid');
+                $u['group'] = $a['group_name'];
+            }
             foreach (['lock', 'multi_login', 'comment'] as $k) {
                 if (array_key_exists($k, $a)) {
                     $u['attrs'][$k] = (string) $a[$k];

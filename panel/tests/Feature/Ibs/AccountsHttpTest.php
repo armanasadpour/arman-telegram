@@ -4,6 +4,7 @@ namespace Tests\Feature\Ibs;
 
 use App\Ibs\IbsUnavailableException;
 use App\Models\AuditLog;
+use App\Models\IbsGroup;
 use App\Models\VpnAccount;
 use App\Services\Ibs\AccountActions;
 use App\Services\Ibs\AccountSync;
@@ -105,6 +106,13 @@ class AccountsHttpTest extends IbsTestCase
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/info", ['comment' => 'مریم'])->assertSessionHas('success');
         $this->assertSame('مریم', $a->fresh()->displayComment());
         $this->assertSame('مریم', $this->fake->users[$a->ibs_user_id]['attrs']['comment']);
+        $other = IbsGroup::query()->with('charge')->where('present', true)->where('name', '!=', $a->fresh()->group_name)->get()
+            ->first(fn ($g) => (bool) $g->charge?->isVolume() === $a->fresh()->isVolumeLimited());
+        if ($other) {
+            $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/info", ['comment' => 'مریم', 'group' => $other->name])->assertSessionHas('success');
+            $this->assertSame($other->name, $this->fake->users[$a->ibs_user_id]['group']);
+            $this->assertSame($other->name, $a->fresh()->group_name);
+        }
         $this->actingAs($admin)->from("/accounts/{$a->id}")->post("/accounts/{$a->id}/reset-first-login", ['reason' => 'فروش مجدد'])->assertSessionHas('success');
     }
 
