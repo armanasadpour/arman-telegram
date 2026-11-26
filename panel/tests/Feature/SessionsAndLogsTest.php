@@ -56,4 +56,26 @@ class SessionsAndLogsTest extends IbsTestCase
         $this->assertSame(1, \DB::table('connection_logs')->where('account_key', 'm:'.$l->id)->count(), 'same IP: one row');
 
     }
+
+    public function test_account_page_shows_live_online_state_without_waiting_for_cron(): void
+    {
+        $this->syncCatalog();
+        $this->ibsUser('live1');
+        $a = app(AccountSync::class)->importByUsername('live1');
+        $this->assertFalse($a->is_online);
+        $this->fake->connect('live1', stationIp: '2.2.2.2');   // no onlines sync has run
+        $this->actingAs($this->superAdmin())->get('/accounts/'.$a->id)->assertSee('conn-card is-online', false)->assertSee('2.2.2.2');
+        $this->assertTrue($a->fresh()->is_online);
+    }
+
+    public function test_l2tp_online_from_ppp_active_even_when_l2tp_server_list_has_no_user(): void
+    {
+        $l = app(MtProvisioning::class)->create($this->l2tp, (string) Str::uuid(), ['username' => 'nouser', 'comment' => 'x'], null);
+        $this->ros->connectL2tp('nouser', '8.8.4.4');
+        $this->ros->trafficL2tp('nouser', 100, 200);
+        $this->ros->menus['interface/l2tp-server'] = array_map(fn ($x) => array_diff_key($x, ['user' => 1]), $this->ros->menus['interface/l2tp-server']);
+        $l->forceFill(['last_synced_at' => now()->subMinute()])->save();
+        $this->actingAs($this->superAdmin())->get('/mt/accounts/'.$l->id)->assertSee('conn-card is-online', false)->assertSee('8.8.4.4');
+        $this->assertSame(300, $l->fresh()->used_bytes, 'bytes found by interface name');
+    }
 }

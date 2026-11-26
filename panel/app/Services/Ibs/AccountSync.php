@@ -143,6 +143,25 @@ class AccountSync
         return $info ? ($this->apply($info) ?? $account) : $account;
     }
 
+    /** Live "is this account online right now" from the server's online list (account page). */
+    public function refreshOnline(VpnAccount $a): VpnAccount
+    {
+        $sessions = [];
+        foreach ($this->ibs->onlineUsers() as $s) {
+            if ((int) ($s['user_id'] ?? 0) === $a->ibs_user_id || ($s['normal_username'] ?? null) === $a->username) {
+                $sessions[] = ['ras_ip' => $s['ras_ip'] ?? null, 'service' => $s['service'] ?? null, 'login_epoch' => $s['login_time_epoch'] ?? null,
+                    'duration_secs' => $s['duration_secs'] ?? null, 'in_bytes' => $s['in_bytes'] ?? null, 'out_bytes' => $s['out_bytes'] ?? null,
+                    'unique_id_val' => $s['unique_id_val'] ?? null, 'client_ip' => ConnectionLog::ibsClientIp($s)];
+            }
+        }
+        $a->forceFill(['is_online' => (bool) $sessions, 'online_sessions' => count($sessions), 'sessions' => $sessions ?: null])->save();
+        foreach ($sessions as $sess) {
+            app(ConnectionLog::class)->seen('openvpn', 'v:'.$a->id, $sess['client_ip']);
+        }
+
+        return $a;
+    }
+
     public function importByUsername(string $username): ?VpnAccount
     {
         $info = $this->ibs->userByUsername($username);

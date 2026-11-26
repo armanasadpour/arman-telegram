@@ -179,6 +179,13 @@ class AccountsController extends Controller
         $this->authorize('accounts.view');
 
         $account->load('group.charge', 'creator');
+        if (! $account->ibs_deleted_at && app(IbsConnector::class)->isConfigured()) {
+            try {
+                $this->sync->refreshOnline($account);   // the online card must be live, not from the last cron run
+            } catch (\Throwable) {
+                // server unreachable: show the last known state
+            }
+        }
         $pricing = app(PricingEngine::class);
 
         return view('accounts.show', [

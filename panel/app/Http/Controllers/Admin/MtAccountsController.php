@@ -153,6 +153,14 @@ class MtAccountsController extends Controller
 
     private function showView(MtAccount $a, bool $reveal): View
     {
+        if (! $a->trashed() && $a->router?->is_active && (! $a->last_synced_at || $a->last_synced_at->lt(now()->subSeconds(20)))) {
+            try {
+                app(MtAccounting::class)->syncRouter($a->router);   // live online state and usage for the page
+                $a->refresh();
+            } catch (\Throwable) {
+                // router unreachable: show the last known state
+            }
+        }
         $a->load(['group', 'router', 'reseller', 'package', 'creator']);
         $usage = DB::table('mt_usage_daily')->where('mt_account_id', $a->id)->where('day', '>=', now()->setTimezone('Asia/Tehran')->subDays(29)->toDateString())->orderBy('day')->get();
         $renewals = Package::query()->where('protocol', 'mikrotik')->where('is_active', true)->whereIn('type', ['renewal', 'topup'])->orderBy('sort_order')->get()

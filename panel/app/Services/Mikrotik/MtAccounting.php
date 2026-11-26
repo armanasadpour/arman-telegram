@@ -7,6 +7,7 @@ use App\Models\MtDevice;
 use App\Models\Router;
 use App\RouterOs\RouterConnector;
 use App\RouterOs\RouterOsException;
+use App\RouterOs\RouterOsUnreachable;
 use App\Services\ConnectionLog;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -42,18 +43,7 @@ class MtAccounting
         $wg = $accounts->where('protocol', 'wireguard');
         $sessions = $secrets = $peers = [];
         if ($l2tp->isNotEmpty()) {
-            $bytes = [];
-            foreach ($this->ros->get($r, 'interface', ['type' => 'l2tp-in']) as $if) {
-                $bytes[$if['name'] ?? ''] = [RosValues::int($if['rx-byte'] ?? 0), RosValues::int($if['tx-byte'] ?? 0)];
-            }
-            foreach ($this->ros->get($r, 'interface/l2tp-server') as $s) {
-                if (! RosValues::bool($s['dynamic'] ?? 'false') || ($s['user'] ?? '') === '') {
-                    continue;
-                }
-                [$rx, $tx] = $bytes[$s['name'] ?? ''] ?? [0, 0];
-                $sessions[$s['user']][] = ['key' => ($s['.id'] ?? '').'|'.($s['name'] ?? ''), 'rx' => $rx, 'tx' => $tx,
-                    'ip' => $s['client-address'] ?? null, 'uptime' => RosValues::seconds($s['uptime'] ?? null) ?? 0];
-            }
+            $sessions = $this->l2tpSessions($r);
             foreach ($this->ros->get($r, 'ppp/secret') as $s) {
                 $secrets[$s['name'] ?? ''] = $s;
             }
@@ -155,6 +145,58 @@ class MtAccounting
         }
     }
 
+    /**
+     * Live L2TP sessions per user. /ppp/active is the source of truth for "who is connected"; byte counters come
+     * from the session's dynamic interface (<l2tp-user> or <l2tp-user-N>), matched through /interface/l2tp-server
+     * when it reports the user, otherwise by the interface name.
+     *
+     * @return array<string, list<array{key:string,rx:int,tx:int,ip:?string,uptime:int,active_id:string}>>
+     */
+    public function l2tpSessions(Router $r): array
+    {
+        $bytes = [];
+        foreach ($this->ros->get($r, 'interface', ['type' => 'l2tp-in']) as $if) {
+            $bytes[$if['name'] ?? ''] = [RosValues::int($if['rx-byte'] ?? 0), RosValues::int($if['tx-byte'] ?? 0)];
+        }
+        $srvByUser = [];
+        $srvId = [];
+        try {
+            foreach ($this->ros->get($r, 'interface/l2tp-server') as $s) {
+                if (RosValues::bool($s['dynamic'] ?? 'false') && ($s['name'] ?? '') !== '') {
+                    $srvId[$s['name']] = (string) ($s['.id'] ?? '');
+                    if (($s['user'] ?? '') !== '') {
+                        $srvByUser[$s['user']][] = $s['name'];
+                    }
+                }
+            }
+        } catch (RouterOsException $e) {
+            if ($e instanceof RouterOsUnreachable) {
+                throw $e;
+            }
+        }
+        $active = [];
+        foreach ($this->ros->get($r, 'ppp/active') as $a) {
+            if (($a['service'] ?? 'l2tp') === 'l2tp' && ($a['name'] ?? '') !== '') {
+                $active[$a['name']][] = $a;
+            }
+        }
+        $out = [];
+        foreach ($active as $user => $rows) {
+            usort($rows, fn ($x, $y) => (RosValues::seconds($y['uptime'] ?? '') ?? 0) <=> (RosValues::seconds($x['uptime'] ?? '') ?? 0));   // oldest first
+            $names = $srvByUser[$user] ?? array_values(array_filter(array_keys($bytes), fn ($n) => preg_match('/^<l2tp-'.preg_quote($user, '/').'(-\d+)?>$/', $n)));
+            sort($names, SORT_NATURAL);
+            foreach ($rows as $i => $a) {
+                $name = $names[$i] ?? null;
+                [$rx, $tx] = $name !== null ? ($bytes[$name] ?? [0, 0]) : [0, 0];
+                $out[$user][] = ['key' => ($name !== null && isset($srvId[$name]) ? $srvId[$name] : (string) ($a['.id'] ?? '')).'|'.($name ?? ''),
+                    'rx' => $rx, 'tx' => $tx, 'ip' => ($a['caller-id'] ?? '') !== '' ? $a['caller-id'] : null,
+                    'uptime' => RosValues::seconds($a['uptime'] ?? null) ?? 0, 'active_id' => (string) ($a['.id'] ?? '')];
+            }
+        }
+
+        return $out;
+    }
+
     private function logIps(MtAccount $a, array $d, array $l2tpSessions): void
     {
         $log = app(ConnectionLog::class);
@@ -211,7 +253,7 @@ class MtAccounting
             [$up, $down] = [$rx - $p[0], $tx - $p[1]];
         }
         $hs = RosValues::seconds($peer['last-handshake'] ?? null);
-        $online = $hs !== null && $hs <= 180 && ! RosValues::bool($peer['disabled'] ?? 'false');
+        $online = ! RosValues::bool($peer['disabled'] ?? 'false') && (($hs !== null && $hs <= 180) || ($p !== null && $up + $down > 0));
 
         return ['up' => $up, 'down' => $down, 'counters' => ['peer' => [$rx, $tx]], 'online' => $online ? 1 : 0,
             'ip' => $online ? ($peer['current-endpoint-address'] ?? null) : null, 'seen' => $hs !== null ? now()->subSeconds($hs) : null];
