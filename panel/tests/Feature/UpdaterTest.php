@@ -56,13 +56,14 @@ class UpdaterTest extends TestCase
         $this->actingAs($admin)->get('/system/update')->assertOk()->assertSee(config('panel.version'));
         $zip = $this->zip(['update-manifest.json' => $this->manifest(config('panel.version'), ['app/Old.php']), 'config/panel.php' => "<?php return ['version' => '9.9.9'];",
             'app/New.php' => 'new', '.env' => 'APP_KEY=evil', 'storage/app/installed.lock' => 'x']);
-        $this->actingAs($admin)->post('/system/update', ['package' => $zip])->assertRedirect(route('system.status'))->assertSessionHas('auto_upgrade');
+        $this->actingAs($admin)->post('/system/update', ['package' => $zip])->assertRedirect(route('system.status'))->assertSessionHas('success', fn ($m) => str_contains($m, 'دیتابیس به‌روز شد'));
         $this->assertSame('new', file_get_contents($this->root.'/app/New.php'));
         $this->assertFileDoesNotExist($this->root.'/app/Old.php');
         $this->assertSame('APP_KEY=keep-me', file_get_contents($this->root.'/.env'));
         $this->assertFileDoesNotExist($this->root.'/storage/app/installed.lock');
         $this->assertFileDoesNotExist($this->root.'/update-manifest.json');
         $this->assertDatabaseHas('audit_logs', ['action' => 'system.update_installed']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'system.upgraded']);
     }
 
     public function test_update_for_another_version_or_unsafe_paths_changes_nothing(): void

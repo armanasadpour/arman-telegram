@@ -19,7 +19,7 @@ class Notices
     private function ready(): bool
     {
         try {
-            return $this->ready ??= Schema::hasTable('panel_notices');
+            return $this->ready ??= Schema::hasTable('panel_notices') && Schema::hasColumn('users', 'notices_seen_at');
         } catch (Throwable) {
             return false;
         }
@@ -72,6 +72,11 @@ class Notices
         }
 
         return PanelNotice::query()->when($user->notices_seen_at, fn ($q, $t) => $q->where('created_at', '>', $t))->count();
+    }
+
+    public function lastId(): int
+    {
+        return $this->ready() ? (int) PanelNotice::query()->max('id') : 0;
     }
 
     public function prune(): void

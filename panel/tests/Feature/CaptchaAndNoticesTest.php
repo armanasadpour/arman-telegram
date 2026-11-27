@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Notices;
 use App\Support\Captcha;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class CaptchaAndNoticesTest extends TestCase
@@ -70,5 +71,15 @@ class CaptchaAndNoticesTest extends TestCase
         $this->actingAs($admin)->get('/accounts')->assertDontSee('down-banner', false);
 
         $this->actingAs($this->userWith(['accounts.view']))->get('/notices')->assertForbidden();
+    }
+
+    public function test_pages_still_open_before_the_notices_migration_ran(): void
+    {
+        Schema::drop('panel_notices');
+        Schema::table('users', fn ($t) => $t->dropColumn('notices_seen_at'));
+        $admin = $this->superAdmin();
+        $this->actingAs($admin)->get('/system')->assertOk();
+        $this->actingAs($admin)->get('/system/update')->assertOk();
+        $this->actingAs($admin)->get('/')->assertOk();
     }
 }

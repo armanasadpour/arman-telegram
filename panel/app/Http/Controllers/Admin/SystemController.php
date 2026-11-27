@@ -79,7 +79,22 @@ class SystemController extends Controller
         Cache::forget('system.pending_migrations');
         $audit->log('system.update_installed', null, 'نصب '.($r['type'] === 'full' ? 'بسته کامل' : 'بسته به‌روزرسانی').' '.$r['from'].' ← '.$r['to'].' ('.$r['files'].' فایل)');
 
-        return redirect()->route('system.status')->with('success', 'فایل‌های نسخه '.$r['to'].' نصب شد ('.fa($r['files']).' فایل).')->with('auto_upgrade', true);
+        // Update the database right away, in this request: the next page already runs the new code and may need the new tables.
+        try {
+            $code = Artisan::call('migrate', ['--force' => true]);
+        } catch (\Throwable $e) {
+            $code = 1;
+        }
+        Cache::forget('system.pending_migrations');
+        if ($code !== 0) {
+            return redirect()->route('system.status')->with('success', 'فایل‌های نسخه '.$r['to'].' نصب شد ('.fa($r['files']).' فایل).')->with('auto_upgrade', true);
+        }
+        Artisan::call('permissions:sync');
+        Artisan::call('view:clear');
+        app(Settings::class)->set('system.version', $r['to']);
+        $audit->log('system.upgraded', null, 'به‌روزرسانی به نسخه '.$r['to'].' (همراه نصب فایل‌ها)');
+
+        return redirect()->route('system.status')->with('success', 'به‌روزرسانی به نسخه '.$r['to'].' کامل شد ('.fa($r['files']).' فایل، دیتابیس به‌روز شد).');
     }
 
     private function bytes(string|false $v): int
