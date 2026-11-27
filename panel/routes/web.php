@@ -212,6 +212,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/resellers', [ResellersController::class, 'store'])->name('resellers.store');
     Route::get('/resellers/{reseller}', [ResellersController::class, 'show'])->name('resellers.show')->whereNumber('reseller');
     Route::put('/resellers/{reseller}', [ResellersController::class, 'update'])->name('resellers.update');
+    Route::post('/resellers/{reseller}/accounts/bulk', [ResellersController::class, 'bulkAccounts'])->name('resellers.bulk')->middleware('throttle:20,1');
     Route::post('/resellers/{reseller}/category-discount', [ResellersController::class, 'setCategoryDiscount'])->name('resellers.category-discount');
     Route::post('/resellers/{reseller}/fixed-price', [ResellersController::class, 'setFixedPrice'])->name('resellers.fixed-price');
 

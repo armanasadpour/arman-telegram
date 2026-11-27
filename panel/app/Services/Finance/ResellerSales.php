@@ -19,6 +19,7 @@ use App\Services\Mikrotik\MtActions;
 use App\Services\Mikrotik\MtProvisioning;
 use App\Services\Pricing\PackageApplier;
 use App\Services\Pricing\PackageRules;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -61,6 +62,14 @@ class ResellerSales
         if ($package->type === 'new') {
             if ($target) {
                 throw new RuntimeException('بسته اکانت جدید روی اکانت موجود اعمال نمی‌شود.');
+            }
+            $un = (string) ($opts['username'] ?? '');
+            if ($un === '' && $reseller->account_prefix) {
+                // the panel and the bot always ask for a username; other callers still get the reseller's prefix
+                $opts['username'] = $un = $reseller->account_prefix.strtolower(Str::random(6));
+            }
+            if ($un !== '' && $reseller->account_prefix && ! str_starts_with($un, $reseller->account_prefix)) {
+                throw new RuntimeException('نام کاربری اکانت‌های شما باید با «'.$reseller->account_prefix.'» شروع شود.');
             }
         } else {
             if (! $target || $target->reseller_id !== $reseller->id) {

@@ -13,7 +13,7 @@ class ResellerHttpTest extends ResellerTestCase
     {
         $admin = $this->superAdmin();
         $this->actingAs($admin)->post('/resellers', ['name' => 'فروشگاه نمونه', 'username' => 'shopx', 'password' => 'ShopPass123',
-            'password_confirmation' => 'ShopPass123', 'global_discount_percent' => 15])->assertRedirect();
+            'password_confirmation' => 'ShopPass123', 'global_discount_percent' => 15, 'account_prefix' => 'nmn'])->assertRedirect();
         $r = Reseller::query()->where('name', 'فروشگاه نمونه')->firstOrFail();
         $this->assertSame('R'.(1000 + $r->id), $r->code);
         $this->post('/logout');
@@ -62,7 +62,7 @@ class ResellerHttpTest extends ResellerTestCase
 
         $this->actingAs($a->user)->get('/r/sell')->assertOk()->assertSee('یک‌ماهه');
         $r = $this->actingAs($a->user)->post('/r/sell', ['sale_key' => (string) Str::uuid(), 'package_id' => $this->newPkg->id,
-            'sale_price_toman' => 130000, 'customer_name' => 'مشتری الف']);
+            'sale_price_toman' => 130000, 'customer_name' => 'مشتری الف', 'username' => 'custa1']);
         $sale = ResellerSale::query()->firstOrFail();
         $r->assertRedirect(route('portal.sales.show', $sale))->assertSessionHas('new_password');
         $acc = VpnAccount::query()->findOrFail($sale->vpn_account_id);

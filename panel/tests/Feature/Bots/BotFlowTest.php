@@ -132,7 +132,7 @@ class BotFlowTest extends BotTestCase
         $this->tg(Engine::SELL);
         $this->tg(collect($this->lastKeyboard())->first(fn ($l) => str_contains($l, 'یک‌ماهه')));
         $this->tg('مشتری');
-        $this->tg(Engine::AUTO);
+        $this->tg('cust9');
         $this->tg(Engine::AUTO);
         $this->tg(Engine::CONFIRM);
         $this->assertStringContainsString('موجودی کیف پول کافی نیست', $this->lastText());

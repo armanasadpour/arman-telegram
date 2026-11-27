@@ -129,9 +129,12 @@ class PortalController extends Controller
             'sale_price_toman' => ['required', 'integer', 'between:0,1000000000'],
             'customer_name' => [$request->filled('account_id') || $request->filled('mt_account_id') ? 'nullable' : 'required', 'string', 'max:100'],
             'customer_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s۰-۹]+$/u'],
-            'username' => ['nullable', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9_.-]*$/'],
+            'username' => [$request->filled('account_id') || $request->filled('mt_account_id') ? 'nullable' : 'required', 'string', 'max:32', 'regex:'.($me->account_prefix ? Reseller::SUFFIX_RULE : '/^[a-z0-9][a-z0-9_.-]{2,31}$/')],
             'password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/'],
         ], [], ['password' => 'رمز', 'package_id' => 'بسته', 'sale_price_toman' => 'قیمت فروش به مشتری', 'customer_name' => 'نام مشتری', 'customer_phone' => 'تلفن مشتری', 'username' => 'نام کاربری']);
+        if (! empty($d['username'])) {
+            $d['username'] = $me->accountUsername($d['username']);   // permanent reseller prefix + what was typed
+        }
 
         $target = ! empty($d['account_id']) ? $this->ownAccount($me, (int) $d['account_id'])
             : (! empty($d['mt_account_id']) ? $this->ownMt($me, (int) $d['mt_account_id']) : null);

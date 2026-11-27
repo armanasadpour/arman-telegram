@@ -29,8 +29,8 @@ class PasswordRulesTest extends ResellerTestCase
     public function test_panel_users_need_only_four_characters(): void
     {
         $admin = $this->superAdmin();
-        $this->actingAs($admin)->post('/resellers', ['name' => 'ساده', 'username' => 'simple', 'password' => 'abcd', 'password_confirmation' => 'abcd'])->assertSessionHasNoErrors();
-        $this->actingAs($admin)->post('/resellers', ['name' => 'کوتاه', 'username' => 'short', 'password' => 'abc', 'password_confirmation' => 'abc'])->assertSessionHasErrors('password');
+        $this->actingAs($admin)->post('/resellers', ['name' => 'ساده', 'username' => 'simple', 'password' => 'abcd', 'password_confirmation' => 'abcd', 'account_prefix' => 'sim'])->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post('/resellers', ['name' => 'کوتاه', 'username' => 'short', 'password' => 'abc', 'password_confirmation' => 'abc', 'account_prefix' => 'sho'])->assertSessionHasErrors('password');
     }
 
     public function test_reseller_must_enter_customer_name_for_a_new_account(): void

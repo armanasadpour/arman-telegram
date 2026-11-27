@@ -4,24 +4,31 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\LedgerEntry;
+use App\Models\MtAccount;
 use App\Models\Package;
 use App\Models\PackageCategory;
+use App\Models\Payment;
 use App\Models\Reseller;
 use App\Models\ResellerCategoryDiscount;
 use App\Models\ResellerPrice;
 use App\Models\ResellerSale;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Finance\ResellerPricing;
 use App\Services\Finance\ResellerSales;
 use App\Services\Finance\WalletService;
+use App\Services\Ibs\AccountActions;
+use App\Services\Mikrotik\MtActions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class ResellersController extends Controller
 {
@@ -58,7 +65,9 @@ class ResellersController extends Controller
             'username' => ['required', 'string', 'min:3', 'max:60', 'regex:/^[a-zA-Z0-9_.-]+$/', 'unique:users,username'],
             'password' => ['required', 'confirmed', 'min:4', 'max:200'],
             'global_discount_percent' => ['nullable', 'numeric', 'between:0,100'],
-        ], [], ['name' => 'نام', 'phone' => 'تلفن', 'username' => 'نام کاربری', 'password' => 'رمز', 'global_discount_percent' => 'تخفیف سراسری']);
+            'account_prefix' => ['required', 'string', 'regex:'.Reseller::PREFIX_RULE, 'unique:resellers,account_prefix'],
+        ], ['account_prefix.regex' => 'پیشوند: ۲ تا ۸ کاراکتر، حروف کوچک انگلیسی و عدد، شروع با حرف (مثلاً sam).', 'account_prefix.unique' => 'این پیشوند مال همکار دیگری است.'],
+            ['name' => 'نام', 'phone' => 'تلفن', 'username' => 'نام کاربری', 'password' => 'رمز', 'global_discount_percent' => 'تخفیف سراسری', 'account_prefix' => 'پیشوند اکانت‌ها']);
 
         $reseller = DB::transaction(function () use ($d) {
             $user = User::query()->create(['name' => $d['name'], 'username' => $d['username'], 'password' => $d['password'], 'is_active' => true]);
@@ -68,12 +77,12 @@ class ResellersController extends Controller
                 'user_id' => $user->id, 'code' => 'tmp-'.Str::random(8), 'name' => $d['name'], 'phone' => $d['phone'] ?? null,
                 'telegram' => $d['telegram'] ?? null, 'global_discount_percent' => (float) ($d['global_discount_percent'] ?? 0),
             ]);
-            $r->forceFill(['code' => 'R'.(1000 + $r->id)])->save();
+            $r->forceFill(['code' => 'R'.(1000 + $r->id), 'account_prefix' => $d['account_prefix']])->save();
             $this->wallets->walletFor('reseller', $r->id);
 
             return $r;
         });
-        $this->audit->log('resellers.create', $reseller, 'ایجاد همکار «'.$reseller->name.'» ('.$reseller->code.')', [
+        $this->audit->log('resellers.create', $reseller, 'ایجاد همکار «'.$reseller->name.'» ('.$reseller->code.') با پیشوند اکانت «'.$reseller->account_prefix.'»', [
             'global_discount_percent' => [null, (float) $reseller->global_discount_percent],
         ]);
 
@@ -96,7 +105,94 @@ class ResellersController extends Controller
             'categories' => PackageCategory::query()->orderBy('name')->get(),
             'packages' => $packages,
             'quotes' => $packages->mapWithKeys(fn ($p) => [$p->id => $pricing->quote($reseller, $p)]),
+            'report' => $this->report($reseller, $wallet),
+            'accounts' => $this->accountRows($reseller),
         ]);
+    }
+
+    /** Totals for the reseller's report card. */
+    private function report(Reseller $r, $wallet): array
+    {
+        $ok = ResellerSale::query()->where('reseller_id', $r->id)->where('status', 'completed');
+        $since = now()->subDays(30);
+
+        return [
+            'sales' => (clone $ok)->count(),
+            'sales30' => (clone $ok)->where('created_at', '>=', $since)->count(),
+            'cost' => (int) (clone $ok)->sum('cost_rial'),
+            'revenue' => (int) (clone $ok)->sum('sale_price_rial'),
+            'profit' => (int) (clone $ok)->sum('profit_rial'),
+            'profit30' => (int) (clone $ok)->where('created_at', '>=', $since)->sum('profit_rial'),
+            'refunded' => ResellerSale::query()->where('reseller_id', $r->id)->where('status', 'refunded')->count(),
+            'topups' => (int) Payment::query()->where('wallet_id', $wallet->id)->where('status', 'paid')->sum('amount_rial'),
+            'first' => ResellerSale::query()->where('reseller_id', $r->id)->min('created_at'),
+            'last' => ResellerSale::query()->where('reseller_id', $r->id)->max('created_at'),
+        ];
+    }
+
+    /** All the reseller's accounts (OpenVPN + L2TP + WireGuard) as uniform rows. */
+    private function accountRows(Reseller $r): Collection
+    {
+        $rows = collect();
+        foreach (VpnAccount::query()->where('reseller_id', $r->id)->whereNull('ibs_deleted_at')->orderBy('username')->get() as $a) {
+            $st = $a->status();
+            $rows->push(['key' => 'v:'.$a->id, 'proto' => 'openvpn', 'username' => $a->username, 'customer' => $a->displayComment(), 'status' => $st,
+                'label' => VpnAccount::STATUS_LABELS[$st] ?? [$st, 'primary'], 'online' => (bool) $a->is_online, 'expires' => $a->expires_at,
+                'disabled' => (bool) $a->locked, 'url' => route('accounts.show', $a)]);
+        }
+        foreach (MtAccount::query()->where('reseller_id', $r->id)->orderBy('username')->get() as $a) {
+            $rows->push(['key' => 'm:'.$a->id, 'proto' => $a->protocol, 'username' => $a->username, 'customer' => $a->comment, 'status' => $a->displayStatus(),
+                'label' => $a->statusLabel(), 'online' => (bool) $a->is_online, 'expires' => $a->expires_at,
+                'disabled' => $a->status === 'disabled', 'url' => route('mt.accounts.show', $a)]);
+        }
+
+        return $rows->sortBy('username')->values();
+    }
+
+    /** Suspend, re-enable or delete many of a reseller's accounts at once. */
+    public function bulkAccounts(Request $request, Reseller $reseller, AccountActions $ibs, MtActions $mt): RedirectResponse
+    {
+        $this->authorize('resellers.view');
+        $d = $request->validate(['action' => ['required', 'in:disable,enable,delete'], 'ids' => ['required', 'array', 'min:1', 'max:500'], 'ids.*' => ['string', 'regex:/^[vm]:\d+$/']],
+            ['ids.required' => 'هیچ اکانتی انتخاب نشده است.']);
+        $user = $request->user();
+        $reason = 'عملیات گروهی روی اکانت‌های همکار «'.$reseller->name.'»';
+        $ok = 0;
+        $failed = [];
+        foreach ($d['ids'] as $key) {
+            [$type, $id] = explode(':', $key);
+            try {
+                if ($type === 'v') {
+                    $a = VpnAccount::query()->where('reseller_id', $reseller->id)->whereNull('ibs_deleted_at')->findOrFail((int) $id);
+                    abort_unless($user->can($d['action'] === 'delete' ? 'accounts.delete' : 'accounts.update'), 403);
+                    match ($d['action']) {
+                        'disable' => $a->locked ? null : $ibs->lock($a, $reason),
+                        'enable' => $a->locked ? $ibs->unlock($a, $reason) : null,
+                        'delete' => $ibs->delete($a, $reason),
+                    };
+                } else {
+                    $a = MtAccount::query()->where('reseller_id', $reseller->id)->findOrFail((int) $id);
+                    abort_unless($user->can($d['action'] === 'delete' ? 'mt_accounts.delete' : 'mt_accounts.update'), 403);
+                    match ($d['action']) {
+                        'disable' => $a->status === 'disabled' ? null : $mt->disable($a, $reason),
+                        'enable' => $a->status === 'disabled' ? $mt->enable($a, $reason) : null,
+                        'delete' => $mt->delete($a, $reason),
+                    };
+                }
+                $ok++;
+            } catch (HttpException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                $failed[] = ($a->username ?? $key).': '.mb_substr($e->getMessage(), 0, 80);
+            }
+        }
+        $verb = ['disable' => 'تعلیق', 'enable' => 'فعال‌سازی', 'delete' => 'حذف'][$d['action']];
+        $this->audit->log('resellers.bulk', $reseller, $verb.' گروهی '.count($d['ids']).' اکانت همکار «'.$reseller->name.'» — موفق: '.$ok.($failed ? '، ناموفق: '.count($failed) : ''));
+        $msg = $verb.' '.fa($ok).' اکانت انجام شد.';
+
+        return $failed
+            ? back()->with('error', $msg.' ناموفق: '.implode(' | ', array_slice($failed, 0, 5)))
+            : back()->with('success', $msg);
     }
 
     public function update(Request $request, Reseller $reseller): RedirectResponse
@@ -110,6 +206,12 @@ class ResellersController extends Controller
             'status' => ['required', 'in:active,suspended'],
             'notes' => ['nullable', 'string', 'max:500'],
         ], [], ['name' => 'نام', 'global_discount_percent' => 'تخفیف سراسری', 'status' => 'وضعیت']);
+        if ($reseller->account_prefix === null && $request->filled('account_prefix')) {
+            $p = $request->validate(['account_prefix' => ['string', 'regex:'.Reseller::PREFIX_RULE, 'unique:resellers,account_prefix']],
+                ['account_prefix.regex' => 'پیشوند: ۲ تا ۸ کاراکتر، حروف کوچک انگلیسی و عدد، شروع با حرف.', 'account_prefix.unique' => 'این پیشوند مال همکار دیگری است.'])['account_prefix'];
+            $reseller->forceFill(['account_prefix' => $p])->save();
+            $this->audit->log('resellers.prefix', $reseller, 'ثبت پیشوند دائمی «'.$p.'» برای اکانت‌های همکار «'.$reseller->name.'»');
+        }
         $before = $reseller->only(array_keys($d));
         $before['global_discount_percent'] = (float) $before['global_discount_percent'];
         $d['global_discount_percent'] = (float) $d['global_discount_percent'];

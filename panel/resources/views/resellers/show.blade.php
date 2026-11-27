@@ -1,7 +1,7 @@
 <x-layouts.app title="همکار {{ $r->name }}">
   <div class="page-head">
     <div><h1>{{ $r->name }} <bdi class="muted ltr small">{{ $r->code }}</bdi></h1>
-      <p class="muted">نام کاربری: <bdi class="ltr">{{ $r->user->username }}</bdi> — @if($r->isActive())<span class="badge badge-success">فعال</span>@else<span class="badge badge-warning">تعلیق (فروش ممکن نیست)</span>@endif</p></div>
+      <p class="muted">نام کاربری: <bdi class="ltr">{{ $r->user->username }}</bdi>@if($r->account_prefix) — پیشوند اکانت‌ها: <bdi class="ltr"><strong>{{ $r->account_prefix }}</strong></bdi>@endif — @if($r->isActive())<span class="badge badge-success">فعال</span>@else<span class="badge badge-warning">تعلیق (فروش ممکن نیست)</span>@endif</p></div>
     <a class="btn btn-secondary" href="{{ route('resellers.index') }}">بازگشت</a>
   </div>
 
@@ -10,6 +10,50 @@
       @if($recon)<div class="hint">@if($recon['ok'])تطبیق با دفتر کل: درست ({{ fa($recon['entries']) }} ردیف)@else<span class="text-danger">عدم تطبیق! دفتر کل: {{ fa_money($recon['ledger_sum']) }}</span>@endif</div>@endif
     </div>
   </div>
+
+  <section class="card report-card mb-16">
+    <h2>گزارش کامل</h2>
+    <div class="rep-grid">
+      <div class="rep"><small>فروش موفق</small><strong>{{ fa($report['sales']) }}</strong><span>۳۰ روز اخیر: {{ fa($report['sales30']) }}</span></div>
+      <div class="rep"><small>جمع خرید همکار</small><strong>{{ fa_money($report['cost']) }}</strong><span>از کیف پول کسر شده</span></div>
+      <div class="rep"><small>جمع فروش به مشتری</small><strong>{{ fa_money($report['revenue']) }}</strong><span>اعلام‌شده توسط همکار</span></div>
+      <div class="rep"><small>سود همکار</small><strong>{{ fa_money($report['profit']) }}</strong><span>۳۰ روز اخیر: {{ fa_money($report['profit30']) }}</span></div>
+      <div class="rep"><small>شارژهای تأییدشده</small><strong>{{ fa_money($report['topups']) }}</strong><span>کارت‌به‌کارت و آنلاین</span></div>
+      <div class="rep"><small>بازپرداخت‌شده</small><strong>{{ fa($report['refunded']) }}</strong><span>فروش برگشتی</span></div>
+      <div class="rep"><small>اکانت‌ها</small><strong>{{ fa($accounts->count()) }}</strong><span>{{ fa($accounts->where('online', true)->count()) }} آنلاین · {{ fa($accounts->where('disabled', true)->count()) }} معلق</span></div>
+      <div class="rep"><small>اولین / آخرین فروش</small><strong class="rep-sm">{{ $report['first'] ? jdate(\Carbon\Carbon::parse($report['first']), 'Y/m/d') : '—' }}</strong><span>{{ $report['last'] ? jdate(\Carbon\Carbon::parse($report['last']), 'Y/m/d') : '—' }}</span></div>
+    </div>
+  </section>
+
+  <section class="card mb-16" id="accounts">
+    <div class="card-head"><h2>اکانت‌های همکار ({{ fa($accounts->count()) }})</h2></div>
+    @if($accounts->isEmpty())
+      <div class="empty"><div>این همکار هنوز اکانتی ندارد.</div></div>
+    @else
+      <form method="post" action="{{ route('resellers.bulk', $r) }}" class="bulk-form" data-confirm="عملیات روی اکانت‌های انتخاب‌شده انجام شود؟" data-confirm-ok="انجام بده">
+        @csrf
+        <div class="bulk-bar">
+          <label class="check"><input type="checkbox" data-check-all=".bulk-cb"> همه</label>
+          <select name="action" class="input input-sm" required>
+            <option value="disable">تعلیق (غیرفعال‌سازی)</option>
+            <option value="enable">فعال‌سازی دوباره</option>
+            <option value="delete">حذف از سرور</option>
+          </select>
+          <button class="btn btn-sm" type="submit">اجرا روی انتخاب‌شده‌ها</button>
+        </div>
+        <div class="bulk-list">
+          @foreach($accounts as $a)
+            <label class="bulk-row">
+              <input class="bulk-cb" type="checkbox" name="ids[]" value="{{ $a['key'] }}">
+              <x-proto-logo :proto="$a['proto']" :online="$a['online']" class="bulk-logo"/>
+              <span class="bulk-main"><a href="{{ $a['url'] }}"><bdi class="ltr">{{ $a['username'] }}</bdi></a><small>{{ $a['customer'] ?: '—' }}@if($a['expires']) · انقضا {{ jdate($a['expires'], 'Y/m/d') }}@endif</small></span>
+              <span class="acc-pill tone-{{ $a['label'][1] }}"><i></i>{{ $a['label'][0] }}</span>
+            </label>
+          @endforeach
+        </div>
+      </form>
+    @endif
+  </section>
 
   <div class="grid two">
     @can('wallets.sensitive')
@@ -38,6 +82,14 @@
             <div class="field"><label for="telegram">تلگرام</label><input id="telegram" name="telegram" class="input ltr" value="{{ old('telegram', $r->telegram) }}"></div>
             <div class="field"><label for="gdp">تخفیف سراسری (٪)</label><input id="gdp" name="global_discount_percent" type="number" step="0.01" min="0" max="100" class="input ltr" value="{{ old('global_discount_percent', (float) $r->global_discount_percent) }}" required></div>
             <div class="field"><label for="status">وضعیت</label><select id="status" name="status" class="input"><option value="active" @selected($r->status === 'active')>فعال</option><option value="suspended" @selected($r->status === 'suspended')>تعلیق</option></select></div>
+          </div>
+          <div class="field"><label for="account_prefix">پیشوند دائمی اکانت‌ها</label>
+            @if($r->account_prefix)
+              <div class="locked-val"><bdi class="ltr">{{ $r->account_prefix }}</bdi> <span class="muted small">🔒 ثابت؛ قابل تغییر نیست</span></div>
+            @else
+              <input id="account_prefix" name="account_prefix" class="input ltr" maxlength="8" autocapitalize="none" spellcheck="false" placeholder="مثلاً sam">
+              <div class="help">این همکار هنوز پیشوند ندارد. فقط یک بار قابل ثبت است و بعد از آن ثابت می‌ماند.</div>
+            @endif
           </div>
           <div class="field"><label for="notes">یادداشت داخلی</label><input id="notes" name="notes" class="input" value="{{ old('notes', $r->notes) }}" maxlength="500"></div>
           <button class="btn btn-secondary" type="submit">ذخیره</button>

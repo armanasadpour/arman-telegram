@@ -795,20 +795,22 @@ class Engine
             return;
         }
         $d['customer_name'] = $name;
-        $this->ask($u, 'sell_user', $d, 'نام کاربری دلخواه (حروف کوچک انگلیسی و عدد) را بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
+        $r = $this->reseller($u);
+        $this->ask($u, 'sell_user', $d, 'نام کاربری اکانت را بفرستید (حروف کوچک انگلیسی و عدد)'.($r?->account_prefix ? '؛ پیشوند «'.$r->account_prefix.'» خودکار اول آن می‌آید' : '').':');
     }
 
     private function sellUsername(BotUser $u, string $text): void
     {
         $d = $u->state_data ?? [];
-        if ($text !== self::AUTO) {
-            if (! preg_match('/^[a-z0-9][a-z0-9_.-]{2,31}$/', $text)) {
-                $this->ask($u, 'sell_user', $d, 'نام کاربری باید ۳ تا ۳۲ کاراکتر از حروف کوچک انگلیسی، عدد، «_»، «.» یا «-» باشد. دوباره بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
+        $r = $this->reseller($u);
+        $text = mb_strtolower(trim($text));
+        $rule = $r?->account_prefix ? Reseller::SUFFIX_RULE : '/^[a-z0-9][a-z0-9_.-]{2,31}$/';
+        if (! preg_match($rule, $text)) {
+            $this->ask($u, 'sell_user', $d, 'نام کاربری لازم است: حروف کوچک انگلیسی، عدد، «_»، «.» یا «-» ('.($r?->account_prefix ? '۲ تا ۲۴' : '۳ تا ۳۲').' کاراکتر). دوباره بفرستید:');
 
-                return;
-            }
-            $d['username'] = $text;
+            return;
         }
+        $d['username'] = $r ? $r->accountUsername($text) : $text;
         if (! empty($d['no_password'])) {
             $this->confirm($u, 'sell_confirm', $d);
 
