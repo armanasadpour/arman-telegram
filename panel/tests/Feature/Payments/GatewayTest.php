@@ -140,7 +140,7 @@ class GatewayTest extends PaymentTestCase
     public function test_disabled_or_unconfigured_methods_are_refused(): void
     {
         $r = $this->reseller();
-        $this->actingAs($r->user)->get('/r/topup')->assertSee('هنوز روش پرداختی فعال نشده');
+        $this->actingAs($r->user)->get('/r/topup')->assertSee('مدیر هنوز کارت بانکی برای واریز ثبت نکرده');
         $this->enable(['zarinpal.enabled' => '1']);   // no merchant id
         $this->actingAs($r->user)->post('/r/topup', ['amount_toman' => 50000, 'method' => 'zarinpal'])->assertSessionHasErrors('method');
         $this->assertSame(0, Payment::query()->count());

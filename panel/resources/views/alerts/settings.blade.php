@@ -26,7 +26,7 @@
       <h2>همکاران</h2>
       <label class="check"><input type="checkbox" name="reseller_digest_enabled" value="1" @checked($v['reseller_digest_enabled'] === '1')> خلاصه روزانه (اکانت‌های در آستانه انقضا، منقضی‌شده‌ها، موجودی)</label>
       <div class="form-grid">
-        <div class="field"><label for="reseller_low_balance_toman">هشدار موجودی کم زیر (تومان؛ ۰ = خاموش)</label><input class="input ltr" type="number" id="reseller_low_balance_toman" name="reseller_low_balance_toman" min="0" value="{{ old('reseller_low_balance_toman', $v['reseller_low_balance_toman']) }}"></div>
+        <div class="field"><label for="reseller_low_balance_toman">هشدار موجودی کم زیر (تومان؛ ۰ = خاموش)</label><input class="input ltr" data-money inputmode="numeric" id="reseller_low_balance_toman" name="reseller_low_balance_toman" min="0" value="{{ old('reseller_low_balance_toman', $v['reseller_low_balance_toman']) }}"></div>
       </div>
     </div>
     <div class="card">

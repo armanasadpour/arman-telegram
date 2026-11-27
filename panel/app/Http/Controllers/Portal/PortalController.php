@@ -215,7 +215,9 @@ class PortalController extends Controller
 
         return view('portal.topup', [
             'wallet' => $this->wallets->walletFor('reseller', $me->id),
-            'methods' => $payments->enabledMethods(),
+            'methods' => array_diff_key($payments->enabledMethods(), ['card' => true]),
+            'cards' => $payments->topupCards(),
+            'pending' => Payment::query()->where('wallet_id', $this->wallets->walletFor('reseller', $me->id)->id)->where('status', 'review')->count(),
             'networks' => array_intersect_key(Payment::NETWORKS, $payments->usdtNetworks()),
             'recent' => Payment::query()->where('wallet_id', $this->wallets->walletFor('reseller', $me->id)->id)->orderByDesc('id')->limit(10)->get(),
         ]);
@@ -237,6 +239,25 @@ class PortalController extends Controller
         }
 
         return redirect()->route('pay.show', $p->uuid);
+    }
+
+    /** Card-to-card top-up request: amount + receipt image; credited after the admin approves it. */
+    public function topupCard(Request $request, Payments $payments): RedirectResponse
+    {
+        $me = $this->me($request);
+        $d = $request->validate([
+            'amount_toman' => ['required', 'integer', 'between:1000,200000000'],
+            'receipt' => ['required', 'file', 'image', 'max:6144'],
+            'note' => ['nullable', 'string', 'max:200'],
+        ], ['receipt.required' => 'عکس فیش واریزی را انتخاب کنید.', 'receipt.image' => 'فایل فیش باید عکس باشد.'], ['amount_toman' => 'مبلغ', 'receipt' => 'عکس فیش']);
+        $path = $request->file('receipt')->store('receipts', 'local');
+        try {
+            $payments->cardTopup($this->wallets->walletFor('reseller', $me->id), (int) $d['amount_toman'] * 10, $path, $d['note'] ?? null, $request->user()->id);
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('portal.topup')->with('success', 'درخواست شارژ '.fa_money((int) $d['amount_toman'] * 10).' ثبت شد. پس از تأیید مدیر، کیف پول شما شارژ می‌شود.');
     }
 
     /** A reseller's own L2TP / WireGuard account, with its connection details (the reseller delivers them). */

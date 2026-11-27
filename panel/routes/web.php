@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AccountingController;
 use App\Http\Controllers\Admin\AccountsController;
 use App\Http\Controllers\Admin\AlertsController;
 use App\Http\Controllers\Admin\AuditController;
@@ -219,6 +220,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/topup', [PortalController::class, 'topupForm'])->name('topup');
         Route::get('/export/{type}', [PortalController::class, 'export'])->name('export')->middleware('throttle:20,1');
         Route::post('/topup', [PortalController::class, 'topup'])->name('topup.store')->middleware('throttle:20,1');
+        Route::post('/topup/card', [PortalController::class, 'topupCard'])->name('topup.card')->middleware('throttle:10,1');
         Route::get('/', [PortalController::class, 'dashboard'])->name('dashboard');
         Route::get('/prices', [PortalController::class, 'prices'])->name('prices');
         Route::get('/sell', [PortalController::class, 'sellForm'])->name('sell');
@@ -264,6 +266,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::get('/system', [SystemController::class, 'status'])->name('system.status');
     Route::get('/notices', [NoticesController::class, 'index'])->name('notices.index');
+    Route::get('/accounting/topups', [AccountingController::class, 'topups'])->name('accounting.topups');
+    Route::get('/accounting/cards', [AccountingController::class, 'cards'])->name('accounting.cards');
+    Route::put('/accounting/cards', [AccountingController::class, 'saveCards'])->name('accounting.cards.save')->middleware('throttle:20,1');
     Route::get('/notices/poll', [NoticesController::class, 'poll'])->name('notices.poll')->middleware('throttle:30,1');
     Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade')->middleware('throttle:10,1');
     Route::get('/system/update', [SystemController::class, 'updateForm'])->name('system.update');

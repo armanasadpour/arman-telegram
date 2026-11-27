@@ -20,7 +20,7 @@
           <input type="hidden" name="op_key" value="{{ \Illuminate\Support\Str::uuid() }}">
           <div class="form-grid">
             <div class="field"><label for="direction">نوع</label><select id="direction" name="direction" class="input"><option value="credit">شارژ (افزایش)</option><option value="debit">کسر (کاهش)</option></select></div>
-            <div class="field"><label for="amount_toman">مبلغ (تومان)</label><input id="amount_toman" name="amount_toman" type="number" min="1" class="input ltr" required></div>
+            <div class="field"><label for="amount_toman">مبلغ (تومان)</label><input id="amount_toman" name="amount_toman" data-money inputmode="numeric" min="1" class="input ltr" required></div>
           </div>
           <button class="btn" type="submit">ثبت تراکنش</button>
           <p class="help muted">عملیات حساس: تأیید مجدد رمز می‌خواهد و با نام شما، زمان و شناسه تراکنش ثبت می‌شود.</p>
@@ -28,7 +28,7 @@
       </div>
     @endcan
     @can('resellers.update')
-      <div class="card">
+      <div class="card" id="edit">
         <h2>اطلاعات و تخفیف سراسری</h2>
         <form method="post" action="{{ route('resellers.update', $r) }}">
           @csrf @method('put')
@@ -65,7 +65,7 @@
               <form method="post" action="{{ route('resellers.fixed-price', $r) }}" class="actions">@csrf
                 <input type="hidden" name="package_id" value="{{ $p->id }}">
                 @php($fx = $r->prices->firstWhere('package_id', $p->id))
-                <input name="price_toman" type="number" min="0" class="input input-sm w-160 ltr" value="{{ $fx ? intdiv($fx->price_rial, 10) : '' }}" placeholder="خالی = ندارد" aria-label="قیمت اختصاصی">
+                <input name="price_toman" data-money inputmode="numeric" min="0" class="input input-sm w-160 ltr" value="{{ $fx ? intdiv($fx->price_rial, 10) : '' }}" placeholder="خالی = ندارد" aria-label="قیمت اختصاصی">
                 <button class="btn btn-secondary btn-sm" type="submit">ثبت</button>
               </form>
             </td>

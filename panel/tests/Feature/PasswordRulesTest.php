@@ -36,7 +36,7 @@ class PasswordRulesTest extends ResellerTestCase
     public function test_reseller_must_enter_customer_name_for_a_new_account(): void
     {
         $r = $this->reseller(creditRial: 5_000_000);
-        $this->actingAs($r->user)->get('/r/sell')->assertOk()->assertSee('pkg-opt', false)->assertSee('نام مشتری');
+        $this->actingAs($r->user)->get('/r/sell')->assertOk()->assertSee('dd-opt', false)->assertSee('نام مشتری');
         $this->actingAs($r->user)->from('/r/sell')->post('/r/sell', ['sale_key' => (string) Str::uuid(), 'package_id' => $this->newPkg->id, 'sale_price_toman' => 100000])
             ->assertSessionHasErrors('customer_name');
         $this->assertSame(0, VpnAccount::query()->count());

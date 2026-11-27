@@ -5,6 +5,6 @@
   @if($secret)
     <input class="input ltr" id="{{ $name }}" name="{{ $name }}" type="password" autocomplete="new-password" placeholder="{{ $values[$k] ?? 'تنظیم نشده' }}">
   @else
-    <input class="input ltr" id="{{ $name }}" name="{{ $name }}" type="{{ $type ?? 'text' }}" autocomplete="off" value="{{ old($name, $values[$k] ?? '') }}">
+    <input class="input ltr" id="{{ $name }}" name="{{ $name }}" type="{{ str_ends_with($name, '_toman') ? 'text' : ($type ?? 'text') }}" @if(str_ends_with($name, '_toman')) data-money inputmode="numeric" @endif autocomplete="off" value="{{ old($name, $values[$k] ?? '') }}">
   @endif
 </div>

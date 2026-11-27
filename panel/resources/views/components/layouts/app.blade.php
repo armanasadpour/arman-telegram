@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="{{ url('/pwa/icon-180.png') }}?v={{ $pwaV }}">
 <link rel="icon" type="image/png" sizes="192x192" href="{{ url('/pwa/icon-192.png') }}?v={{ $pwaV }}">
 </head>
-<body>
+<body @class(['theme-reseller' => auth()->user()->isReseller()])>
 <div class="shell">
   <header class="header">
     <button id="menu-btn" class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="منو"><x-icon name="menu" width="20" height="20"/></button>
@@ -83,6 +83,14 @@
     @can('routers.view')
       <div class="section">سرورها</div>
       <a href="{{ route('routers.index') }}" @class(['active' => request()->routeIs('routers.*')])><x-icon name="link"/>روترهای میکروتیک</a>
+    @endcan
+    @can('payments.view')
+      <div class="section">حسابداری</div>
+      @php($topupReview = rescue(fn () => \App\Models\Payment::query()->where('method', 'card')->where('purpose', 'topup')->where('status', 'review')->whereHas('wallet', fn ($w) => $w->where('owner_type', 'reseller'))->count(), 0, false))
+      <a href="{{ route('accounting.topups') }}" @class(['active' => request()->routeIs('accounting.topups')])><x-icon name="inbox"/>درخواست شارژ حساب @if($topupReview)<span class="nav-count">{{ fa($topupReview) }}</span>@endif</a>
+      @can('payments.sensitive')
+        <a href="{{ route('accounting.cards') }}" @class(['active' => request()->routeIs('accounting.cards')])><x-icon name="key"/>کارت‌های بانکی</a>
+      @endcan
     @endcan
     @if(auth()->user()->can('packages.view') || auth()->user()->can('discounts.view') || auth()->user()->can('resellers.view') || auth()->user()->can('payments.view'))
       <div class="section">فروش</div>

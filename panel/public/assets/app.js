@@ -147,6 +147,53 @@
   })();
   // Bar widths come from data-w (inline style attributes are blocked by the CSP).
   document.querySelectorAll('.bar i[data-w]').forEach(function (i) { i.style.width = Math.max(0, Math.min(100, +i.getAttribute('data-w'))) + '%'; });
+  // Money inputs: show thousands separators while typing (1,250,000); the server strips them (NormalizeMoneyInput).
+  (function () {
+    var toEn = function (v) { return String(v).replace(/[۰-۹]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }).replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }); };
+    var fmt = function (v) { var d = toEn(v).replace(/\D/g, '').replace(/^0+(?=\d)/, ''); return d.replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+    document.querySelectorAll('input[data-money]').forEach(function (el) {
+      el.setAttribute('type', 'text'); el.setAttribute('dir', 'ltr'); el.setAttribute('autocomplete', 'off');
+      if (el.value) el.value = fmt(el.value);
+      el.addEventListener('input', function () {
+        var before = el.value, pos = el.selectionStart || before.length, digitsLeft = toEn(before.slice(0, pos)).replace(/\D/g, '').length;
+        el.value = fmt(before);
+        var i = 0, n = 0; while (i < el.value.length && n < digitsLeft) { if (/\d/.test(el.value[i])) n++; i++; }
+        try { el.setSelectionRange(i, i); } catch (x) {}
+      });
+    });
+  })();
+  // Receipt image preview.
+  document.querySelectorAll('input[type=file][data-preview]').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      var img = document.querySelector(inp.getAttribute('data-preview')), f = inp.files && inp.files[0];
+      if (!img || !f) return; img.src = URL.createObjectURL(f); img.hidden = false;
+      var hint = img.parentNode.querySelector('.upload-hint'); if (hint) hint.lastChild.textContent = f.name;
+    });
+  });
+  // Package dropdown (reseller sell page).
+  document.querySelectorAll('[data-dd]').forEach(function (dd) {
+    var trig = dd.querySelector('[data-dd-trigger]'), panel = dd.querySelector('.dd-panel'), cur = dd.querySelector('.dd-current');
+    function sync() {
+      var r = dd.querySelector('input[type=radio]:checked') || dd.querySelector('input[type=radio]');
+      if (!r) return; r.checked = true;
+      var row = r.parentNode.querySelector('.dd-row').cloneNode(true); var ck = row.querySelector('.dd-check'); if (ck) ck.remove();
+      cur.innerHTML = ''; cur.appendChild(row);
+    }
+    function open(v) { panel.hidden = !v; trig.setAttribute('aria-expanded', String(v)); dd.classList.toggle('open', v); }
+    trig.addEventListener('click', function () { open(panel.hidden); });
+    dd.addEventListener('change', function (e) { if (e.target.name === 'package_id') { sync(); open(false); } });
+    document.addEventListener('click', function (e) { if (!dd.contains(e.target)) open(false); });
+    sync();
+  });
+  // Copy a literal value (bank card / sheba: English digits).
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-copy-text]');
+    if (!b) return;
+    var text = b.getAttribute('data-copy-text'), old = b.textContent;
+    var done = function () { b.textContent = 'کپی شد ✓'; b.classList.add('ok'); setTimeout(function () { b.textContent = old; b.classList.remove('ok'); }, 1500); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done);
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (x) {} ta.remove(); }
+  });
   // Small helpers that would otherwise be inline handlers (the CSP blocks inline scripts).
   document.addEventListener('click', function (e) {
     var tg = e.target.closest('[data-toggle]');

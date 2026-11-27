@@ -179,6 +179,29 @@ class Payments
     }
 
     /** Card-to-card: the payer reports the transfer; an admin must approve. */
+    /** Bank cards shown to resellers for wallet top-up (number, sheba, holder, bank). @return list<array<string,string>> */
+    public function topupCards(): array
+    {
+        return array_values(array_filter((array) json_decode((string) $this->settings->get('topup.cards'), true), fn ($c) => ! empty($c['number']) || ! empty($c['sheba'])));
+    }
+
+    /**
+     * Reseller wallet top-up by card-to-card: one request with the amount and the receipt image, straight to manual review.
+     * The wallet is credited only when an admin approves it (approve() is atomic and idempotent).
+     */
+    public function cardTopup(Wallet $wallet, int $amountRial, string $receiptPath, ?string $note, int $userId): Payment
+    {
+        if ($this->topupCards() === []) {
+            throw new RuntimeException('کارت بانکی برای واریز هنوز تعریف نشده است؛ با مدیر تماس بگیرید.');
+        }
+        if ($amountRial < self::MIN_RIAL || $amountRial > self::MAX_RIAL) {
+            throw new RuntimeException('مبلغ باید بین '.fa_money(self::MIN_RIAL).' و '.fa_money(self::MAX_RIAL).' باشد.');
+        }
+        $p = Payment::query()->create(['uuid' => (string) Str::uuid(), 'method' => 'card', 'wallet_id' => $wallet->id, 'amount_rial' => $amountRial, 'created_by' => $userId]);
+
+        return $this->reportCard($p, 'درخواست شارژ کیف پول'.($note ? ' — '.$note : ''), $receiptPath);
+    }
+
     public function reportCard(Payment $p, string $note, ?string $receiptPath = null): Payment
     {
         if ($p->method !== 'card' || $p->status !== 'pending') {
