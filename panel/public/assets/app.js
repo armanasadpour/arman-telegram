@@ -321,6 +321,12 @@
       '🗑': ['red', p('<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/>')]
     };
   })();
+  // One-line tile labels (the bottom sheet keeps the full title).
+  var TILE_SHORT = {
+    'ویرایش اطلاعات حساب': 'ویرایش حساب', 'بازنشانی تاریخ و حجم': 'بازنشانی', 'ویرایش محدودیت‌ها': 'محدودیت‌ها',
+    'مصرف ۳۰ روز اخیر': 'مصرف ۳۰ روز', 'لاگ اتصال (IP)': 'لاگ اتصال', 'غیرفعال‌سازی (قفل)': 'غیرفعال‌سازی',
+    'فعال‌سازی دوباره': 'فعال‌سازی', 'مشاهده رمز فعلی': 'مشاهده رمز', 'نشست‌های آنلاین': 'نشست‌ها', 'حذف از سرور': 'حذف'
+  };
   function setIcon(el, emoji) {
     var ic = TILE_ICONS[emoji];
     if (ic) { el.innerHTML = ic[1]; el.classList.add('ti-' + ic[0]); } else { el.textContent = emoji || '•'; }
@@ -369,8 +375,9 @@
       var pw = card.getAttribute('data-sheet-pw');
       t.innerHTML = '<span class="tile-icon"></span><span class="tile-title"></span>';
       setIcon(t.querySelector('.tile-icon'), card.getAttribute('data-sheet-icon'));
-      if (card.getAttribute('data-sheet-wide') !== null || card.getAttribute('data-sheet-icon') === '🗑') t.classList.add('tile-wide');
-      t.querySelector('.tile-title').textContent = card.getAttribute('data-sheet');
+      var full = card.getAttribute('data-sheet');
+      t.querySelector('.tile-title').textContent = card.getAttribute('data-sheet-tile') || TILE_SHORT[full] || full;
+      t.title = full;
       if (pw) {
         t.classList.add('tile-pw');
         t.innerHTML = '<span class="tile-icon"></span><span class="tile-title">رمز جدید</span><span class="tile-pw-row"><bdi class="tile-pw-val"></bdi>'

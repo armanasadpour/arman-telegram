@@ -1081,3 +1081,8 @@ button.conn-card{cursor:pointer}
 .toast-info{background:linear-gradient(135deg,#ff922b,#e8590c)}
 .notice-row.lvl-info .nd{background:#f76707}
 .un-locked{font-weight:700;letter-spacing:.02em}
+/* account tiles: one-line labels, delete tile in the grid like the others */
+.tile{flex-wrap:nowrap}
+.tile-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile-wide{grid-column:auto}
+.tile-pw{grid-column:1/-1;flex-wrap:wrap}
