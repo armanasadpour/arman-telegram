@@ -65,7 +65,6 @@
       <div class="field"><label for="customer_phone">تلفن مشتری (اختیاری)</label>
         <div class="input-ico"><input id="customer_phone" name="customer_phone" class="input ltr" value="{{ old('customer_phone') }}" maxlength="20" inputmode="tel"><svg viewBox="0 0 24 24" aria-hidden="true">{!! $ic['phone'] !!}</svg></div></div>
       <button class="btn btn-lg w-full sell-submit" type="submit" @disabled(! $me->isActive())><span>+</span> {{ $target ? 'تمدید / افزایش حجم' : 'ثبت اکانت جدید' }}</button>
-      <p class="help muted">مبلغ خرید از کیف پول کسر می‌شود؛ اگر کار در سرور انجام نشود، خودکار برمی‌گردد.</p>
     </form>
   </div>
   @endif
