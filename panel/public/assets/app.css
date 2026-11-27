@@ -850,3 +850,5 @@ button.conn-card{cursor:pointer}
 .fin-bars i:nth-child(1){height:35%}.fin-bars i:nth-child(2){height:60%}.fin-bars i:nth-child(3){height:80%}.fin-bars i:nth-child(4){height:100%}
 @media (prefers-color-scheme:dark){.fin-bars i{opacity:.55}}
 .fin-bars i:nth-child(1){height:100%}.fin-bars i:nth-child(2){height:80%}.fin-bars i:nth-child(3){height:60%}.fin-bars i:nth-child(4){height:35%}
+.pd-wireguard{--pd:#9f1239;--pd-bd:#fecdd3;--pd-bg:linear-gradient(160deg,#fff1f2 0%,#ffe4e6 55%,#fbd0d6 100%);--pd-btn:linear-gradient(135deg,#be123c,#881337)}
+@media (prefers-color-scheme:dark){.pd-wireguard{--pd-bg:linear-gradient(160deg,color-mix(in srgb,#9f1239 18%,var(--surface)),color-mix(in srgb,#9f1239 8%,var(--surface)));--pd-bd:color-mix(in srgb,#9f1239 40%,var(--border))}}
