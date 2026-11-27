@@ -64,6 +64,30 @@
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { bar.value = target; return; }
     setTimeout(function () { requestAnimationFrame(step); }, 150);
   });
+  // Remaining days / volume rings: draw the arc and count the number up.
+  (function () {
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var fa = function (s) { return String(s).replace(/[0-9]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }).replace('.', '٫'); };
+    document.querySelectorAll('.ring-arc[data-ring]').forEach(function (arc) {
+      var c = +arc.getAttribute('data-c'), pct = Math.max(0, Math.min(100, +arc.getAttribute('data-ring')));
+      var to = c * (1 - pct / 100);
+      if (reduce) { arc.style.transition = 'none'; arc.style.strokeDashoffset = to; return; }
+      requestAnimationFrame(function () { setTimeout(function () { arc.style.strokeDashoffset = to; }, 120); });
+    });
+    document.querySelectorAll('.ring-num[data-count]').forEach(function (el) {
+      var target = +el.getAttribute('data-count'), dec = +el.getAttribute('data-dec') || 0;
+      if (reduce || !isFinite(target)) return;
+      var start = null;
+      function step(ts) {
+        if (start === null) start = ts;
+        var k = Math.min(1, (ts - start) / 1400), e = 1 - Math.pow(1 - k, 3);
+        el.textContent = fa((target * e).toFixed(dec));
+        if (k < 1) requestAnimationFrame(step);
+      }
+      el.textContent = fa((0).toFixed(dec));
+      setTimeout(function () { requestAnimationFrame(step); }, 120);
+    });
+  })();
   // Create-account helpers: random password, quick-value chips.
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-gen-pass]');

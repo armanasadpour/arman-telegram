@@ -34,6 +34,6 @@ class MeterTest extends IbsTestCase
         $this->ibsUser('volx', 'vol-30d', 4096);
         $a = app(AccountSync::class)->importByUsername('volx');
         $this->actingAs($this->superAdmin())->get('/accounts/'.$a->id)->assertOk()
-            ->assertSee('حجم باقی‌مانده')->assertSee('زمان باقی‌مانده')->assertSee('<progress class="meter-bar"', false)->assertSee('۱۰۰٪');
+            ->assertSee('حجم باقی‌مانده')->assertSee('مدت اعتبار')->assertSee('class="rings-card', false)->assertSee('data-ring="100"', false);
     }
 }
