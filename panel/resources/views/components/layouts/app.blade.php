@@ -24,6 +24,14 @@
     <button id="menu-btn" class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="منو"><x-icon name="menu" width="20" height="20"/></button>
     <div class="brand">{{ $siteName }}</div>
     <div class="user">
+      @can('system.view')
+        @php($notices = app(\App\Services\Notices::class))
+        @php($unread = $notices->unreadCount(auth()->user()))
+        <a href="{{ route('notices.index') }}" class="bell" title="اعلان‌ها" data-poll="{{ route('notices.poll') }}" data-last="{{ (int) \App\Models\PanelNotice::query()->max('id') }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+          <span class="bell-count" @if(! $unread) hidden @endif>{{ $unread > 9 ? '۹+' : fa($unread) }}</span>
+        </a>
+      @endcan
       <a href="{{ route('profile.password') }}" title="تغییر رمز"><span class="avatar" aria-hidden="true">{{ mb_substr(auth()->user()->name, 0, 1) }}</span><span class="user-name">{{ auth()->user()->name }}</span></a>
       <form method="post" action="{{ route('logout') }}">
         @csrf
@@ -131,6 +139,16 @@
     @if(auth()->user()->isSuperAdmin() && \App\Services\SystemStatus::pendingMigrations() > 0)
       <div class="alert alert-warning">نسخه جدید نصب شده و دیتابیس باید به‌روزرسانی شود. <a href="{{ route('system.status') }}">اجرای به‌روزرسانی</a></div>
     @endif
+    @can('system.view')
+      @php($down = app(\App\Services\Notices::class)->openProblems())
+      @if($down->isNotEmpty() && ! request()->routeIs('notices.*'))
+        <a class="down-banner" href="{{ route('notices.index') }}">
+          <span class="down-pulse" aria-hidden="true"></span>
+          <span><strong>{{ $down->first()->title }}</strong>@if($down->count() > 1) <span>و {{ fa($down->count() - 1) }} مشکل دیگر</span>@endif
+            <small>از {{ fa_ago($down->first()->created_at) }}</small></span>
+        </a>
+      @endif
+    @endcan
     @include('partials.flash')
     {{ $slot }}
   </main>

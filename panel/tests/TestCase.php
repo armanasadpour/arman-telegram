@@ -18,7 +18,7 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
         $this->app->make(PermissionRegistry::class)->sync();
         // The panel ships with password re-confirmation off; the confirmation flow itself stays tested.
-        config(['panel.require_password_confirmation' => true]);
+        config(['panel.require_password_confirmation' => true, 'panel.login_captcha' => false]);
     }
 
     protected function superAdmin(array $attrs = []): User

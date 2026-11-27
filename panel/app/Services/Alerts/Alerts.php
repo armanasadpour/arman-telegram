@@ -18,6 +18,7 @@ use App\Models\VpnAccount;
 use App\Services\ConnectionLog;
 use App\Services\Finance\WalletService;
 use App\Services\Ibs\AccountSync;
+use App\Services\Notices;
 use App\Services\Settings;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -84,12 +85,21 @@ class Alerts
 
     public function serverHealth(): int
     {
-        if (! $this->on('alerts.server_enabled') || ! $this->ibs->isConfigured()) {
+        if (! $this->ibs->isConfigured()) {
             return 0;
         }
         $h = $this->ibs->health();
         $down = $h['breaker_open'] || ($h['error_at'] && (! $h['ok_at'] || strtotime($h['error_at']) > strtotime($h['ok_at'])) && (! $h['ok_at'] || strtotime($h['ok_at']) < time() - 600));
         $state = $down ? 'down' : ($h['ok_at'] ? 'up' : null);
+        // In-panel notice: always on (independent of the bot alert setting).
+        if ($state === 'down') {
+            app(Notices::class)->raise('ibs', 'ارتباط پنل با سرور OpenVPN (IBSng) قطع است', $h['error'] ? mb_substr((string) $h['error'], 0, 300) : null, route('ibs.settings'));
+        } elseif ($state === 'up') {
+            app(Notices::class)->resolve('ibs', 'ارتباط پنل با سرور OpenVPN (IBSng) دوباره برقرار شد', route('ibs.settings'));
+        }
+        if (! $this->on('alerts.server_enabled')) {
+            return 0;
+        }
         $prev = $this->settings->get('alerts.ibs_state');
         if ($state === null || $state === $prev) {
             return 0;
@@ -313,6 +323,7 @@ class Alerts
         }
         BotOutbox::query()->where('status', 'sent')->where('sent_at', '<', now()->subDays(30))->delete();
         BotLinkCode::query()->where('expires_at', '<', now()->subDay())->delete();
+        app(Notices::class)->prune();
         DB::table('alert_log')->where('created_at', '<', now()->subDays(120))->delete();
         app(ConnectionLog::class)->prune(180);
     }

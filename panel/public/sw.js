@@ -23,3 +23,12 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(fetch(req).catch(() => new Response(OFFLINE, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
   }
 });
+// Tapping a panel notification opens (or focuses) the notifications page.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/notices';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ('focus' in c) { c.navigate(url); return c.focus(); } }
+    return self.clients.openWindow(url);
+  }));
+});

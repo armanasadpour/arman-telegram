@@ -101,6 +101,50 @@
       } else { download(); }
     }).catch(download);
   });
+  // Notifications: poll every minute; new notices show a toast, a sound and (if allowed) a system notification.
+  (function () {
+    var bell = document.querySelector('.bell[data-poll]');
+    var enableBtn = document.querySelector('[data-enable-notify]'), onBadge = document.querySelector('[data-notify-on]');
+    var canNotify = 'Notification' in window;
+    function refreshBtn() {
+      if (!enableBtn) return;
+      var granted = canNotify && Notification.permission === 'granted';
+      enableBtn.hidden = !canNotify || granted || Notification.permission === 'denied';
+      if (onBadge) onBadge.hidden = !granted;
+    }
+    refreshBtn();
+    if (enableBtn) enableBtn.addEventListener('click', function () { Notification.requestPermission().then(refreshBtn); });
+    if (!bell) return;
+    var last = +bell.getAttribute('data-last') || 0, count = bell.querySelector('.bell-count');
+    function beep() {
+      try { var C = window.AudioContext || window.webkitAudioContext, ctx = new C(), o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = 880; g.gain.value = .08; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + .18); } catch (x) {}
+    }
+    function toast(n) {
+      var t = document.createElement('a'); t.href = bell.href; t.className = 'toast toast-' + n.level;
+      t.innerHTML = '<strong></strong><span></span>'; t.querySelector('strong').textContent = n.title; t.querySelector('span').textContent = n.body || '';
+      document.body.appendChild(t); requestAnimationFrame(function () { t.classList.add('show'); });
+      setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 400); }, 9000);
+    }
+    function system(n) {
+      if (!canNotify || Notification.permission !== 'granted') return;
+      var opts = { body: n.body || '', icon: '/pwa/icon-192.png', tag: 'notice-' + n.id, data: { url: bell.href } };
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+        navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.showNotification(n.title, opts); else new Notification(n.title, opts); }).catch(function () {});
+      } else { try { new Notification(n.title, opts); } catch (x) {} }
+    }
+    function poll() {
+      fetch(bell.getAttribute('data-poll') + '?after=' + last, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+          if (!d) return;
+          count.hidden = !d.unread; count.textContent = d.unread > 9 ? '۹+' : String(d.unread).replace(/[0-9]/g, function (x) { return '۰۱۲۳۴۵۶۷۸۹'[x]; });
+          if (d.new && d.new.length) { beep(); d.new.forEach(function (n) { toast(n); system(n); }); }
+          last = Math.max(last, d.last || 0);
+        }).catch(function () {});
+    }
+    setInterval(function () { if (!document.hidden || 'serviceWorker' in navigator) poll(); }, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  })();
   // Create-account helpers: random password, quick-value chips.
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-gen-pass]');

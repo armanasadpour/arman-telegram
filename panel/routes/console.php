@@ -25,6 +25,7 @@ use App\Services\Ibs\ExpiredCleanup;
 use App\Services\Ibs\Provisioning;
 use App\Services\Mikrotik\MtAccounting;
 use App\Services\Mikrotik\MtProvisioning;
+use App\Services\Notices;
 use App\Services\PermissionRegistry;
 use App\Services\Settings;
 use Illuminate\Support\Facades\Artisan;
@@ -204,6 +205,12 @@ Artisan::command('routers:health', function () {
             $r->forceFill(['health' => 'down'])->save();
         }
         $this->line($r->name.': '.$state);
+        $notices = app(Notices::class);
+        if ($state === 'down') {
+            $notices->raise('router:'.$r->id, 'سرور «'.$r->name.'» قطع است', 'پنل به روتر وصل نمی‌شود: '.mb_substr((string) $r->fresh()->last_error, 0, 300), route('routers.show', $r));
+        } else {
+            $notices->resolve('router:'.$r->id, 'سرور «'.$r->name.'» دوباره وصل شد', route('routers.show', $r));
+        }
         if ($prev !== null && $prev !== $state) {
             app(Notifier::class)->toStaff('system.view', $state === 'down'
                 ? '🔴 ارتباط پنل با روتر «'.$r->name.'» قطع شد: '.mb_substr((string) $r->fresh()->last_error, 0, 150)

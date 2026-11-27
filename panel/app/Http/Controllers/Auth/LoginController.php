@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\Captcha;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -22,7 +24,18 @@ class LoginController extends Controller
 
     public function show(): View
     {
-        return view('auth.login');
+        return view('auth.login', ['captcha' => Captcha::enabled()]);
+    }
+
+    /** Captcha image; every request issues a new code for this session. */
+    public function captcha(Request $request): Response
+    {
+        abort_unless(Captcha::enabled(), 404);
+        $code = Captcha::issue($request->session());
+        $png = Captcha::png($code);
+        abort_if($png === null, 503, 'افزونه GD در PHP هاست فعال نیست.');
+
+        return response($png, 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'no-store, no-cache, must-revalidate', 'Pragma' => 'no-cache']);
     }
 
     public function login(Request $request): RedirectResponse
@@ -30,7 +43,12 @@ class LoginController extends Controller
         $data = $request->validate([
             'username' => ['required', 'string', 'max:60'],
             'password' => ['required', 'string', 'max:200'],
-        ], [], ['username' => 'نام کاربری', 'password' => 'رمز عبور']);
+            'captcha' => [Captcha::enabled() ? 'required' : 'nullable', 'string', 'max:10'],
+        ], ['captcha.required' => 'کد امنیتی داخل تصویر را وارد کنید.'], ['username' => 'نام کاربری', 'password' => 'رمز عبور', 'captcha' => 'کد امنیتی']);
+
+        if (Captcha::enabled() && ! Captcha::check($request->session(), $data['captcha'] ?? null)) {
+            throw ValidationException::withMessages(['captcha' => 'کد امنیتی درست نیست؛ کد تصویر جدید را وارد کنید.']);
+        }
 
         $key = 'login:'.mb_strtolower($data['username']).'|'.$request->ip();
         if (RateLimiter::tooManyAttempts($key, 5)) {

@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\IbsGroupsController;
 use App\Http\Controllers\Admin\IbsSettingsController;
 use App\Http\Controllers\Admin\MtAccountsController;
 use App\Http\Controllers\Admin\MtGroupsController;
+use App\Http\Controllers\Admin\NoticesController;
 use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Admin\PaymentsController;
 use App\Http\Controllers\Admin\PaymentSettingsController;
@@ -38,6 +39,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'show'])->name('login');
     Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:20,1');
+    Route::get('/captcha.png', [LoginController::class, 'captcha'])->name('captcha')->middleware('throttle:30,1');
 });
 
 // Installable app (PWA): public manifest and icons
@@ -261,6 +263,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/settings/app', [PwaController::class, 'update'])->name('settings.app.update')->middleware('throttle:20,1');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::get('/system', [SystemController::class, 'status'])->name('system.status');
+    Route::get('/notices', [NoticesController::class, 'index'])->name('notices.index');
+    Route::get('/notices/poll', [NoticesController::class, 'poll'])->name('notices.poll')->middleware('throttle:30,1');
     Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade')->middleware('throttle:10,1');
     Route::get('/system/update', [SystemController::class, 'updateForm'])->name('system.update');
     Route::post('/system/update', [SystemController::class, 'updateUpload'])->name('system.update.store')->middleware('throttle:10,1');
