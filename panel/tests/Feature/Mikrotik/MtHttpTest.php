@@ -41,7 +41,7 @@ class MtHttpTest extends MikrotikTestCase
         $res = $this->actingAs($admin)->post('/mt/accounts', ['comment' => 'مشتری تست', 'job_key' => (string) Str::uuid(), 'mt_group_id' => $this->wg->id, 'username' => 'shop.ali', 'days' => 45, 'volume_gb' => 15]);
         $a = MtAccount::query()->firstOrFail();
         $res->assertRedirect(route('mt.accounts.show', $a));
-        $this->followRedirects($res)->assertSee('PrivateKey')->assertSee('<svg', false)->assertSee('۴۵ روز');
+        $this->followRedirects($res)->assertSee('PrivateKey')->assertSee('data:image/png;base64,', false)->assertSee('ذخیره عکس QR')->assertSee('۴۵ روز');
         $this->assertSame([45, 15 * 1073741824], [$a->duration_days, $a->volume_limit_bytes]);
 
         $this->actingAs($admin)->get(route('mt.accounts.show', $a))->assertOk()->assertDontSee('PrivateKey');

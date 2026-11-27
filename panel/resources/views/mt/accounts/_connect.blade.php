@@ -10,7 +10,20 @@
       @php($conf = \App\Services\Mikrotik\WgConfig::build($a, $dev instanceof \App\Models\MtDevice ? $dev : null))
       @if($a->deviceCount() > 1)<h3 class="mt-8">دستگاه {{ fa($dev->deviceNo()) }} از {{ fa($a->deviceCount()) }}</h3>@endif
       <div class="connect-grid mb-16">
-        <div class="qr-box">{!! \App\Support\QrCode::svg($conf, 4) !!}<div class="muted small">در برنامه WireGuard: ➕ → Scan from QR code</div></div>
+        @php($qrPng = \App\Support\QrCode::png($conf, 8))
+        @php($qrName = preg_replace('/\.conf$/', '', \App\Services\Mikrotik\WgConfig::filename($a, $dev instanceof \App\Models\MtDevice ? $dev : null)).'-qr.png')
+        <div class="qr-box">
+          @if($qrPng)
+            <img class="qr-img" src="data:image/png;base64,{{ base64_encode($qrPng) }}" alt="QR {{ $a->username }}" width="320" height="320">
+            <div class="qr-actions">
+              <button type="button" class="btn btn-sm" data-save-img="{{ $qrName }}">📥 ذخیره عکس QR</button>
+            </div>
+            <div class="muted small">روی آیفون می‌توانید روی عکس هم انگشت نگه دارید ← Save to Photos.</div>
+          @else
+            {!! \App\Support\QrCode::svg($conf, 4) !!}
+          @endif
+          <div class="muted small">در برنامه WireGuard: ➕ → Scan from QR code</div>
+        </div>
         <div>
           <pre class="conf ltr" id="wgconf{{ $dev->deviceNo() }}">{{ $conf }}</pre>
           <div class="actions">

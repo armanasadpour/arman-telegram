@@ -88,6 +88,19 @@
       setTimeout(function () { requestAnimationFrame(step); }, 120);
     });
   })();
+  // Save a QR image to the gallery: share sheet with the PNG on phones (→ Save Image), download elsewhere.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-save-img]');
+    if (!b) return;
+    var img = b.closest('.qr-box').querySelector('img'), name = b.getAttribute('data-save-img') || 'qr.png';
+    var download = function () { var a = document.createElement('a'); a.href = img.src; a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+    fetch(img.src).then(function (r) { return r.blob(); }).then(function (blob) {
+      var file = new File([blob], name, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file] }).catch(function (err) { if (err && err.name !== 'AbortError') download(); });
+      } else { download(); }
+    }).catch(download);
+  });
   // Create-account helpers: random password, quick-value chips.
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-gen-pass]');
