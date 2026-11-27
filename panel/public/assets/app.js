@@ -154,6 +154,31 @@
     deferred.prompt();
     deferred.userChoice.finally(function () { deferred = null; document.querySelectorAll('#install-btn, [data-install]').forEach(function (x) { x.hidden = true; }); });
   });
+  // Colored line icons for the account tiles (keyed by the card's emoji).
+  var TILE_ICONS = (function () {
+    var p = function (d) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>'; };
+    return {
+      'ℹ️': ['indigo', p('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>')],
+      '🟢': ['green', p('<path d="M3 12h4l2-5 4 10 2-5h6"/>')],
+      '🌐': ['blue', p('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>')],
+      '✏️': ['amber', p('<path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20z"/><path d="M14 7l3 3"/>')],
+      '📦': ['teal', p('<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>')],
+      '📅': ['rose', p('<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/>')],
+      '📶': ['violet', p('<path d="M6 20v-5M11 20v-9M16 20V7M21 20V4"/>')],
+      '📊': ['violet', p('<path d="M4 20h16M7 16v-4M12 16V8M17 16v-7"/>')],
+      '↺': ['sky', p('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>')],
+      '⛔': ['red', p('<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="16" r="1.2"/>')],
+      '⚙️': ['slate', p('<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>')],
+      '🔑': ['amber', p('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l2 2M15 8l2 2"/>')],
+      '🗝': ['amber', p('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l2 2M15 8l2 2"/>')],
+      '👁': ['violet', p('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>')],
+      '🗑': ['red', p('<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/>')]
+    };
+  })();
+  function setIcon(el, emoji) {
+    var ic = TILE_ICONS[emoji];
+    if (ic) { el.innerHTML = ic[1]; el.classList.add('ti-' + ic[0]); } else { el.textContent = emoji || '•'; }
+  }
   // Account pages: every [data-sheet] card becomes a tile; tapping it opens the card in a bottom sheet.
   (function () {
     var holder = document.querySelector('[data-sheet-tiles]');
@@ -176,7 +201,7 @@
       if (current) { home.appendChild(current); current.hidden = true; }
       current = card; home = card.parentNode;
       sheet.querySelector('.bs-title').textContent = card.getAttribute('data-sheet');
-      sheet.querySelector('.bs-icon').textContent = card.getAttribute('data-sheet-icon') || '';
+      var bi = sheet.querySelector('.bs-icon'); bi.className = 'bs-icon'; setIcon(bi, card.getAttribute('data-sheet-icon') || '');
       sheet.classList.toggle('bs-danger', card.getAttribute('data-sheet-tone') === 'danger');
       card.hidden = false; body.innerHTML = ''; body.appendChild(card);
       document.documentElement.classList.add('bs-lock');
@@ -197,12 +222,14 @@
       t.className = 'tile' + (card.getAttribute('data-sheet-tone') === 'danger' ? ' tile-danger' : '');
       var pw = card.getAttribute('data-sheet-pw');
       t.innerHTML = '<span class="tile-icon"></span><span class="tile-title"></span>';
-      t.querySelector('.tile-icon').textContent = card.getAttribute('data-sheet-icon') || '•';
+      setIcon(t.querySelector('.tile-icon'), card.getAttribute('data-sheet-icon'));
+      if (card.getAttribute('data-sheet-wide') !== null || card.getAttribute('data-sheet-icon') === '🗑') t.classList.add('tile-wide');
       t.querySelector('.tile-title').textContent = card.getAttribute('data-sheet');
       if (pw) {
         t.classList.add('tile-pw');
-        t.innerHTML = '<span class="tile-icon">🔑</span><span class="tile-title">رمز جدید</span><span class="tile-pw-row"><bdi class="tile-pw-val"></bdi>'
+        t.innerHTML = '<span class="tile-icon"></span><span class="tile-title">رمز جدید</span><span class="tile-pw-row"><bdi class="tile-pw-val"></bdi>'
           + '<span class="tile-copy" role="button" tabindex="0" aria-label="کپی رمز">⧉ کپی</span></span>';
+        setIcon(t.querySelector('.tile-icon'), '🔑');
         t.querySelector('.tile-pw-val').textContent = pw;
         t.querySelector('.tile-copy').addEventListener('click', function (ev) {
           ev.stopPropagation();

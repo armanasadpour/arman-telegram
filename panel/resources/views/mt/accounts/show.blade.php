@@ -1,21 +1,20 @@
 @php($lbl = $a->statusLabel())
 <x-layouts.app :title="'اکانت '.$a->username">
-  <div class="page-head">
-    <div>
-      <h1><bdi class="ltr">{{ $a->username }}</bdi> <span class="badge badge-{{ $lbl[1] }}">{{ $lbl[0] }}</span></h1>
-      <p class="muted">{{ $a->protocolLabel() }} · گروه {{ $a->group?->name }} · روتر {{ $a->router?->name }}
-        — به‌روزرسانی: {{ $a->last_synced_at ? fa_ago($a->last_synced_at) : 'هنوز نه' }}</p>
-    </div>
-    <div class="actions">
+  @php($syncIco = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></svg>')
+  <div class="acct-head">
+    <h1><bdi class="ltr">{{ $a->username }}</bdi></h1>
+    <p class="acct-sync">{!! $syncIco !!} {{ $a->protocolLabel() }} · گروه {{ $a->group?->name }} · روتر {{ $a->router?->name }}
+      — به‌روزرسانی: {{ $a->last_synced_at ? jdate($a->last_synced_at, 'Y/m/d – H:i:s').' ('.fa_ago($a->last_synced_at).')' : 'هنوز نه' }}</p>
+    <div class="acct-actions">
       @unless($a->trashed())
-        <form method="post" action="{{ route('mt.accounts.sync', $a) }}">@csrf<button class="btn btn-secondary" type="submit">به‌روزرسانی از روتر</button></form>
+        <form method="post" action="{{ route('mt.accounts.sync', $a) }}">@csrf<button class="pill-btn" type="submit">{!! $syncIco !!}به‌روزرسانی از روتر</button></form>
         @can('mt_accounts.sensitive')
           @if(! $reveal)
-            <a class="btn btn-secondary" href="{{ route('mt.accounts.connect', $a) }}">{{ $a->isWireguard() ? 'فایل و QR' : 'اطلاعات اتصال' }}</a>
+            <a class="pill-btn" href="{{ route('mt.accounts.connect', $a) }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></svg>{{ $a->isWireguard() ? 'فایل و QR' : 'اطلاعات اتصال' }}</a>
           @endif
         @endcan
       @endunless
-      <a class="btn btn-secondary" href="{{ $a->listUrl() }}">بازگشت</a>
+      <a class="pill-btn" href="{{ $a->listUrl() }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg>بازگشت</a>
     </div>
   </div>
 
@@ -32,13 +31,12 @@
     @include('mt.accounts._connect', ['a' => $a])
   @endif
 
-  <div class="grid stats mb-16">
+  <div class="acct-top mb-16">
+    @include('accounts._statuscard', ['label' => $lbl[0], 'tone' => $lbl[1]])
     @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? 'آنلاین' : 'آفلاین',
       'hint2' => $a->isWireguard() ? null : 'نشست‌های آنلاین: '.fa((int) $a->online_count).' — حداکثر همزمان: '.(($a->multi_login ?? $a->group?->multi_login) ? fa($a->multi_login ?? $a->group->multi_login) : 'نامحدود'),
       'hint' => $a->online_ip ? 'از IP '.$a->online_ip : ($a->last_seen_at ? 'آخرین فعالیت '.fa_ago($a->last_seen_at) : 'هنوز وصل نشده'),
       'kickUrl' => ! $a->isWireguard() && ! $a->trashed() && auth()->user()->can('mt_accounts.update') ? route('mt.accounts.kick', $a) : null])
-    <div class="card stat"><div class="label">مصرف کل</div><div class="value small">{{ fa_bytes($a->used_bytes) }}</div>
-      <div class="hint">دانلود {{ fa_bytes($a->download_bytes) }} · آپلود {{ fa_bytes($a->upload_bytes) }}</div></div>
   </div>
   @include('mt.accounts._meters', ['a' => $a, 'class' => 'mb-16'])
   <div class="sheet-tiles" data-sheet-tiles></div>
@@ -53,6 +51,7 @@
         @else<dt>اتصال همزمان</dt><dd>{{ ($a->multi_login ?? $a->group?->multi_login) ? fa($a->multi_login ?? $a->group->multi_login) : 'نامحدود' }}</dd>@endif
         <dt>مدت</dt><dd>{{ $a->duration_days ? fa($a->duration_days).' روز' : 'نامحدود' }}{{ $a->expires_at ? ' — تا '.jdate($a->expires_at, 'Y/m/d H:i') : ($a->duration_days ? ' (از اولین اتصال)' : '') }}</dd>
         <dt>حجم</dt><dd>{{ $a->isVolumeLimited() ? fa_bytes($a->volume_limit_bytes) : 'نامحدود' }}</dd>
+        <dt>مصرف کل</dt><dd>{{ fa_bytes($a->used_bytes) }} <span class="muted small">(دانلود {{ fa_bytes($a->download_bytes) }} · آپلود {{ fa_bytes($a->upload_bytes) }})</span></dd>
         <dt>اولین اتصال</dt><dd>{{ $a->first_used_at ? jdate($a->first_used_at) : '—' }}</dd>
         <dt>ساخت</dt><dd>{{ jdate($a->created_at) }}{{ $a->creator ? ' توسط '.$a->creator->name : '' }}</dd>
         @if($a->package)<dt>بسته</dt><dd>{{ $a->package->name }}</dd>@endif

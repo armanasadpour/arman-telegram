@@ -1,14 +1,11 @@
 <x-layouts.app title="اکانت {{ $a->username }}">
-  <div class="page-head">
-    <div>
-      <h1><bdi class="ltr">{{ $a->username }}</bdi></h1>
-      <p class="muted">
-        آخرین به‌روزرسانی از سرور: {{ $a->last_synced_at ? jdate($a->last_synced_at, 'Y/m/d H:i:s').' ('.fa_ago($a->last_synced_at).')' : 'هرگز' }}
-      </p>
-    </div>
-    <div class="actions">
-      <form method="post" action="{{ route('accounts.refresh', $a) }}">@csrf<button class="btn btn-secondary" type="submit">به‌روزرسانی از سرور</button></form>
-      <a class="btn btn-secondary" href="{{ route('accounts.index') }}">بازگشت</a>
+  <div class="acct-head">
+    <h1><bdi class="ltr">{{ $a->username }}</bdi></h1>
+    <p class="acct-sync"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></svg>
+      آخرین به‌روزرسانی از سرور: {{ $a->last_synced_at ? jdate($a->last_synced_at, 'Y/m/d – H:i:s').' ('.fa_ago($a->last_synced_at).')' : 'هرگز' }}</p>
+    <div class="acct-actions">
+      <form method="post" action="{{ route('accounts.refresh', $a) }}">@csrf<button class="pill-btn" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></svg>به‌روزرسانی از سرور</button></form>
+      <a class="pill-btn" href="{{ route('accounts.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg>بازگشت</a>
     </div>
   </div>
 
@@ -30,8 +27,9 @@
     $pct = ($total && $used !== null) ? min(100, (int) round($used * 100 / max(1, $total))) : null;
     $rel = $a->effectiveRelExpSeconds();
   @endphp
-  <div class="grid stats mb-16">
-    <div class="card stat"><div class="label">وضعیت</div><div class="value small">@include('accounts._status', ['a' => $a])</div></div>
+  @php([$stLabel, $stTone] = \App\Models\VpnAccount::STATUS_LABELS[$a->status()] ?? [$a->status(), 'primary'])
+  <div class="acct-top mb-16">
+    @include('accounts._statuscard', ['label' => $stLabel, 'tone' => $stTone])
     @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? 'آنلاین' : 'آفلاین',
       'hint' => 'حداکثر همزمان: '.($a->effectiveMultiLogin() !== null ? fa($a->effectiveMultiLogin()) : '—'),
       'hint2' => 'نشست‌های آنلاین: '.fa((int) $a->online_sessions),

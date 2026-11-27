@@ -9,6 +9,11 @@
     </div>
   </div>
   @if($a->status === 'pending')<div class="alert alert-warning">اکانت در حال ساخت روی سرور است؛ چند دقیقه دیگر دوباره سر بزنید.</div>@endif
+  <div class="acct-top mb-16">
+    @include('accounts._statuscard', ['label' => $lbl[0], 'tone' => $lbl[1]])
+    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? 'آنلاین' : 'آفلاین', 'kickUrl' => null,
+      'hint' => $a->last_seen_at ? 'آخرین اتصال '.fa_ago($a->last_seen_at) : 'هنوز وصل نشده', 'hint2' => null])
+  </div>
   @include('mt.accounts._meters', ['a' => $a, 'class' => 'mb-16'])
   @if(! in_array($a->status, ['pending', 'failed'], true))@include('mt.accounts._connect', ['a' => $a])@endif
   <div class="card w-640">

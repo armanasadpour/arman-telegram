@@ -52,7 +52,6 @@
         @endif
       </div>
       </div>
-      @if($tm && $tm['started'] && $expiresAt)<span class="ring-foot">تا {{ jdate($expiresAt, 'Y/m/d H:i') }}</span>@endif
     </div>
     {{-- volume (left in RTL) --}}
     <div class="ring ring-vol lvl-{{ $vm ? $lvl($volPct) : 'ok' }}">
@@ -74,8 +73,11 @@
         @endif
       </div>
       </div>
-      <span class="ring-foot">مصرف‌شده {{ fa_bytes((int) $used) }}</span>
     </div>
+  </div>
+  <div class="rings-foot">
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>{{ $tm && $tm['started'] && $expiresAt ? jdate($expiresAt, 'Y/m/d – H:i') : ($tm ? 'از اولین اتصال' : 'بدون تاریخ انقضا') }}</span>
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg>مصرف‌شده: {{ fa_bytes((int) $used) }}</span>
   </div>
   <svg class="rings-wave" viewBox="0 0 600 80" preserveAspectRatio="none" aria-hidden="true">
     <path class="w1" d="M0 40 C 100 10 200 70 300 40 S 500 10 600 40 V80 H0Z"/>

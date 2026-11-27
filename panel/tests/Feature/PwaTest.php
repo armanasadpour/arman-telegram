@@ -14,7 +14,7 @@ class PwaTest extends TestCase
         $this->get('/pwa/icon-77.png')->assertNotFound();
 
         $admin = $this->superAdmin();
-        $this->actingAs($admin)->get('/')->assertSee('manifest.webmanifest')->assertSee('install-btn', false);
+        $this->actingAs($admin)->get('/')->assertSee('manifest.webmanifest')->assertSee('manifest.webmanifest');
         $this->actingAs($admin)->get('/settings/app')->assertOk()->assertSee('برنامه نصبی');
         $img = imagecreatetruecolor(300, 200);
         ob_start();

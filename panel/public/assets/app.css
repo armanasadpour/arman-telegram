@@ -568,7 +568,7 @@ button.conn-card:active{transform:scale(.98)}
 .tile:active{transform:scale(.98)}
 .tile-icon{flex:none;width:38px;height:38px;display:grid;place-items:center;border-radius:13px;font-size:1.2rem;background:var(--primary-soft);box-shadow:inset 0 0 0 1px rgba(79,70,229,.08)}
 .tile-title{flex:1;min-width:0;font-weight:800;font-size:.86rem;line-height:1.5}
-.tile-danger .tile-icon{background:#fee2e2}
+.tile-danger .tile-icon{background:var(--ti-bg,#fee2e2)}
 .tile-danger:hover{border-color:#ef4444;box-shadow:0 12px 24px -16px rgba(239,68,68,.6)}
 .tile-pw{background:linear-gradient(150deg,#ecfdf5,#d1fae5);border-color:#34d399}
 .tile-pw{grid-column:1/-1}
@@ -585,7 +585,7 @@ button.conn-card:active{transform:scale(.98)}
 .bs-grip{width:44px;height:5px;border-radius:9px;background:var(--border-strong,#cbd5e1);margin:10px auto 2px}
 .bs-head{display:flex;align-items:center;gap:10px;padding:8px 18px 12px;border-bottom:1px solid var(--border)}
 .bs-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;background:var(--primary-soft);font-size:1.1rem}
-.bs-danger .bs-icon{background:#fee2e2}
+.bs-danger .bs-icon{background:var(--ti-bg,#fee2e2)}
 .bs-title{flex:1;margin:0;font-size:1.05rem}
 .bs-close{width:34px;height:34px;border-radius:11px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:.95rem}
 .bs-body{overflow:auto;padding:14px 16px 20px;overscroll-behavior:contain}
@@ -637,3 +637,80 @@ button.conn-card:active{transform:scale(.98)}
 @keyframes ring-wave{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @keyframes ring-pulse{0%{box-shadow:0 0 0 0 rgba(14,159,110,.55)}70%{box-shadow:0 0 0 8px rgba(14,159,110,0)}100%{box-shadow:0 0 0 0 rgba(14,159,110,0)}}
 @media (prefers-reduced-motion:reduce){.rings-wave,.rings-status i{animation:none}.ring-arc{transition:none}}
+/* ---------- account page (v2) ---------- */
+.acct-head{margin-bottom:14px}
+.acct-head h1{margin:0 0 4px;font-size:1.35rem}
+.acct-sync{display:flex;align-items:center;gap:6px;margin:0 0 10px;color:var(--muted);font-size:.8rem;flex-wrap:wrap}
+.acct-sync svg,.pill-btn svg,.rings-foot svg,.conn-card .hint svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.acct-actions{display:flex;gap:10px;flex-wrap:wrap}
+.acct-actions form{margin:0}
+.pill-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-weight:800;font-size:.88rem;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s var(--ease),box-shadow .15s var(--ease)}
+.pill-btn svg{color:var(--primary);width:18px;height:18px}
+.pill-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);color:var(--text)}
+.acct-top{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.acct-top .conn-form{margin:0;display:flex}
+.acct-top>.card,.acct-top .conn-card{margin:0;min-height:150px;border-radius:22px}
+/* status card */
+.status-card{display:flex;align-items:stretch;justify-content:space-between;gap:4px;padding:16px}
+.status-card::before{display:none}
+.status-text{display:flex;flex-direction:column;gap:12px;z-index:1}
+.status-card .label{font-size:1rem;font-weight:800;color:var(--text-2)}
+.status-pill{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;padding:6px 14px;border-radius:999px;font-weight:800;font-size:.92rem;background:var(--success-soft);color:var(--success-ink)}
+.status-pill i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.status-card.tone-danger .status-pill{background:var(--danger-soft);color:var(--danger-ink)}
+.status-card.tone-warning .status-pill{background:var(--warning-soft);color:var(--warning-ink)}
+.status-card.tone-primary .status-pill{background:var(--primary-soft);color:var(--primary)}
+.status-art{width:46%;max-width:130px;align-self:flex-end;flex:none;filter:drop-shadow(0 10px 12px rgba(16,24,40,.12))}
+.status-shield{animation:shield-float 3.2s ease-in-out infinite;transform-origin:60px 50px}
+.tone-success .sh-a{stop-color:#4ade80}.tone-success .sh-b{stop-color:#15803d}
+.tone-danger .sh-a{stop-color:#fb7185}.tone-danger .sh-b{stop-color:#be123c}
+.tone-warning .sh-a{stop-color:#fcd34d}.tone-warning .sh-b{stop-color:#d97706}
+.tone-primary .sh-a{stop-color:#a5b4fc}.tone-primary .sh-b{stop-color:#4f46e5}
+@keyframes shield-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+/* connection card */
+.conn-card{display:flex!important;flex-direction:column;align-items:flex-start;gap:2px;padding:16px!important;cursor:default}
+button.conn-card{cursor:pointer}
+.conn-card.is-online{background:linear-gradient(140deg,#22c55e 0%,#15803d 100%)}
+.conn-card.is-offline{background:linear-gradient(140deg,#f43f5e 0%,#be123c 100%)}
+.conn-card .label{font-size:.9rem;font-weight:700}
+.conn-card .value{font-size:1.7rem;font-weight:900;line-height:1.3;margin:0 0 6px}
+.conn-card .hint{display:flex!important;align-items:center;gap:6px;font-size:.78rem;font-weight:500;margin-top:2px}
+.conn-badge{position:absolute;top:12px;inset-inline-end:12px;width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 8px 20px -8px rgba(0,0,0,.35)}
+.conn-ico{width:32px;height:32px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round}
+.conn-ico circle{fill:#fff;stroke:none}
+.is-online .conn-ico path{animation:wifi-wave 1.8s ease-in-out infinite}
+.is-online .conn-ico path:nth-child(2){animation-delay:.2s}.is-online .conn-ico path:nth-child(1){animation-delay:.4s}
+@keyframes wifi-wave{0%,100%{opacity:.45}50%{opacity:1}}
+.conn-wave{position:absolute;inset:auto 0 0 0;height:55%;z-index:-1;background:radial-gradient(120% 90% at 0% 100%,rgba(255,255,255,.16),transparent 60%),radial-gradient(90% 70% at 100% 120%,rgba(0,0,0,.14),transparent 70%)}
+/* rings footer */
+.rings-foot{display:flex;justify-content:space-around;gap:8px;flex-wrap:wrap;margin:14px -10px -28px;padding:12px 10px;background:color-mix(in srgb,var(--surface) 70%,transparent);border-top:1px solid var(--border);font-size:.8rem;color:var(--text-2);backdrop-filter:blur(4px)}
+.rings-foot span{display:inline-flex;align-items:center;gap:6px}
+.rings-foot svg{color:var(--primary)}
+.rings-wave{bottom:44px}
+.ring-arc{stroke-width:9}
+/* tiles with colored icons */
+.sheet-tiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{min-height:68px;border-radius:20px;padding:12px 14px;background:var(--surface);box-shadow:var(--shadow)}
+.tile-icon{width:46px;height:46px;border-radius:15px;background:var(--ti-bg,var(--primary-soft));color:var(--ti,var(--primary));box-shadow:0 6px 14px -8px var(--ti,var(--primary)),inset 0 1px 0 rgba(255,255,255,.6)}
+.tile-icon svg,.bs-icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tile-title{font-size:.92rem}
+.tile-wide{grid-column:1/-1}
+.bs-icon{background:var(--ti-bg,var(--primary-soft));color:var(--ti,var(--primary))}
+.ti-indigo{--ti:#4f46e5;--ti-bg:linear-gradient(145deg,#e0e7ff,#c7d2fe)}
+.ti-green{--ti:#16a34a;--ti-bg:linear-gradient(145deg,#dcfce7,#bbf7d0)}
+.ti-blue{--ti:#2563eb;--ti-bg:linear-gradient(145deg,#dbeafe,#bfdbfe)}
+.ti-amber{--ti:#d97706;--ti-bg:linear-gradient(145deg,#fef3c7,#fde68a)}
+.ti-rose{--ti:#e11d48;--ti-bg:linear-gradient(145deg,#ffe4e6,#fecdd3)}
+.ti-violet{--ti:#7c3aed;--ti-bg:linear-gradient(145deg,#ede9fe,#ddd6fe)}
+.ti-sky{--ti:#0284c7;--ti-bg:linear-gradient(145deg,#e0f2fe,#bae6fd)}
+.ti-red{--ti:#dc2626;--ti-bg:linear-gradient(145deg,#fee2e2,#fecaca)}
+.ti-teal{--ti:#0d9488;--ti-bg:linear-gradient(145deg,#ccfbf1,#99f6e4)}
+.ti-slate{--ti:#475569;--ti-bg:linear-gradient(145deg,#f1f5f9,#e2e8f0)}
+@media (prefers-color-scheme:dark){
+  .ti-indigo,.ti-green,.ti-blue,.ti-amber,.ti-rose,.ti-violet,.ti-sky,.ti-red,.ti-teal,.ti-slate{--ti-bg:color-mix(in srgb,var(--ti) 22%,var(--surface-2))}
+  .tile-icon{color:color-mix(in srgb,var(--ti) 55%,#fff)}
+  .status-card ellipse{opacity:.35}
+}
+@media (max-width:420px){.acct-top{gap:10px}.conn-badge{width:48px;height:48px}.conn-ico{width:26px;height:26px}.conn-card .value{font-size:1.4rem}.status-art{width:50%}}
+@media (prefers-reduced-motion:reduce){.status-shield,.is-online .conn-ico path{animation:none}}
+@media (max-width:420px){.tile{gap:9px;padding:10px 11px}.tile-icon{width:40px;height:40px;border-radius:13px}.tile-icon svg{width:21px;height:21px}.tile-title{font-size:.84rem}}

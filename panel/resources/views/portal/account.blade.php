@@ -6,9 +6,11 @@
       <a class="btn btn-secondary" href="{{ route('portal.accounts') }}">بازگشت</a>
     </div>
   </div>
-  <div class="grid stats mb-16">
-    <div class="card stat"><div class="label">وضعیت</div><div class="value small">@include('accounts._status', ['a' => $a])</div></div>
-    <div class="card stat"><div class="label">اتصال</div><div class="value small">{{ $a->is_online ? fa($a->online_sessions).' نشست آنلاین' : 'آفلاین' }}</div></div>
+  @php([$stLabel, $stTone] = \App\Models\VpnAccount::STATUS_LABELS[$a->status()] ?? [$a->status(), 'primary'])
+  <div class="acct-top mb-16">
+    @include('accounts._statuscard', ['label' => $stLabel, 'tone' => $stTone])
+    @include('accounts._conncard', ['online' => (bool) $a->is_online, 'main' => $a->is_online ? 'آنلاین' : 'آفلاین', 'hint' => null,
+      'hint2' => 'نشست‌های آنلاین: '.fa((int) $a->online_sessions), 'kickUrl' => null])
   </div>
   @include('accounts._meters', ['a' => $a, 'class' => 'mb-16'])
   <div class="card">

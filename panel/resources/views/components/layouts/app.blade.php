@@ -23,7 +23,6 @@
   <header class="header">
     <button id="menu-btn" class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="منو"><x-icon name="menu" width="20" height="20"/></button>
     <div class="brand">{{ $siteName }}</div>
-    <button id="install-btn" class="btn btn-sm install-btn" type="button" hidden>📲 نصب برنامه</button>
     <div class="user">
       <a href="{{ route('profile.password') }}" title="تغییر رمز"><span class="avatar" aria-hidden="true">{{ mb_substr(auth()->user()->name, 0, 1) }}</span><span class="user-name">{{ auth()->user()->name }}</span></a>
       <form method="post" action="{{ route('logout') }}">
