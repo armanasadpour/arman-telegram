@@ -95,7 +95,7 @@ class DashboardController extends Controller
             });
             $live = VpnAccount::query()->whereNull('ibs_deleted_at');
             $cards['openvpn'] = [
-                'title' => 'OpenVPN', 'url' => route('accounts.index'),
+                'title' => 'OpenVPN', 'url' => route('accounts.index'), 'create' => $user->can('accounts.create') ? route('accounts.create') : null,
                 'active' => (clone $live)->where('locked', false)->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>=', now()))->count(),
                 'online' => VpnAccount::query()->where('is_online', true)->count(),
                 'expired' => (clone $live)->where('expires_at', '<', now())->count(),
@@ -107,7 +107,7 @@ class DashboardController extends Controller
             foreach (['l2tp' => ['L2TP', 'l2tp.accounts'], 'wireguard' => ['WireGuard', 'wg.accounts']] as $p => [$title, $route]) {
                 $q = MtAccount::query()->where('protocol', $p);
                 $cards[$p] = [
-                    'title' => $title, 'url' => route($route),
+                    'title' => $title, 'url' => route($route), 'create' => $user->can('mt_accounts.create') ? route('mt.accounts.create', ['protocol' => $p]) : null,
                     'active' => (clone $q)->where('status', 'active')->count(),
                     'online' => (clone $q)->where('is_online', true)->count(),
                     'expired' => (clone $q)->whereIn('status', ['expired', 'depleted'])->count(),

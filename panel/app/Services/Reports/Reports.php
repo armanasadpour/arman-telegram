@@ -105,6 +105,7 @@ class Reports
             'orders_count' => (clone $orders)->count(),
             'orders_rial' => (int) (clone $orders)->sum('price_rial'),
             'payments_rial' => (int) (clone $paid)->sum('amount_rial'),
+            'payments_count' => (clone $paid)->count(),
             'payments_by_method' => (clone $paid)->selectRaw('method, count(*) c, sum(amount_rial) s')->groupBy('method')->get()
                 ->mapWithKeys(fn ($r) => [$r->method => ['count' => (int) $r->c, 'rial' => (int) $r->s]])->all(),
             'new_accounts' => VpnAccount::withTrashed()->where('source', '!=', 'imported')->whereBetween('created_at', [$from, $to])->count(),
