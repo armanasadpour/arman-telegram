@@ -14,7 +14,7 @@ class NoticesController extends Controller
 {
     public function index(Request $request, Notices $notices): View
     {
-        $this->authorize('system.view');
+        abort_unless($request->user()->can('system.view') || $request->user()->can('payments.view'), 403);
         $user = $request->user();
         $seen = $user->notices_seen_at;
         $user->forceFill(['notices_seen_at' => now()])->save();
@@ -29,9 +29,9 @@ class NoticesController extends Controller
     /** Polled by the panel every minute: unread count + notices newer than ?after (for toasts / browser notifications). */
     public function poll(Request $request, Notices $notices): JsonResponse
     {
-        $this->authorize('system.view');
+        abort_unless($request->user()->can('system.view') || $request->user()->can('payments.view'), 403);
         $after = (int) $request->query('after', 0);
-        $new = $after > 0
+        $new = $request->has('after')
             ? PanelNotice::query()->where('id', '>', $after)->orderBy('id')->limit(5)->get(['id', 'level', 'title', 'body'])
             : collect();
 

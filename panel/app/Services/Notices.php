@@ -44,6 +44,14 @@ class Notices
         return true;
     }
 
+    /** One-off information notice (e.g. a new wallet top-up request): bell, toast and browser notification. */
+    public function info(string $key, string $title, ?string $body = null, ?string $url = null): void
+    {
+        if ($this->ready()) {
+            PanelNotice::query()->create(['key' => $key, 'level' => 'info', 'title' => mb_substr($title, 0, 200), 'body' => $body !== null ? mb_substr($body, 0, 1000) : null, 'url' => $url]);
+        }
+    }
+
     /** @return bool true when an open problem was closed */
     public function resolve(string $key, string $title, ?string $url = null): bool
     {

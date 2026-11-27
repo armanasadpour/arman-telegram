@@ -1,7 +1,7 @@
 <x-layouts.app title="اعلان‌ها">
   <div class="list-head">
     <span class="list-head-ico notice-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></span>
-    <div><h1>اعلان‌ها</h1><p>قطع و وصل شدن سرورها (روترها) و ارتباط پنل با سرور OpenVPN؛ هر ۵ تا ۱۰ دقیقه بررسی می‌شود.</p></div>
+    <div><h1>اعلان‌ها</h1><p>قطع و وصل شدن سرورها و ارتباط پنل با سرور OpenVPN (هر ۵ تا ۱۰ دقیقه بررسی می‌شود) و درخواست‌های شارژ حساب همکاران.</p></div>
   </div>
 
   <div class="card mb-16 push-card">

@@ -9,6 +9,7 @@ use App\Models\Wallet;
 use App\Services\AuditLogger;
 use App\Services\Finance\CustomerOrders;
 use App\Services\Finance\WalletService;
+use App\Services\Notices;
 use App\Services\Settings;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -199,7 +200,10 @@ class Payments
         }
         $p = Payment::query()->create(['uuid' => (string) Str::uuid(), 'method' => 'card', 'wallet_id' => $wallet->id, 'amount_rial' => $amountRial, 'created_by' => $userId]);
 
-        return $this->reportCard($p, 'درخواست شارژ کیف پول'.($note ? ' — '.$note : ''), $receiptPath);
+        $p = $this->reportCard($p, 'درخواست شارژ کیف پول'.($note ? ' — '.$note : ''), $receiptPath);
+        app(Notices::class)->info('topup:'.$p->id, '💳 درخواست شارژ حساب: '.fa_money($amountRial), $p->payerLabel().($note ? ' — '.$note : '').' · منتظر تأیید', route('accounting.topups'));
+
+        return $p;
     }
 
     public function reportCard(Payment $p, string $note, ?string $receiptPath = null): Payment

@@ -30,6 +30,8 @@ class TopupRequestTest extends ResellerTestCase
         Storage::disk('local')->assertExists($p->receipt_path);
         $this->assertSame(0, $this->bal($r));
 
+        $this->actingAs($admin)->getJson('/notices/poll?after=0')->assertJsonPath('unread', 1)->assertJsonPath('new.0.level', 'info');
+        $this->actingAs($this->userWith(['payments.view']))->get('/notices')->assertOk()->assertSee('درخواست شارژ حساب');
         $this->actingAs($admin)->get('/accounting/topups')->assertOk()->assertSee($r->name)->assertSee('تأیید و شارژ کیف پول');
         $this->actingAs($admin)->confirmed()->post('/payments/'.$p->id.'/approve')->assertSessionHas('success');
         $this->actingAs($admin)->confirmed()->post('/payments/'.$p->id.'/approve');   // twice: still one credit

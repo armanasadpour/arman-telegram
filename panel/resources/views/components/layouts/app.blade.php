@@ -24,14 +24,14 @@
     <button id="menu-btn" class="menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="منو"><x-icon name="menu" width="20" height="20"/></button>
     <div class="brand">{{ $siteName }}</div>
     <div class="user">
-      @can('system.view')
+      @if(auth()->user()->can('system.view') || auth()->user()->can('payments.view'))
         @php($notices = app(\App\Services\Notices::class))
         @php($unread = $notices->unreadCount(auth()->user()))
         <a href="{{ route('notices.index') }}" class="bell" title="اعلان‌ها" data-poll="{{ route('notices.poll') }}" data-last="{{ $notices->lastId() }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
           <span class="bell-count" @if(! $unread) hidden @endif>{{ $unread > 9 ? '۹+' : fa($unread) }}</span>
         </a>
-      @endcan
+      @endif
       <a href="{{ route('profile.password') }}" title="تغییر رمز"><span class="avatar" aria-hidden="true">{{ mb_substr(auth()->user()->name, 0, 1) }}</span><span class="user-name">{{ auth()->user()->name }}</span></a>
       <form method="post" action="{{ route('logout') }}">
         @csrf
