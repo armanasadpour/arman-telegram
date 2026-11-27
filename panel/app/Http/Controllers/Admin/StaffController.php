@@ -135,7 +135,8 @@ class StaffController extends Controller
         $staff->password = $data['password'];
         $staff->password_changed_at = now();
         $staff->save();
-        DB::table('sessions')->where('user_id', $staff->id)->delete();
+        // own account: keep this session, sign out the other devices only
+        DB::table('sessions')->where('user_id', $staff->id)->when($staff->is($request->user()), fn ($q) => $q->where('id', '!=', $request->session()->getId()))->delete();
         $this->audit->log('staff.password_reset', $staff, 'تعیین رمز جدید برای «'.$staff->username.'»', null, $data['reason']);
 
         return back()->with('success', 'رمز جدید ثبت شد و کاربر از همه نشست‌ها خارج شد.');

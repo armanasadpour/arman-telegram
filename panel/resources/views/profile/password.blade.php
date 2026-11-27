@@ -9,11 +9,13 @@
       <div class="field">
         <label for="current_password">رمز فعلی</label>
         <input id="current_password" name="current_password" type="password" class="input ltr @error('current_password') is-invalid @enderror" autocomplete="current-password" required>
+        @error('current_password')<div class="error">{{ $message }}</div>@enderror
       </div>
       <div class="field">
         <label for="password">رمز جدید</label>
         <input id="password" name="password" type="password" class="input ltr @error('password') is-invalid @enderror" autocomplete="new-password" required>
-        <div class="help">حداقل ۴ کاراکتر.</div>
+        <div class="help">حداقل ۴ کاراکتر؛ نباید با رمز فعلی یکی باشد.</div>
+        @error('password')<div class="error">{{ $message }}</div>@enderror
       </div>
       <div class="field">
         <label for="password_confirmation">تکرار رمز جدید</label>
