@@ -26,10 +26,14 @@ class ResellerPrefixBulkTest extends ResellerTestCase
 
         app(WalletService::class)->post(app(WalletService::class)->walletFor('reseller', $r->id), 5_000_000, 'manual_credit', 'seed');
         $sell = ['sale_key' => (string) Str::uuid(), 'package_id' => $this->newPkg->id, 'sale_price_toman' => '130,000', 'customer_name' => 'علی'];
-        $this->actingAs($r->user)->get('/r/sell')->assertSee('un-prefix', false)->assertSee('>sam<', false);
+        $this->actingAs($r->user)->get('/r/sell')->assertSee('data-lock-prefix="sam"', false)->assertSee('value="sam"', false);
         $this->actingAs($r->user)->post('/r/sell', $sell)->assertSessionHasErrors('username');   // username required
         $this->actingAs($r->user)->post('/r/sell', $sell + ['username' => 'ali'])->assertSessionHasNoErrors();
         $this->assertTrue(VpnAccount::query()->where('username', 'samali')->where('reseller_id', $r->id)->exists());
+        // the field sends the prefix too: it is not doubled
+        $sell['sale_key'] = (string) Str::uuid();
+        $this->actingAs($r->user)->post('/r/sell', $sell + ['username' => 'samreza'])->assertSessionHasNoErrors();
+        $this->assertTrue(VpnAccount::query()->where('username', 'samreza')->exists());
     }
 
     public function test_bulk_disable_enable_delete_and_report(): void

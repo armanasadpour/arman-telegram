@@ -54,8 +54,9 @@
         <div class="help">سود شما = این مبلغ − قیمت خرید.</div></div>
       @unless($target)
         <div class="field"><label for="username">نام کاربری اکانت</label>
-          <div class="input-ico prefixed">@if($me->account_prefix)<span class="un-prefix ltr" title="پیشوند ثابت اکانت‌های شما">{{ $me->account_prefix }}</span>@endif<input id="username" name="username" class="input ltr" value="{{ old('username') }}" maxlength="{{ $me->account_prefix ? 24 : 32 }}" autocapitalize="none" spellcheck="false" required placeholder="مثلاً ali"><svg viewBox="0 0 24 24" aria-hidden="true">{!! $ic['at'] !!}</svg></div>
-          <div class="help">حروف کوچک انگلیسی، عدد، «_»، «.» یا «-».@if($me->account_prefix) نام نهایی: <bdi class="ltr">{{ $me->account_prefix }}…</bdi>@endif</div>
+          @php($pre = (string) $me->account_prefix)
+          <div class="input-ico"><input id="username" name="username" class="input ltr un-locked" value="{{ $pre.preg_replace('/^'.preg_quote($pre, '/').'/', '', (string) old('username')) }}" maxlength="{{ $pre !== '' ? strlen($pre) + 24 : 32 }}" autocapitalize="none" spellcheck="false" autocomplete="off" required @if($pre !== '') data-lock-prefix="{{ $pre }}" @endif><svg viewBox="0 0 24 24" aria-hidden="true">{!! $ic['at'] !!}</svg></div>
+          <div class="help">@if($pre !== '')<bdi class="ltr"><strong>{{ $pre }}</strong></bdi> پیشوند ثابت اکانت‌های شماست و پاک نمی‌شود؛ ادامه نام را بنویسید (مثلاً <bdi class="ltr">{{ $pre }}ali</bdi>). @endif حروف کوچک انگلیسی، عدد، «_»، «.» یا «-».</div>
           @error('username')<div class="error">{{ $message }}</div>@enderror</div>
         <div class="field"><label for="password">رمز اکانت (اختیاری)</label>
           <div class="input-ico"><input id="password" name="password" class="input ltr" value="" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false"><svg viewBox="0 0 24 24" aria-hidden="true">{!! $ic['lock'] !!}</svg></div>

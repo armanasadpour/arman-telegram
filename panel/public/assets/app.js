@@ -195,6 +195,27 @@
     if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done);
     else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (x) {} ta.remove(); }
   });
+  // Username with a fixed reseller prefix: the prefix stays at the start of the field and cannot be deleted.
+  document.querySelectorAll('input[data-lock-prefix]').forEach(function (el) {
+    var pre = el.getAttribute('data-lock-prefix');
+    function fix() {
+      var v = el.value.toLowerCase();
+      if (v.indexOf(pre) !== 0) {
+        var rest = v; for (var i = pre.length; i > 0; i--) { if (v.indexOf(pre.slice(0, i)) === 0) { rest = v.slice(i); break; } }
+        el.value = pre + rest;
+      } else if (v !== el.value) { el.value = v; }
+      if ((el.selectionStart || 0) < pre.length) { try { el.setSelectionRange(pre.length, Math.max(pre.length, el.selectionEnd || 0)); } catch (x) {} }
+    }
+    el.addEventListener('input', fix);
+    el.addEventListener('keydown', function (e) {
+      var s = el.selectionStart || 0, en = el.selectionEnd || 0;
+      if ((e.key === 'Backspace' && s <= pre.length && en <= pre.length) || (e.key === 'Delete' && s < pre.length) || (e.key === 'Home')) {
+        e.preventDefault(); try { el.setSelectionRange(pre.length, pre.length); } catch (x) {}
+      }
+    });
+    ['focus', 'click', 'select'].forEach(function (ev) { el.addEventListener(ev, function () { setTimeout(function () { if ((el.selectionStart || 0) < pre.length) { try { el.setSelectionRange(pre.length, Math.max(pre.length, el.selectionEnd || 0)); } catch (x) {} } }, 0); }); });
+    fix();
+  });
   // Small helpers that would otherwise be inline handlers (the CSP blocks inline scripts).
   document.addEventListener('click', function (e) {
     var tg = e.target.closest('[data-toggle]');
