@@ -14,7 +14,7 @@ use Illuminate\View\View;
 
 class AlertsController extends Controller
 {
-    private const FLAGS = ['expiry_enabled', 'expired_enabled', 'volume_enabled', 'reseller_digest_enabled', 'admin_report_enabled', 'server_enabled'];
+    private const FLAGS = ['expiry_enabled', 'expired_enabled', 'volume_enabled', 'reseller_digest_enabled', 'admin_report_enabled', 'server_enabled', 'topup_enabled'];
 
     public function __construct(private Alerts $alerts, private Settings $settings, private AuditLogger $audit) {}
 

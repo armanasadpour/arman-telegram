@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Finance;
 
+use App\Models\PanelNotice;
 use App\Models\Payment;
 use App\Services\Finance\WalletService;
+use App\Services\Settings;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -58,5 +60,20 @@ class TopupRequestTest extends ResellerTestCase
     private function bal($r): int
     {
         return (int) app(WalletService::class)->walletFor('reseller', $r->id)->fresh()->balance;
+    }
+
+    public function test_topup_notice_can_be_turned_off_in_alert_settings(): void
+    {
+        Storage::fake('local');
+        $admin = $this->superAdmin();
+        $r = $this->reseller();
+        $this->actingAs($admin)->put('/accounting/cards', ['cards' => [['number' => '6037991123456789']]]);
+        $this->actingAs($admin)->get('/settings/alerts')->assertSee('اعلان درخواست شارژ حساب');
+        app(Settings::class)->set('alerts.topup_enabled', '0');
+        $this->actingAs($r->user)->post('/r/topup/card', ['amount_toman' => '100000', 'receipt' => UploadedFile::fake()->image('f.jpg')])->assertSessionHas('success');
+        $this->assertSame(0, PanelNotice::query()->count());
+        app(Settings::class)->set('alerts.topup_enabled', '1');
+        $this->actingAs($r->user)->post('/r/topup/card', ['amount_toman' => '200000', 'receipt' => UploadedFile::fake()->image('f.jpg')])->assertSessionHas('success');
+        $this->assertSame(1, PanelNotice::query()->where('title', 'like', '%درخواست شارژ حساب%')->count());
     }
 }

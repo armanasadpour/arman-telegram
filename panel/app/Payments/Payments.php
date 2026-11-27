@@ -200,10 +200,7 @@ class Payments
         }
         $p = Payment::query()->create(['uuid' => (string) Str::uuid(), 'method' => 'card', 'wallet_id' => $wallet->id, 'amount_rial' => $amountRial, 'created_by' => $userId]);
 
-        $p = $this->reportCard($p, 'درخواست شارژ کیف پول'.($note ? ' — '.$note : ''), $receiptPath);
-        app(Notices::class)->info('topup:'.$p->id, '💳 درخواست شارژ حساب: '.fa_money($amountRial), $p->payerLabel().($note ? ' — '.$note : '').' · منتظر تأیید', route('accounting.topups'));
-
-        return $p;
+        return $this->reportCard($p, 'درخواست شارژ کیف پول'.($note ? ' — '.$note : ''), $receiptPath);
     }
 
     public function reportCard(Payment $p, string $note, ?string $receiptPath = null): Payment
@@ -212,7 +209,12 @@ class Payments
             throw new RuntimeException('این پرداخت قابل ثبت نیست.');
         }
         $p->forceFill(['status' => 'review', 'payer_note' => mb_substr($note, 0, 300), 'receipt_path' => $receiptPath])->save();
-        $this->notifier->toStaff('payments.sensitive', '🏦 واریز کارت‌به‌کارت '.fa_money($p->amount_rial).' — '.$p->payerLabel().' — منتظر بررسی در پنل (پرداخت #'.fa((string) $p->id).').');
+        if (($this->settings->get('alerts.topup_enabled') ?? '1') === '1') {
+            $isTopup = $p->purpose === 'topup' && $p->wallet?->owner_type === 'reseller';
+            $this->notifier->toStaff('payments.sensitive', ($isTopup ? '💳 درخواست شارژ حساب (کارت‌به‌کارت) ' : '🏦 واریز کارت‌به‌کارت ').fa_money($p->amount_rial).' — '.$p->payerLabel().' — منتظر بررسی در پنل (پرداخت #'.fa((string) $p->id).').');
+            app(Notices::class)->info('payment:'.$p->id, ($isTopup ? '💳 درخواست شارژ حساب: ' : '🏦 واریز کارت‌به‌کارت: ').fa_money($p->amount_rial),
+                $p->payerLabel().' · منتظر تأیید', $isTopup ? route('accounting.topups') : route('payments.show', $p));
+        }
 
         return $p;
     }

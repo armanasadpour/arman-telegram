@@ -37,6 +37,7 @@
           <select class="input" id="report_hour" name="report_hour">@for($h = 0; $h < 24; $h++)<option value="{{ $h }}" @selected((int) old('report_hour', $v['report_hour']) === $h)>{{ fa(str_pad((string) $h, 2, '0', STR_PAD_LEFT)) }}:۰۰</option>@endfor</select></div>
       </div>
       <label class="check"><input type="checkbox" name="server_enabled" value="1" @checked($v['server_enabled'] === '1')> هشدار قطع و وصل شدن ارتباط با سرور</label>
+      <label class="check"><input type="checkbox" name="topup_enabled" value="1" @checked(($v['topup_enabled'] ?? '1') === '1')> اعلان درخواست شارژ حساب همکاران و واریزهای کارت‌به‌کارت (در پنل و ربات)</label>
     </div>
     <button class="btn" type="submit">ذخیره</button>
   </form>

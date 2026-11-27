@@ -37,7 +37,7 @@ class Alerts
         'alerts.expiry_enabled' => '1', 'alerts.expiry_days' => '3,1', 'alerts.expired_enabled' => '1',
         'alerts.volume_enabled' => '1', 'alerts.volume_pct' => '20', 'alerts.volume_mb' => '1024',
         'alerts.reseller_digest_enabled' => '1', 'alerts.reseller_low_balance_toman' => '100000',
-        'alerts.admin_report_enabled' => '1', 'alerts.report_hour' => '9', 'alerts.server_enabled' => '1',
+        'alerts.admin_report_enabled' => '1', 'alerts.report_hour' => '9', 'alerts.server_enabled' => '1', 'alerts.topup_enabled' => '1',
     ];
 
     public function __construct(
