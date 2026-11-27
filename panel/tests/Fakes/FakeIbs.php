@@ -177,6 +177,51 @@ class FakeIbs implements Transport
         return '';
     }
 
+    private function m_group_delGroup(array $p): void
+    {
+        $this->need($p, 'group_name');
+        isset($this->groups[$p['group_name']]) || $this->fault('GROUP_NAME_INVALID', 'Group name '.$p['group_name'].' is invalid');
+        $ids = array_keys(array_filter($this->users, fn ($u) => $u['group'] === $p['group_name']));
+        if ($ids) {
+            $this->fault('GROUP_USED_IN_USER', 'Group '.$p['group_name']." used in users '".implode(',', $ids)."' ");
+        }
+        unset($this->groups[$p['group_name']]);
+    }
+
+    private function m_charge_addNewCharge(array $p): void
+    {
+        $this->need($p, 'name', 'comment', 'charge_type', 'visible_to_all');
+        in_array($p['visible_to_all'], ['t', 'f'], true) || $this->fault('INVALID_BOOL_VALUE', 'Invalid boolean value for Visible to all');
+        in_array($p['charge_type'], ['Internet', 'VoIP'], true) || $this->fault('INVALID_CHARGE_TYPE', 'Invalid charge type '.$p['charge_type']);
+        isset($this->charges[$p['name']]) && $this->fault('CHARGE_NAME_EXISTS', 'Charge name '.$p['name'].' already exists');
+        ($p['name'] !== '' && ! preg_match('/[^a-zA-Z0-9_\-]/', $p['name'])) || $this->fault('INVALID_CHARGE_NAME', 'Invalid Charge Name '.$p['name']);
+        $this->charges[$p['name']] = [];
+    }
+
+    private function m_charge_addInternetChargeRule(array $p): int
+    {
+        $this->need($p, 'charge_name', 'rule_start', 'rule_end', 'cpm', 'cpk', 'assumed_kps', 'bandwidth_limit_kbytes', 'ras', 'ports', 'dows', 'tx_leaf_name', 'rx_leaf_name');
+        isset($this->charges[$p['charge_name']]) || $this->fault('CHARGE_NAME_INVALID', 'Charge name '.$p['charge_name'].' is invalid');
+        // A1.24 request.fixList() returns the key itself for a real list, so only a struct works
+        $dows = is_object($p['dows']) ? array_values(get_object_vars($p['dows'])) : (is_array($p['dows']) && ! array_is_list($p['dows']) ? array_values($p['dows']) : ['d']);
+        foreach ($dows as $d) {
+            in_array($d, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], true) || $this->fault('INVALID_DAY_OF_WEEK', "Charge Rule Day of week error: '$d' is not a valid day of week");
+        }
+        (float) $p['cpk'] >= 0 || $this->fault('CPK_NOT_POSITIVE', 'cpk must be positive');
+        $this->charges[$p['charge_name']][] = ['rule_id' => count($this->charges[$p['charge_name']]) + 1, 'cpk' => (float) $p['cpk'], 'cpm' => (float) $p['cpm']];
+
+        return count($this->charges[$p['charge_name']]);
+    }
+
+    private function m_charge_delCharge(array $p): void
+    {
+        $this->need($p, 'charge_name');
+        isset($this->charges[$p['charge_name']]) || $this->fault('CHARGE_NAME_INVALID', 'Charge name '.$p['charge_name'].' is invalid');
+        $used = array_keys(array_filter($this->groups, fn ($g) => ($g['attrs']['normal_charge'] ?? null) === $p['charge_name']));
+        $used && $this->fault('CHARGE_USED_IN_GROUP', 'Charge '.$p['charge_name']." is used in group(s) '".implode(',', $used)."' ");
+        unset($this->charges[$p['charge_name']]);
+    }
+
     private function m_charge_listCharges(array $p): array
     {
         return array_keys($this->charges);

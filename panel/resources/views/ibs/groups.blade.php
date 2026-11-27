@@ -28,7 +28,12 @@
               </td>
               <td data-label="اکانت‌ها"><a href="{{ route('accounts.index', ['group' => $g->name]) }}">{{ fa((int) ($accountCounts[$g->name] ?? 0)) }}</a></td>
               @can('ibs_groups.update')
-                <td data-label="">@if($g->present)<a class="btn btn-secondary btn-sm" href="{{ route('ibs.groups.edit', $g->name) }}">ویرایش</a>@endif</td>
+                <td data-label="" class="actions">
+                  @if($g->present)<a class="btn btn-secondary btn-sm" href="{{ route('ibs.groups.edit', $g->name) }}">ویرایش</a>@endif
+                  @if((int) ($accountCounts[$g->name] ?? 0) === 0)
+                    <form method="post" action="{{ route('ibs.groups.destroy', $g->name) }}" data-confirm="گروه «{{ $g->name }}» {{ $g->present ? 'از سرور ' : '' }}حذف شود؟">@csrf @method('delete')<button class="btn btn-danger btn-sm" type="submit">حذف</button></form>
+                  @endif
+                </td>
               @endcan
             </tr>
           @endforeach
@@ -70,7 +75,7 @@
     @else
       <div class="table-wrap">
         <table class="table stack">
-          <thead><tr><th>تعرفه</th><th>اعتبار به‌ازای هر کیلوبایت</th><th>هر واحد اعتبار</th><th>نوع</th></tr></thead>
+          <thead><tr><th>تعرفه</th><th>اعتبار به‌ازای هر کیلوبایت</th><th>هر واحد اعتبار</th><th>نوع</th>@can('ibs_groups.update')<th></th>@endcan</tr></thead>
           <tbody>
           @foreach($charges as $c)
             <tr>
@@ -78,11 +83,38 @@
               <td data-label="cpk"><bdi class="ltr">{{ rtrim(rtrim(number_format((float) $c->cpk, 10, '.', ''), '0'), '.') }}</bdi></td>
               <td data-label="هر واحد">{{ $c->isVolume() ? fa_bytes((int) round($c->bytesPerCredit())) : '—' }}</td>
               <td data-label="نوع">@if($c->isVolume())<span class="badge badge-primary">حجمی</span>@else<span class="badge">بدون محدودیت حجم</span>@endif</td>
+              @can('ibs_groups.update')
+                <td data-label="">@unless($groups->where('present', true)->where('charge_name', $c->name)->count())
+                  <form method="post" action="{{ route('ibs.charges.destroy', $c->name) }}" data-confirm="تعرفه «{{ $c->name }}» {{ $c->present ? 'از سرور ' : '' }}حذف شود؟">@csrf @method('delete')<button class="btn btn-danger btn-sm" type="submit">حذف</button></form>
+                @endunless</td>
+              @endcan
             </tr>
           @endforeach
           </tbody>
         </table>
       </div>
     @endif
+    @can('ibs_groups.update')
+      <h3 class="mt-16 mb-8">ساخت تعرفه</h3>
+      <form method="post" action="{{ route('ibs.charges.store') }}">
+        @csrf
+        <div class="form-grid">
+          <div class="field">
+            <label for="charge_name">نام تعرفه</label>
+            <input class="input ltr" id="charge_name" name="charge_name" value="{{ old('charge_name') }}" placeholder="volume" required maxlength="60">
+            <div class="help">حروف انگلیسی، عدد، «_» و «-».</div>
+          </div>
+          <div class="field">
+            <label for="charge_type">نوع</label>
+            <select class="input" id="charge_type" name="charge_type">
+              <option value="volume" @selected(old('charge_type', 'volume') === 'volume')>حجمی (حجم هر اکانت محدود می‌شود)</option>
+              <option value="unlimited" @selected(old('charge_type') === 'unlimited')>بدون محدودیت حجم</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn" type="submit">ساخت تعرفه در سرور</button>
+      </form>
+      <p class="muted small mt-8">بعد از ساخت، در «ساخت گروه» همین صفحه گروه جدیدی با این تعرفه بسازید. تعرفه گروهی را که الان اکانت دارد به حجمی تغییر ندهید؛ اکانت‌های قبلی حجم ندارند و قطع می‌شوند.</p>
+    @endcan
   </div>
 </x-layouts.app>

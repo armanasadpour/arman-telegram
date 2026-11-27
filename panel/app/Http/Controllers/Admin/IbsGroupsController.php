@@ -10,6 +10,7 @@ use App\Ibs\IbsNotConfiguredException;
 use App\Ibs\IbsUnavailableException;
 use App\Models\IbsCharge;
 use App\Models\IbsGroup;
+use App\Models\Package;
 use App\Models\VpnAccount;
 use App\Services\AuditLogger;
 use App\Services\Ibs\AccountSync;
@@ -87,6 +88,86 @@ class IbsGroupsController extends Controller
         $this->resync();
 
         return redirect()->route('ibs.groups')->with('success', 'تنظیمات گروه «'.$name.'» در سرور ذخیره شد.');
+    }
+
+    /** Delete a group on the server (group.delGroup). Refused while accounts or packages use it. */
+    public function destroy(string $name): RedirectResponse
+    {
+        $this->authorize('ibs_groups.update');
+        $group = IbsGroup::query()->where('name', $name)->firstOrFail();
+        $accounts = VpnAccount::query()->whereNull('ibs_deleted_at')->where('group_name', $name)->count();
+        if ($accounts > 0) {
+            return back()->with('error', 'گروه «'.$name.'» '.fa($accounts).' اکانت دارد؛ اول اکانت‌ها را به گروه دیگری ببرید یا حذف کنید.');
+        }
+        $packages = Package::query()->where('ibs_group_name', $name)->pluck('name');
+        if ($packages->isNotEmpty()) {
+            return back()->with('error', 'بسته‌های «'.$packages->implode('»، «').'» از این گروه استفاده می‌کنند؛ اول گروه آن بسته‌ها را عوض کنید یا حذفشان کنید.');
+        }
+        if ($group->present) {
+            try {
+                $this->ibs->delGroup($name);
+            } catch (RuntimeException $e) {
+                if (! ($e instanceof IbsException && $e->ibsCode === 'GROUP_NAME_INVALID')) {   // already gone on the server
+                    return back()->with('error', 'گروه حذف نشد: '.$this->message($e));
+                }
+            }
+        }
+        $group->delete();
+        $this->audit->log('ibs_groups.delete', null, 'حذف گروه «'.$name.'» از سرور');
+
+        return redirect()->route('ibs.groups')->with('success', 'گروه «'.$name.'» حذف شد.');
+    }
+
+    /** Create a charge on the server with one all-day rule: volume (credit per KB) or unlimited. */
+    public function storeCharge(Request $request): RedirectResponse
+    {
+        $this->authorize('ibs_groups.update');
+        $d = $request->validate([
+            'charge_name' => ['required', 'string', 'max:60', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'charge_type' => ['required', 'in:volume,unlimited'],
+        ], ['charge_name.regex' => 'نام تعرفه فقط حروف انگلیسی، عدد، «_» و «-».'], ['charge_name' => 'نام تعرفه']);
+        $name = $d['charge_name'];
+        $cpk = $d['charge_type'] === 'volume' ? 1.0 : 0.0;   // volume: 1 credit per KB; the panel converts GB to credit
+        try {
+            try {
+                $this->ibs->addCharge($name, 'ساخته‌شده از پنل');
+            } catch (IbsException $e) {
+                // retry after a half-finished attempt: the charge exists but has no rule yet
+                if ($e->ibsCode !== 'CHARGE_NAME_EXISTS' || $this->ibs->chargeRules($name) !== []) {
+                    throw $e;
+                }
+            }
+            $this->ibs->addAllDayInternetRule($name, $cpk);
+        } catch (RuntimeException $e) {
+            $this->resync();
+
+            return back()->withInput()->with('error', 'تعرفه ساخته نشد: '.$this->message($e));
+        }
+        $this->audit->log('ibs_charges.create', null, 'ساخت تعرفه '.($cpk > 0 ? 'حجمی' : 'بدون محدودیت حجم').' «'.$name.'» در سرور');
+        $this->resync();
+
+        return redirect()->route('ibs.groups')->with('success', 'تعرفه «'.$name.'» ساخته شد. حالا می‌توانید گروهی با این تعرفه بسازید.');
+    }
+
+    public function destroyCharge(string $name): RedirectResponse
+    {
+        $this->authorize('ibs_groups.update');
+        $charge = IbsCharge::query()->where('name', $name)->firstOrFail();
+        $groups = IbsGroup::query()->where('charge_name', $name)->where('present', true)->pluck('name');
+        if ($groups->isNotEmpty()) {
+            return back()->with('error', 'گروه‌های «'.$groups->implode('»، «').'» از این تعرفه استفاده می‌کنند؛ اول تعرفه آن گروه‌ها را عوض کنید.');
+        }
+        if ($charge->present) {
+            try {
+                $this->ibs->delCharge($name);
+            } catch (RuntimeException $e) {
+                return back()->with('error', 'تعرفه حذف نشد: '.$this->message($e));
+            }
+        }
+        $charge->delete();
+        $this->audit->log('ibs_charges.delete', null, 'حذف تعرفه «'.$name.'» از سرور');
+
+        return redirect()->route('ibs.groups')->with('success', 'تعرفه «'.$name.'» حذف شد.');
     }
 
     // ----------------------------------------------------------------

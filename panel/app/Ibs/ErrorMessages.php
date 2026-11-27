@@ -21,6 +21,11 @@ final class ErrorMessages
         'ADMIN_LOCKED' => 'حساب مدیر سرور قفل است.',
         'INVALID_MULTI_LOGIN' => 'تعداد اتصال همزمان نامعتبر است (۰ تا ۲۵۵).',
         'INVALID_PASSWORD_LENGTH' => 'طول رمز نامعتبر است.',
+        'GROUP_USED_IN_USER' => 'هنوز اکانت‌هایی در سرور عضو این گروه هستند؛ اول آن‌ها را به گروه دیگری ببرید یا حذف کنید.',
+        'CHARGE_NAME_EXISTS' => 'تعرفه‌ای با این نام در سرور وجود دارد.',
+        'INVALID_CHARGE_NAME' => 'نام تعرفه فقط حروف انگلیسی، عدد، «_» و «-».',
+        'CHARGE_USED_IN_GROUP' => 'این تعرفه هنوز در گروهی استفاده می‌شود.',
+        'CHARGE_USED_IN_USER' => 'این تعرفه هنوز روی اکانت‌هایی تنظیم است.',
     ];
 
     public static function for(Throwable $e): string

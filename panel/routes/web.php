@@ -175,6 +175,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/ibs/groups', [IbsGroupsController::class, 'store'])->name('ibs.groups.store')->middleware('throttle:20,1');
     Route::get('/ibs/groups/{name}/edit', [IbsGroupsController::class, 'edit'])->name('ibs.groups.edit')->where('name', '[A-Za-z0-9_-]+');
     Route::put('/ibs/groups/{name}', [IbsGroupsController::class, 'update'])->name('ibs.groups.update')->where('name', '[A-Za-z0-9_-]+')->middleware('throttle:20,1');
+    Route::delete('/ibs/groups/{name}', [IbsGroupsController::class, 'destroy'])->name('ibs.groups.destroy')->where('name', '[A-Za-z0-9_-]+')->middleware('throttle:20,1');
+    Route::post('/ibs/charges', [IbsGroupsController::class, 'storeCharge'])->name('ibs.charges.store')->middleware('throttle:20,1');
+    Route::delete('/ibs/charges/{name}', [IbsGroupsController::class, 'destroyCharge'])->name('ibs.charges.destroy')->where('name', '[A-Za-z0-9_-]+')->middleware('throttle:20,1');
 
     // Accounts
     Route::get('/accounts', [AccountsController::class, 'index'])->name('accounts.index');

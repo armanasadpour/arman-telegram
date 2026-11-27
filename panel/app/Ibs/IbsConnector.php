@@ -179,6 +179,45 @@ class IbsConnector
         $this->write('group.updateGroupAttrs', ['group_name' => $name, 'attrs' => $attrs ?: new \stdClass, 'to_del_attrs' => $delete]);
     }
 
+    /** group.delGroup — IBSng refuses (GROUP_USED_IN_USER) while any user is in the group. */
+    public function delGroup(string $name): void
+    {
+        $this->write('group.delGroup', ['group_name' => $name]);
+    }
+
+    /** charge.addNewCharge (A1.24: name, comment, charge_type Internet|VoIP, visible_to_all "t"|"f"). */
+    public function addCharge(string $name, string $comment): void
+    {
+        $this->write('charge.addNewCharge', ['name' => $name, 'comment' => $comment, 'charge_type' => 'Internet', 'visible_to_all' => 't']);
+    }
+
+    /**
+     * charge.addInternetChargeRule covering every day, all day, every RAS and port.
+     * "dows" goes as a struct {"0": "Monday", ...}: A1.24's request.fixList() only converts dictionaries
+     * (the shape its own PHP interface sends); a plain XML-RPC array is not accepted there.
+     */
+    public function addAllDayInternetRule(string $charge, float $cpk, float $cpm = 0.0): void
+    {
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $this->write('charge.addInternetChargeRule', [
+            'charge_name' => $charge, 'rule_start' => '00:00:00', 'rule_end' => '23:59:59',
+            'cpm' => self::num($cpm), 'cpk' => self::num($cpk), 'assumed_kps' => '8', 'bandwidth_limit_kbytes' => '0',
+            'tx_leaf_name' => '', 'rx_leaf_name' => '', 'ras' => '_ALL_', 'ports' => '_ALL_',
+            'dows' => (object) array_combine(array_map('strval', array_keys($days)), $days),
+        ]);
+    }
+
+    /** charge.delCharge — IBSng refuses while a user or group uses the charge. */
+    public function delCharge(string $name): void
+    {
+        $this->write('charge.delCharge', ['charge_name' => $name]);
+    }
+
+    private static function num(float $v): string
+    {
+        return rtrim(rtrim(number_format($v, 10, '.', ''), '0'), '.') ?: '0';
+    }
+
     /** Adds (or with a negative value, subtracts) credit. */
     public function changeCredit(int $userId, float $credit, string $comment): void
     {

@@ -599,3 +599,4 @@ button.conn-card:active{transform:scale(.98)}
 .cfg-link .input{flex:1;min-width:0;font-size:.85rem}
 .cfg-file details>summary{list-style:none;display:inline-flex;cursor:pointer}
 .cfg-file details>summary::-webkit-details-marker{display:none}
+.mt-16{margin-top:16px}
