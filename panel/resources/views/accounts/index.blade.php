@@ -1,21 +1,16 @@
 <x-layouts.app title="اکانت‌ها">
-  <div class="page-head">
-    <div>
-      <h1>اکانت‌ها</h1>
-      <p class="muted">
-        آنلاین‌ها: {{ $syncedAt['onlines'] ? fa_ago(\Carbon\Carbon::parse($syncedAt['onlines'])) : 'هنوز همگام نشده' }}
-        — اکانت‌ها: {{ $syncedAt['accounts'] ? fa_ago(\Carbon\Carbon::parse($syncedAt['accounts'])) : 'هنوز همگام نشده' }}
-      </p>
-    </div>
-    <div class="actions">
-      @can('accounts.delete')
-        @if($configured)<a class="btn btn-secondary" href="{{ route('accounts.cleanup') }}">حذف منقضی‌های قدیمی</a>@endif
-      @endcan
-      @can('accounts.create')
-        @if($configured)<a class="btn" href="{{ route('accounts.create') }}">ساخت اکانت</a>@endif
-      @endcan
-    </div>
-  </div>
+  @include('accounts._list-head', [
+    'title' => 'اکانت‌های OpenVPN',
+    'subtitle' => 'آنلاین‌ها: '.($syncedAt['onlines'] ? fa_ago(\Carbon\Carbon::parse($syncedAt['onlines'])) : 'هنوز همگام نشده').' — اکانت‌ها: '.($syncedAt['accounts'] ? fa_ago(\Carbon\Carbon::parse($syncedAt['accounts'])) : 'هنوز همگام نشده'),
+    'kpis' => [
+      ['کل اکانت‌ها', $counts['total'], route('accounts.index'), 'indigo', 'layers'],
+      ['آنلاین', $counts['online'], route('accounts.index', ['status' => 'online']), 'green', 'wifi'],
+      ['منقضی', $counts['expired'], route('accounts.index', ['status' => 'expired']), 'amber', 'pause'],
+      ['غیرفعال (قفل)', $counts['locked'], route('accounts.index', ['status' => 'locked']), 'red', 'ban'],
+    ],
+    'primary' => $configured && auth()->user()->can('accounts.create') ? ['ساخت اکانت', route('accounts.create')] : null,
+    'secondary' => $configured && auth()->user()->can('accounts.delete') ? ['حذف منقضی‌های قدیمی', route('accounts.cleanup'), 'trash'] : null,
+  ])
 
   @unless($configured)
     <div class="alert alert-warning">اتصال به سرور تنظیم نشده است. @can('settings.view')<a href="{{ route('ibs.settings') }}">تنظیم اتصال به سرور</a>@endcan</div>
@@ -43,16 +38,15 @@
     </div>
   @endif
 
-  <div class="grid stats mb-16">
-    <a class="card stat" href="{{ route('accounts.index') }}"><div class="label">اکانت‌ها در پنل</div><div class="value">{{ fa($counts['total']) }}</div></a>
-    <a class="card stat" href="{{ route('accounts.index', ['status' => 'online']) }}"><div class="label">آنلاین</div><div class="value">{{ fa($counts['online']) }}</div></a>
-    <a class="card stat" href="{{ route('accounts.index', ['status' => 'expired']) }}"><div class="label">منقضی</div><div class="value">{{ fa($counts['expired']) }}</div></a>
-    <a class="card stat" href="{{ route('accounts.index', ['status' => 'locked']) }}"><div class="label">غیرفعال (قفل)</div><div class="value">{{ fa($counts['locked']) }}</div></a>
-  </div>
-
-  <div class="card">
-    <form method="get" class="form-grid mb-8">
-      <div class="field"><label for="q">جستجو</label><input id="q" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="نام کاربری یا نام کاربر"></div>
+  <div class="card list-shell">
+    <form method="get" class="mb-8 list-filter">
+      @php($moreFilters = collect($filters)->except('q')->filter()->isNotEmpty())
+      <div class="search-row">
+        <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="جستجو در اکانت‌ها (نام کاربری، نام کاربر)" aria-label="جستجو" enterkeyhint="search"></label>
+        <button type="button" @class(['filter-btn', 'on' => $moreFilters]) aria-controls="more-filters" aria-expanded="{{ $moreFilters ? 'true' : 'false' }}" onclick="var f=document.getElementById('more-filters');f.hidden=!f.hidden;this.setAttribute('aria-expanded',!f.hidden)" title="فیلترها"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 8v6l-4-2v-4z"/></svg></button>
+      </div>
+      <div id="more-filters" class="form-grid mt-8" @if(! $moreFilters) hidden @endif>
       <div class="field"><label for="status">وضعیت</label>
         <select id="status" name="status" class="input">
           <option value="">همه</option>
@@ -70,6 +64,7 @@
           <option value="imported" @selected(($filters['creator'] ?? '') === 'imported')>وارد‌شده از سرور</option>
         </select></div>
       <div class="actions"><button class="btn" type="submit">اعمال</button>@if(array_filter($filters))<a class="btn btn-secondary" href="{{ route('accounts.index') }}">حذف فیلتر</a>@endif</div>
+      </div>
     </form>
 
     @if($accounts->isEmpty())

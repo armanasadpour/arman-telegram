@@ -1,29 +1,30 @@
 @php($pl = ['l2tp' => 'L2TP', 'wireguard' => 'WireGuard'][$proto ?? ''] ?? 'L2TP / WireGuard')
 <x-layouts.app :title="'اکانت‌های '.$pl">
-  <div class="page-head">
-    <div>
-      <h1>اکانت‌های {{ $pl }}</h1>
-      <p class="muted">مصرف و وضعیت هر دقیقه از روترها خوانده می‌شود؛ اکانت منقضی یا حجم‌تمام خودکار قطع می‌شود.</p>
-    </div>
-    <div class="actions">
-      @can('routers.view')<a class="btn btn-secondary" href="{{ route($proto === 'wireguard' ? 'wg.groups' : ($proto === 'l2tp' ? 'l2tp.groups' : 'mt.groups.index')) }}">گروه و تعرفه</a>@endcan
-      @can('mt_accounts.create')<a class="btn" href="{{ route('mt.accounts.create', $proto ? ['protocol' => $proto] : []) }}">ساخت اکانت {{ $proto ? $pl : '' }}</a>@endcan
-    </div>
-  </div>
-
-  <div class="grid stats mb-16">
-    <a class="card stat" href="{{ url()->current() }}"><div class="label">اکانت‌ها</div><div class="value">{{ fa((int) $counts->total) }}</div></a>
-    <a class="card stat" href="{{ url()->current().'?'.http_build_query(['status' => 'online']) }}"><div class="label">آنلاین</div><div class="value">{{ fa((int) $counts->online) }}</div></a>
-    <a class="card stat" href="{{ url()->current().'?'.http_build_query(['status' => 'expired']) }}"><div class="label">منقضی</div><div class="value">{{ fa((int) $counts->expired) }}</div></a>
-    <a class="card stat" href="{{ url()->current().'?'.http_build_query(['status' => 'depleted']) }}"><div class="label">حجم تمام‌شده</div><div class="value">{{ fa((int) $counts->depleted) }}</div></a>
-  </div>
+  @include('accounts._list-head', [
+    'title' => 'اکانت‌های '.$pl,
+    'subtitle' => 'مصرف و وضعیت هر دقیقه از روترها خوانده می‌شود.',
+    'kpis' => [
+      ['کل اکانت‌ها', $counts->total, url()->current(), 'indigo', 'layers'],
+      ['آنلاین', $counts->online, url()->current().'?'.http_build_query(['status' => 'online']), 'green', 'wifi'],
+      ['منقضی', $counts->expired, url()->current().'?'.http_build_query(['status' => 'expired']), 'amber', 'pause'],
+      ['حجم تمام‌شده', $counts->depleted, url()->current().'?'.http_build_query(['status' => 'depleted']), 'red', 'db'],
+    ],
+    'primary' => auth()->user()->can('mt_accounts.create') ? ['ساخت اکانت '.($proto ? $pl : ''), route('mt.accounts.create', $proto ? ['protocol' => $proto] : [])] : null,
+    'secondary' => auth()->user()->can('routers.view') ? ['گروه و تعرفه', route($proto === 'wireguard' ? 'wg.groups' : ($proto === 'l2tp' ? 'l2tp.groups' : 'mt.groups.index')), 'tag'] : null,
+  ])
   @if((int) $counts->problems > 0)
     <div class="alert alert-warning">{{ fa((int) $counts->problems) }} اکانت در حال ساخت یا ناموفق است. <a href="{{ url()->current().'?'.http_build_query(['status' => 'pending']) }}">در حال ساخت</a> · <a href="{{ url()->current().'?'.http_build_query(['status' => 'failed']) }}">ناموفق</a></div>
   @endif
 
-  <div class="card">
-    <form method="get" class="form-grid mb-8">
-      <div class="field"><label for="q">جستجو</label><input id="q" name="q" class="input" value="{{ $filters['q'] ?? '' }}" placeholder="نام کاربری، نام کاربر یا IP"></div>
+  <div class="card list-shell">
+    <form method="get" class="mb-8 list-filter">
+      @php($moreFilters = collect($filters)->except('q')->filter()->isNotEmpty())
+      <div class="search-row">
+        <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="جستجو (نام کاربری، نام کاربر یا IP)" aria-label="جستجو" enterkeyhint="search"></label>
+        <button type="button" @class(['filter-btn', 'on' => $moreFilters]) aria-controls="more-filters" aria-expanded="{{ $moreFilters ? 'true' : 'false' }}" onclick="var f=document.getElementById('more-filters');f.hidden=!f.hidden;this.setAttribute('aria-expanded',!f.hidden)" title="فیلترها"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 8v6l-4-2v-4z"/></svg></button>
+      </div>
+      <div id="more-filters" class="form-grid mt-8" @if(! $moreFilters) hidden @endif>
       <div class="field"><label for="status">وضعیت</label>
         <select id="status" name="status" class="input"><option value="">همه</option>
           @foreach(['online' => 'آنلاین', 'active' => 'فعال', 'not_started' => 'شروع‌نشده', 'expiring' => 'انقضا تا ۳ روز آینده', 'expired' => 'منقضی', 'depleted' => 'حجم تمام‌شده', 'disabled' => 'غیرفعال', 'pending' => 'در حال ساخت', 'failed' => 'ناموفق', 'deleted' => 'حذف‌شده'] as $k => $v)
@@ -43,6 +44,7 @@
           @foreach($creators as $c)<option value="{{ $c->id }}" @selected((string) ($filters['creator'] ?? '') === (string) $c->id)>{{ $c->name }} ({{ $c->username }})</option>@endforeach
         </select></div>
       <div class="actions"><button class="btn" type="submit">اعمال</button>@if(array_filter($filters))<a class="btn btn-secondary" href="{{ url()->current() }}">حذف فیلتر</a>@endif</div>
+      </div>
     </form>
 
     @if($accounts->isEmpty())

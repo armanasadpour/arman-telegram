@@ -1,31 +1,13 @@
 {{-- Mobile account card. $a = VpnAccount, $url = link target --}}
 @php($st = $a->status())
+@php([$stLabel, $stTone] = \App\Models\VpnAccount::STATUS_LABELS[$st])
 @php($tm = $a->timeMeter())
 @php($vm = $a->volumeMeter())
-<a class="acc-card acc-{{ $st }}" href="{{ $url }}">
-  <div class="acc-top">
-    <span @class(['acc-avatar', 'is-online' => $a->is_online])>{{ mb_strtoupper(mb_substr($a->username, 0, 1)) }}</span>
-    <div class="acc-id">
-      <bdi class="acc-name ltr">{{ $a->username }}</bdi>
-      @if($a->displayComment())<span class="acc-customer">👤 {{ $a->displayComment() }}</span>@endif
-      <span class="acc-group"><bdi>{{ $a->group_name ?? "—" }}</bdi>@if(! request()->routeIs("portal.*")) · 🛠 {{ $a->creatorLabel() }}@endif</span>
-    </div>
-    <span class="acc-chevron" aria-hidden="true">‹</span>
-  </div>
-  <div class="acc-badges">@include('accounts._status', ['a' => $a])</div>
-  <div class="acc-meters">
-    <div class="acc-meter">
-      <div class="acc-meter-row"><span>زمان</span>
-        <strong>@if(! $tm)—@elseif(! $tm['started']){{ fa_duration($tm['total']) }}@elseif($tm['remaining'] > 0){{ fa_duration($tm['remaining']) }}@else منقضی@endif</strong></div>
-      <progress class="mini-bar lvl-{{ $tm ? \App\Models\VpnAccount::meterLevel($tm['pct']) : 'none' }}" max="100" value="{{ $tm['pct'] ?? 0 }}">{{ $tm['pct'] ?? 0 }}%</progress>
-    </div>
-    <div class="acc-meter">
-      <div class="acc-meter-row"><span>حجم</span><strong>{{ $vm ? fa_bytes($vm['remaining']) : ($a->isVolumeLimited() ? '—' : 'نامحدود') }}</strong></div>
-      <progress class="mini-bar lvl-{{ $vm ? \App\Models\VpnAccount::meterLevel($vm['pct']) : 'unlimited' }}" max="100" value="{{ $vm['pct'] ?? 100 }}">{{ $vm['pct'] ?? 100 }}%</progress>
-    </div>
-  </div>
-  <div class="acc-foot">
-    <span>{{ $a->expires_at ? 'انقضا '.jdate($a->expires_at, 'Y/m/d') : 'شروع با اولین اتصال' }}</span>
-    <span @class(['acc-stale' => $a->isStale()])>{{ $a->last_synced_at ? fa_ago($a->last_synced_at) : 'همگام نشده' }}</span>
-  </div>
-</a>
+@include('accounts._card-body', [
+  'url' => $url, 'st' => $st, 'proto' => 'openvpn', 'online' => (bool) $a->is_online, 'username' => $a->username,
+  'customer' => $a->displayComment(), 'sub' => request()->routeIs('portal.*') ? ($a->group_name ?? '—') : $a->creatorLabel().' · '.($a->group_name ?? '—'),
+  'status' => [$stLabel, $stTone], 'onlineCount' => (int) $a->online_sessions,
+  'tm' => $tm, 'vm' => $vm, 'volUnlimited' => ! $a->isVolumeLimited(),
+  'expires' => $a->expires_at, 'notStarted' => ! $a->expires_at,
+  'ago' => $a->last_synced_at ? fa_ago($a->last_synced_at) : 'همگام نشده', 'stale' => $a->isStale(),
+])
