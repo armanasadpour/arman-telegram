@@ -39,7 +39,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'show'])->name('login');
     Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:20,1');
-    Route::get('/captcha.png', [LoginController::class, 'captcha'])->name('captcha')->middleware('throttle:30,1');
+    Route::get('/login/captcha', [LoginController::class, 'captcha'])->name('captcha')->middleware('throttle:30,1');
 });
 
 // Installable app (PWA): public manifest and icons

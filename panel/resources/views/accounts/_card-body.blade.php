@@ -28,12 +28,12 @@
   <div class="acc-meters">
     <div class="acc-meter">
       <div class="acc-meter-row"><span><span class="acc-i">{!! ! $tm || ! $tm['started'] ? $ico['cal'] : $ico['clock'] !!}</span>زمان</span><strong>{{ $timeText }}</strong></div>
-      <div class="bar lvl-{{ $tm ? $lvl($tm['pct']) : 'unlimited' }}"><i style="width:{{ $tm['pct'] ?? 100 }}%"></i></div>
+      <div class="bar lvl-{{ $tm ? $lvl($tm['pct']) : 'unlimited' }}"><i data-w="{{ $tm['pct'] ?? 100 }}"></i></div>
     </div>
     <div class="acc-meter">
       <div class="acc-meter-row"><span><span class="acc-i">{!! $ico['db'] !!}</span>حجم</span>
         <strong>@if($vm){{ fa_bytes($vm['remaining']) }}@elseif($volUnlimited)<span class="inf">∞</span> نامحدود@else—@endif</strong></div>
-      <div class="bar lvl-{{ $vm ? $lvl($vm['pct']) : 'unlimited' }}"><i style="width:{{ $vm['pct'] ?? 100 }}%"></i></div>
+      <div class="bar lvl-{{ $vm ? $lvl($vm['pct']) : 'unlimited' }}"><i data-w="{{ $vm['pct'] ?? 100 }}"></i></div>
     </div>
   </div>
   <div class="acc-foot">

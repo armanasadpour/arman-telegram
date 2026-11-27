@@ -22,7 +22,7 @@
       <div class="search-row">
         <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input id="q" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="جستجو (نام کاربری، نام کاربر یا IP)" aria-label="جستجو" enterkeyhint="search"></label>
-        <button type="button" @class(['filter-btn', 'on' => $moreFilters]) aria-controls="more-filters" aria-expanded="{{ $moreFilters ? 'true' : 'false' }}" onclick="var f=document.getElementById('more-filters');f.hidden=!f.hidden;this.setAttribute('aria-expanded',!f.hidden)" title="فیلترها"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 8v6l-4-2v-4z"/></svg></button>
+        <button type="button" @class(['filter-btn', 'on' => $moreFilters]) aria-controls="more-filters" aria-expanded="{{ $moreFilters ? 'true' : 'false' }}" data-toggle="#more-filters" title="فیلترها"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 8v6l-4-2v-4z"/></svg></button>
       </div>
       <div id="more-filters" class="form-grid mt-8" @if(! $moreFilters) hidden @endif>
       <div class="field"><label for="status">وضعیت</label>

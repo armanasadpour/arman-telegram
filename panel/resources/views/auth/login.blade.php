@@ -15,8 +15,8 @@
       <div class="field">
         <label for="captcha">کد امنیتی</label>
         <div class="captcha-row">
-          <img src="{{ route('captcha') }}?r={{ \Illuminate\Support\Str::random(6) }}" alt="کد امنیتی" width="210" height="70" id="captcha-img" class="captcha-img">
-          <button type="button" class="captcha-refresh" title="تصویر جدید" aria-label="تصویر جدید" onclick="var i=document.getElementById('captcha-img');i.src=i.src.split('?')[0]+'?r='+Math.random();document.getElementById('captcha').value='';document.getElementById('captcha').focus()">↻</button>
+          <img src="{{ $captchaImg }}" alt="کد امنیتی" width="210" height="70" id="captcha-img" class="captcha-img">
+          <button type="button" class="captcha-refresh" title="تصویر جدید" aria-label="تصویر جدید" data-captcha-url="{{ route('captcha') }}">↻</button>
         </div>
         <input id="captcha" name="captcha" class="input ltr @error('captcha') is-invalid @enderror" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="عدد داخل تصویر" required>
         @error('captcha')<div class="error">{{ $message }}</div>@enderror

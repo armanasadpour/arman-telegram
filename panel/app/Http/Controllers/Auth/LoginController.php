@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Support\Captcha;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -22,20 +22,23 @@ class LoginController extends Controller
 
     public function __construct(private AuditLogger $audit) {}
 
-    public function show(): View
+    public function show(Request $request): View
     {
-        return view('auth.login', ['captcha' => Captcha::enabled()]);
+        $img = null;
+        if (Captcha::enabled()) {
+            $code = Captcha::issue($request->session());
+            $img = Captcha::dataUri($code);
+        }
+
+        return view('auth.login', ['captcha' => Captcha::enabled(), 'captchaImg' => $img]);
     }
 
-    /** Captcha image; every request issues a new code for this session. */
-    public function captcha(Request $request): Response
+    /** New captcha image (data URI) for the refresh button. */
+    public function captcha(Request $request): JsonResponse
     {
         abort_unless(Captcha::enabled(), 404);
-        $code = Captcha::issue($request->session());
-        $png = Captcha::png($code);
-        abort_if($png === null, 503, 'افزونه GD در PHP هاست فعال نیست.');
 
-        return response($png, 200, ['Content-Type' => 'image/png', 'Cache-Control' => 'no-store, no-cache, must-revalidate', 'Pragma' => 'no-cache']);
+        return response()->json(['img' => Captcha::dataUri(Captcha::issue($request->session()))])->header('Cache-Control', 'no-store');
     }
 
     public function login(Request $request): RedirectResponse

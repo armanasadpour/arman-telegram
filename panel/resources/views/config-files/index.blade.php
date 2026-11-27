@@ -20,7 +20,7 @@
         <a class="btn btn-sm" href="{{ route('config-files.download', $f) }}">دانلود</a>
       </header>
       <div class="cfg-link">
-        <input class="input ltr" id="cfl{{ $f->id }}" value="{{ $f->publicUrl() }}" readonly onclick="this.select()">
+        <input class="input ltr" id="cfl{{ $f->id }}" value="{{ $f->publicUrl() }}" readonly data-select-all>
         <button type="button" class="btn btn-secondary" data-copy="#cfl{{ $f->id }}">کپی لینک</button>
       </div>
       <p class="muted small mt-8">هر کس این لینک را داشته باشد فایل را دانلود می‌کند؛ اگر لینک دست افراد ناخواسته افتاد، «لینک جدید» بزنید.</p>

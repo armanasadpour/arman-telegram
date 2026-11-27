@@ -145,6 +145,26 @@
     setInterval(function () { if (!document.hidden || 'serviceWorker' in navigator) poll(); }, 60000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
   })();
+  // Bar widths come from data-w (inline style attributes are blocked by the CSP).
+  document.querySelectorAll('.bar i[data-w]').forEach(function (i) { i.style.width = Math.max(0, Math.min(100, +i.getAttribute('data-w'))) + '%'; });
+  // Small helpers that would otherwise be inline handlers (the CSP blocks inline scripts).
+  document.addEventListener('click', function (e) {
+    var tg = e.target.closest('[data-toggle]');
+    if (tg) {
+      var box = document.querySelector(tg.getAttribute('data-toggle'));
+      if (box) { box.hidden = !box.hidden; tg.setAttribute('aria-expanded', String(!box.hidden)); }
+      return;
+    }
+    var sel = e.target.closest('[data-select-all]');
+    if (sel) { sel.select(); return; }
+    var cap = e.target.closest('[data-captcha-url]');
+    if (cap) {
+      fetch(cap.getAttribute('data-captcha-url'), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { document.getElementById('captcha-img').src = d.img; var i = document.getElementById('captcha'); i.value = ''; i.focus(); })
+        .catch(function () { location.reload(); });
+    }
+  });
   // Create-account helpers: random password, quick-value chips.
   document.addEventListener('click', function (e) {
     var g = e.target.closest('[data-gen-pass]');

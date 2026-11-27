@@ -21,9 +21,11 @@ class CaptchaAndNoticesTest extends TestCase
     {
         config(['panel.login_captcha' => true]);
         $this->user();
-        $this->get('/login')->assertOk()->assertSee('کد امنیتی')->assertSee('captcha.png');
-        $img = $this->get('/captcha.png')->assertOk()->assertHeader('Content-Type', 'image/png');
-        $this->assertSame("\x89PNG", substr($img->getContent(), 0, 4));
+        $this->get('/login')->assertOk()->assertSee('کد امنیتی')->assertSee('src="data:image/', false)->assertDontSee('onclick=', false);
+        $img = $this->getJson('/login/captcha')->assertOk()->json('img');
+        $this->assertStringStartsWith('data:image/png;base64,', $img);
+        $this->assertSame("\x89PNG", substr(base64_decode(substr($img, 22)), 0, 4));
+        $this->assertStringStartsWith('<svg', Captcha::svg('23456'));   // GD-less fallback
 
         // missing / wrong code: refused before the password is even checked
         $this->post('/login', ['username' => 'boss', 'password' => 'Password12345'])->assertSessionHasErrors('captcha');
@@ -45,7 +47,7 @@ class CaptchaAndNoticesTest extends TestCase
         config(['panel.login_captcha' => false]);
         $this->user();
         $this->get('/login')->assertOk()->assertDontSee('کد امنیتی');
-        $this->get('/captcha.png')->assertNotFound();
+        $this->get('/login/captcha')->assertNotFound();
         $this->post('/login', ['username' => 'boss', 'password' => 'Password12345'])->assertRedirect('/');
     }
 

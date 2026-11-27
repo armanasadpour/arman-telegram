@@ -881,3 +881,4 @@ button.conn-card{cursor:pointer}
 .captcha-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .captcha-img{border-radius:12px;border:1px solid var(--border);max-width:calc(100% - 52px);height:auto;background:#f4f6fb}
 .captcha-refresh{width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface);font-size:1.3rem;cursor:pointer;color:var(--primary)}
+.bar i{width:0}

@@ -44,6 +44,41 @@ class Captcha
         return preg_match('/^\d{5}$/', $answer) === 1 && hash_equals((string) $stored['h'], hash('sha256', 'captcha|'.$answer));
     }
 
+    /** Image for an <img src>: PNG when GD works, otherwise a distorted SVG. */
+    public static function dataUri(string $code): string
+    {
+        try {
+            $png = self::png($code);
+        } catch (\Throwable) {
+            $png = null;
+        }
+
+        return $png !== null && $png !== ''
+            ? 'data:image/png;base64,'.base64_encode($png)
+            : 'data:image/svg+xml;base64,'.base64_encode(self::svg($code));
+    }
+
+    /** GD-free fallback: digits as rotated text on a noisy background. */
+    public static function svg(string $code): string
+    {
+        $out = '<svg xmlns="http://www.w3.org/2000/svg" width="210" height="70" viewBox="0 0 210 70"><rect width="210" height="70" fill="#f4f6fb"/>';
+        for ($i = 0; $i < 7; $i++) {
+            $out .= sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="rgb(%d,%d,%d)" stroke-width="%d"/>', random_int(0, 210), random_int(0, 70), random_int(0, 210), random_int(0, 70), random_int(150, 210), random_int(150, 210), random_int(190, 235), random_int(1, 2));
+        }
+        $x = 22;
+        foreach (str_split($code) as $ch) {
+            $y = random_int(42, 56);
+            $out .= sprintf('<text x="%d" y="%d" font-family="Verdana,Arial,sans-serif" font-size="%d" font-weight="700" fill="rgb(%d,%d,%d)" transform="rotate(%d %d %d)">%s</text>',
+                $x, $y, random_int(30, 38), random_int(20, 90), random_int(20, 70), random_int(110, 190), random_int(-22, 22), $x, $y, $ch);
+            $x += random_int(32, 38);
+        }
+        for ($i = 0; $i < 2; $i++) {
+            $out .= sprintf('<line x1="0" y1="%d" x2="210" y2="%d" stroke="rgb(%d,%d,%d)" stroke-width="2"/>', random_int(10, 60), random_int(10, 60), random_int(60, 120), random_int(60, 120), random_int(140, 200));
+        }
+
+        return $out.'</svg>';
+    }
+
     /** PNG bytes, or null when GD is missing. */
     public static function png(string $code): ?string
     {
