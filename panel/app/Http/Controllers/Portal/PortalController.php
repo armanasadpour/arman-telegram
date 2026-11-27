@@ -55,9 +55,41 @@ class PortalController extends Controller
                 'month_profit' => (int) (clone $ok)->where('created_at', '>=', $monthStart)->sum('profit_rial'),
                 'month_spent' => (int) (clone $ok)->where('created_at', '>=', $monthStart)->sum('cost_rial'),
             ],
+            'protocols' => $this->protocolCards($me),
             'recent' => ResellerSale::query()->with('package')->where('reseller_id', $me->id)->orderByDesc('id')->limit(5)->get(),
             'daily' => app(Reports::class)->daily(...array_merge(app(Reports::class)->lastDays(30), [$me->id])),
         ]);
+    }
+
+    /** Own accounts per protocol (only protocols the reseller has accounts in or can sell). */
+    private function protocolCards($me): array
+    {
+        $newPkgs = Package::query()->with('mtGroup')->where('is_active', true)->where('type', 'new')->get();
+        $canSell = $me->isActive();
+        $cards = [];
+        $v = VpnAccount::query()->where('reseller_id', $me->id)->whereNull('ibs_deleted_at');
+        $total = (clone $v)->count();
+        if ($total > 0 || $newPkgs->contains(fn ($p) => ! $p->isMikrotik())) {
+            $cards['openvpn'] = [
+                'title' => 'OpenVPN', 'url' => route('portal.accounts'), 'create' => $canSell ? route('portal.sell') : null,
+                'active' => (clone $v)->where('locked', false)->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>=', now()))->count(),
+                'online' => (clone $v)->where('is_online', true)->count(),
+                'expired' => (clone $v)->where('expires_at', '<', now())->count(),
+            ];
+        }
+        foreach (['l2tp' => 'L2TP', 'wireguard' => 'WireGuard'] as $p => $title) {
+            $q = MtAccount::query()->where('reseller_id', $me->id)->where('protocol', $p);
+            if ((clone $q)->count() > 0 || $newPkgs->contains(fn ($x) => $x->isMikrotik() && $x->mtGroup?->protocol === $p)) {
+                $cards[$p] = [
+                    'title' => $title, 'url' => route('portal.accounts'), 'create' => $canSell ? route('portal.sell') : null,
+                    'active' => (clone $q)->where('status', 'active')->count(),
+                    'online' => (clone $q)->where('is_online', true)->count(),
+                    'expired' => (clone $q)->whereIn('status', ['expired', 'depleted'])->count(),
+                ];
+            }
+        }
+
+        return $cards;
     }
 
     public function prices(Request $request): View

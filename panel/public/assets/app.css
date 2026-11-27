@@ -882,3 +882,7 @@ button.conn-card{cursor:pointer}
 .captcha-img{border-radius:12px;border:1px solid var(--border);max-width:calc(100% - 52px);height:auto;background:#f4f6fb}
 .captcha-refresh{width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--surface);font-size:1.3rem;cursor:pointer;color:var(--primary)}
 .bar i{width:0}
+.pdash-stats.three{grid-template-columns:repeat(3,1fr)}
+.fin-card:not(.fin-wide) .fin-l{padding-inline-end:54px;min-height:48px;align-items:flex-start}
+.fin-wide .fin-h,.fin-wide .fin-v{position:relative;z-index:1;padding-inline-end:96px}
+.fin-wide .fin-bars{opacity:.85}

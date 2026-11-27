@@ -1,13 +1,5 @@
 <x-layouts.app title="داشبورد">
-  @php($di = [
-    'users' => '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M16.5 14.2c2.9.3 5 2.4 5 5.3"/>',
-    'wifi' => '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.4a9.5 9.5 0 0 1 13 0M8.6 15.7a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/>',
-    'pause' => '<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>',
-    'db' => '<ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/>',
-    'cart' => '<path d="M3 4h2.5l2.2 10.5h10.6L20.5 7H7"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>',
-    'cal' => '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/>',
-    'chart' => '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 16v-4M12 16V8M16 16v-6"/>',
-  ])
+  @php($di = \App\Support\DashIcons::all())
   <div class="list-head dash-head">
     <span class="list-head-ico"><svg viewBox="0 0 24 24" aria-hidden="true">{!! $di['chart'] !!}</svg></span>
     <div><h1>داشبورد</h1><p>آخرین به‌روزرسانی: {{ jdate($generatedAt, 'Y/m/d') }} ؛ {{ jdate($generatedAt, 'H:i:s') }}</p></div>
@@ -16,21 +8,7 @@
   @if($protocols)
     <div class="pdash mb-16">
       @foreach($protocols as $key => $c)
-        <section class="pdash-card pd-{{ $key }}">
-          <header class="pdash-head">
-            <a class="pdash-id" href="{{ $c['url'] }}">
-              <x-proto-logo :proto="$key"/>
-              <span class="pdash-title"><strong>{{ $c['title'] }}</strong><small>پروتکل {{ $c['title'] }}</small></span>
-            </a>
-            @if($c['create'])<a class="pdash-new" href="{{ $c['create'] }}"><span>+</span> اکانت جدید</a>@endif
-          </header>
-          <a class="pdash-stats" href="{{ $c['url'] }}">
-            <span class="pds"><svg class="ic-users" viewBox="0 0 24 24" aria-hidden="true">{!! $di['users'] !!}</svg><span class="pds-l">فعال</span><strong class="pds-v">{{ fa($c['active']) }}</strong></span>
-            <span class="pds"><svg class="ic-wifi" viewBox="0 0 24 24" aria-hidden="true">{!! $di['wifi'] !!}</svg><span class="pds-l">آنلاین</span><strong class="pds-v">{{ fa($c['online']) }}<i class="pds-dot"></i></strong></span>
-            <span class="pds"><svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true">{!! $di['pause'] !!}</svg><span class="pds-l">منقضی</span><strong class="pds-v">{{ fa($c['expired']) }}</strong></span>
-            <span class="pds pds-wide"><svg class="ic-db" viewBox="0 0 24 24" aria-hidden="true">{!! $di['db'] !!}</svg><span class="pds-l">مصرف دیتا</span><strong class="pds-v pds-sm">{{ fa_bytes($c['used']) }}</strong>@if($c['today'] !== null)<small class="pds-sub">امروز {{ fa_bytes($c['today']) }}</small>@endif</span>
-          </a>
-        </section>
+        @include('dashboard._proto-card', ['key' => $key, 'c' => $c])
       @endforeach
     </div>
   @endif
