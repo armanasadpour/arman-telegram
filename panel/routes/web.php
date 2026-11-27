@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AlertsController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\BotsController;
 use App\Http\Controllers\Admin\CleanupController;
+use App\Http\Controllers\Admin\ConfigFilesController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DiscountsController;
 use App\Http\Controllers\Admin\IbsGroupsController;
@@ -42,6 +43,8 @@ Route::middleware('guest')->group(function () {
 // Installable app (PWA): public manifest and icons
 Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
 Route::get('/pwa/icon-{size}.png', [PwaController::class, 'icon'])->whereNumber('size')->name('pwa.icon');
+// Direct link to a client config file (secret token; sent to customers)
+Route::get('/f/{token}', [ConfigFilesController::class, 'public'])->where('token', '[A-Za-z0-9]{32,64}')->middleware('throttle:30,1')->name('config-files.public');
 
 // Web-cron for hosts without CLI cron: /cron/{key}. Key is set by the installer.
 Route::get('/cron/{key}', CronController::class)->middleware('throttle:10,1')->name('cron');
@@ -163,6 +166,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/ibsng/test', [IbsSettingsController::class, 'test'])->name('ibs.settings.test')->middleware('throttle:10,1');
     Route::post('/ibs/groups/sync', [IbsSettingsController::class, 'syncCatalog'])->name('ibs.groups.sync')->middleware('throttle:10,1');
     Route::get('/ibs/groups', [IbsGroupsController::class, 'index'])->name('ibs.groups');
+    Route::get('/config-files', [ConfigFilesController::class, 'index'])->name('config-files.index');
+    Route::post('/config-files', [ConfigFilesController::class, 'store'])->name('config-files.store')->middleware('throttle:20,1');
+    Route::put('/config-files/{file}', [ConfigFilesController::class, 'update'])->name('config-files.update')->middleware('throttle:20,1');
+    Route::post('/config-files/{file}/new-link', [ConfigFilesController::class, 'newLink'])->name('config-files.new-link')->middleware('throttle:20,1');
+    Route::delete('/config-files/{file}', [ConfigFilesController::class, 'destroy'])->name('config-files.destroy');
+    Route::get('/config-files/{file}/download', [ConfigFilesController::class, 'download'])->name('config-files.download');
     Route::post('/ibs/groups', [IbsGroupsController::class, 'store'])->name('ibs.groups.store')->middleware('throttle:20,1');
     Route::get('/ibs/groups/{name}/edit', [IbsGroupsController::class, 'edit'])->name('ibs.groups.edit')->where('name', '[A-Za-z0-9_-]+');
     Route::put('/ibs/groups/{name}', [IbsGroupsController::class, 'update'])->name('ibs.groups.update')->where('name', '[A-Za-z0-9_-]+')->middleware('throttle:20,1');

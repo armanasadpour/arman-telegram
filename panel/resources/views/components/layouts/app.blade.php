@@ -57,6 +57,9 @@
       @can('ibs_groups.view')
         <a href="{{ route('ibs.groups') }}" @class(['active' => request()->routeIs('ibs.groups*')])><x-icon name="layers"/>گروه و تعرفه OpenVPN</a>
       @endcan
+      @can('accounts.view')
+        <a href="{{ route('config-files.index') }}" @class(['active' => request()->routeIs('config-files.*')])><x-icon name="box"/>فایل‌های کانفیگ</a>
+      @endcan
     @endif
     @php($mtProto = request()->route('proto') ?? request('protocol') ?? (request()->route('account') instanceof \App\Models\MtAccount ? request()->route('account')->protocol : (request()->route('group') instanceof \App\Models\MtGroup ? request()->route('group')->protocol : null)))
     @foreach(['l2tp' => ['L2TP', 'l2tp.accounts', 'l2tp.groups'], 'wireguard' => ['WireGuard', 'wg.accounts', 'wg.groups']] as $pk => [$pl, $accRoute, $grpRoute])

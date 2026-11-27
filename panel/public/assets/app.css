@@ -592,3 +592,10 @@ button.conn-card:active{transform:scale(.98)}
 .bs-body>.card{border:0;box-shadow:none;padding:0;margin:0;background:transparent}
 .bs-body>.card>h2:first-child{display:none}
 @media (prefers-reduced-motion:reduce){.bs,.bs-backdrop,.tile{transition:none}}
+/* config files */
+.cfg-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.cfg-head h2{margin:0;font-size:1.05rem}
+.cfg-link{display:flex;gap:8px;align-items:stretch}
+.cfg-link .input{flex:1;min-width:0;font-size:.85rem}
+.cfg-file details>summary{list-style:none;display:inline-flex;cursor:pointer}
+.cfg-file details>summary::-webkit-details-marker{display:none}
