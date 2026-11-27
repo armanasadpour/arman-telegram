@@ -258,6 +258,7 @@ class Engine
             'mk_vol' => $this->mkVol($u, $text),
             'mk_name' => $this->mkCreate($u, $text),
             'sell_pkg' => $this->sellPicked($u, $text),
+            'sell_name' => $this->sellName($u, $text),
             'sell_user' => $this->sellUsername($u, $text),
             'sell_pass' => $this->sellPassword($u, $text, $in),
             'sell_confirm', 'renew_confirm' => $text === self::CONFIRM ? $this->sellConfirm($u) : $this->ask($u, $u->state, $d, 'برای ادامه «تأیید» یا «انصراف» را بزنید.', [[self::CONFIRM]]),
@@ -780,12 +781,21 @@ class Engine
 
             return;
         }
-        if ($p->isMikrotik() && $p->mtGroup?->isWireguard()) {
-            $this->ask($u, 'sell_user', ['package_id' => $p->id, 'no_password' => true], 'نام کاربری دلخواه (حروف کوچک انگلیسی و عدد) را بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
+        $d = ['package_id' => $p->id] + ($p->isMikrotik() && $p->mtGroup?->isWireguard() ? ['no_password' => true] : []);
+        $this->ask($u, 'sell_name', $d, '👤 نام مشتری را بفرستید:');
+    }
+
+    private function sellName(BotUser $u, string $text): void
+    {
+        $d = $u->state_data ?? [];
+        $name = trim(mb_substr($text, 0, 100));
+        if ($name === '' || $text === self::AUTO) {
+            $this->ask($u, 'sell_name', $d, 'نام مشتری لازم است. نام مشتری را بفرستید:');
 
             return;
         }
-        $this->ask($u, 'sell_user', ['package_id' => $p->id], 'نام کاربری دلخواه (حروف کوچک انگلیسی و عدد) را بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
+        $d['customer_name'] = $name;
+        $this->ask($u, 'sell_user', $d, 'نام کاربری دلخواه (حروف کوچک انگلیسی و عدد) را بفرستید یا «خودکار» را بزنید:', [[self::AUTO]]);
     }
 
     private function sellUsername(BotUser $u, string $text): void
@@ -860,6 +870,7 @@ class Engine
         } elseif (! empty($d['mt_account_id'])) {
             $lines[] = 'اکانت: '.MtAccount::query()->whereKey($d['mt_account_id'])->value('username');
         } else {
+            $lines[] = '👤 مشتری: '.($d['customer_name'] ?? '—');
             $lines[] = 'نام کاربری: '.($d['username'] ?? 'خودکار');
             $lines[] = ! empty($d['no_password']) ? 'نوع: WireGuard (فایل پیکربندی پس از ساخت ارسال می‌شود)' : 'رمز: '.(isset($d['password']) ? 'دلخواه شما' : 'خودکار');
         }
@@ -890,7 +901,7 @@ class Engine
         }
         try {
             $res = $this->sales->sell($r, $p, $d['sale_key'], $this->pricing->quote($p)->finalPrice,
-                ['username' => $d['username'] ?? null, 'password' => $d['password'] ?? null, 'customer_name' => null, 'customer_phone' => null, 'source' => $this->bot->platform],
+                ['username' => $d['username'] ?? null, 'password' => $d['password'] ?? null, 'customer_name' => $d['customer_name'] ?? null, 'customer_phone' => null, 'source' => $this->bot->platform],
                 $target, $u->user_id);
         } catch (InsufficientBalanceException) {
             $this->menu($u, '❗ موجودی کیف پول کافی نیست. کیف پول خود را شارژ کنید.');

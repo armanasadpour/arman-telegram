@@ -58,4 +58,12 @@ class ConfigFilesTest extends TestCase
         $this->actingAs($viewer)->post('/config-files', ['name' => 'X', 'content' => self::OVPN])->assertForbidden();
         $this->actingAs($this->userWith([]))->get('/config-files')->assertForbidden();
     }
+
+    public function test_dashboard_openvpn_card_offers_the_config_download(): void
+    {
+        $admin = $this->superAdmin();
+        $this->actingAs($admin)->post('/config-files', ['name' => 'Server11', 'content' => self::OVPN])->assertSessionHas('success');
+        $f = ConfigFile::query()->sole();
+        $this->actingAs($admin)->get('/')->assertOk()->assertSee('دانلود کانفیگ')->assertSee($f->publicUrl());
+    }
 }

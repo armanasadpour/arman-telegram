@@ -127,7 +127,7 @@ class PortalController extends Controller
             'account_id' => ['nullable', 'integer'],
             'mt_account_id' => ['nullable', 'integer'],
             'sale_price_toman' => ['required', 'integer', 'between:0,1000000000'],
-            'customer_name' => ['nullable', 'string', 'max:120'],
+            'customer_name' => [$request->filled('account_id') || $request->filled('mt_account_id') ? 'nullable' : 'required', 'string', 'max:100'],
             'customer_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s۰-۹]+$/u'],
             'username' => ['nullable', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9_.-]*$/'],
             'password' => ['nullable', 'string', 'max:64', 'regex:/^[^\x00-\x1F\x7F]+$/'],

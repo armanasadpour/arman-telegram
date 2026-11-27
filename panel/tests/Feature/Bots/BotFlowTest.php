@@ -94,6 +94,8 @@ class BotFlowTest extends BotTestCase
         $label = collect($this->lastKeyboard())->first(fn ($l) => str_contains($l, 'یک‌ماهه'));
         $this->assertNotNull($label);
         $this->tg($label);
+        $this->assertStringContainsString('نام مشتری', $this->lastText());
+        $this->tg('علی رضایی');
         $this->tg('botcust1');
         $this->tg('simple');
         $this->assertStringContainsString('مبلغ کسر از کیف پول', $this->lastText());
@@ -129,6 +131,7 @@ class BotFlowTest extends BotTestCase
         $this->tg($code);
         $this->tg(Engine::SELL);
         $this->tg(collect($this->lastKeyboard())->first(fn ($l) => str_contains($l, 'یک‌ماهه')));
+        $this->tg('مشتری');
         $this->tg(Engine::AUTO);
         $this->tg(Engine::AUTO);
         $this->tg(Engine::CONFIRM);

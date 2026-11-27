@@ -121,7 +121,7 @@ class MtSalesTest extends BotTestCase
     {
         $r = $this->reseller(creditRial: 3_000_000);
         $this->actingAs($r->user)->get('/r/sell')->assertOk()->assertSee('WG ماهانه')->assertSee('WireGuard');
-        $res = $this->actingAs($r->user)->post('/r/sell', ['sale_key' => (string) Str::uuid(), 'package_id' => $this->wgPkg->id, 'sale_price_toman' => 90000]);
+        $res = $this->actingAs($r->user)->post('/r/sell', ['sale_key' => (string) Str::uuid(), 'package_id' => $this->wgPkg->id, 'sale_price_toman' => 90000, 'customer_name' => 'مشتری']);
         $sale = ResellerSale::query()->firstOrFail();
         $res->assertRedirect(route('portal.sales.show', $sale));
         $this->followRedirects($res)->assertSee('PrivateKey')->assertSee('Endpoint = ir11.example.com:13231');

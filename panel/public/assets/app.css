@@ -886,3 +886,28 @@ button.conn-card{cursor:pointer}
 .fin-card:not(.fin-wide) .fin-l{padding-inline-end:54px;min-height:48px;align-items:flex-start}
 .fin-wide .fin-h,.fin-wide .fin-v{position:relative;z-index:1;padding-inline-end:96px}
 .fin-wide .fin-bars{opacity:.85}
+/* package picker (reseller sell) */
+.pkg-list{display:grid;gap:10px}
+.pkg-opt{display:block;cursor:pointer}
+.pkg-opt input{position:absolute;opacity:0;pointer-events:none}
+.pkg-box{position:relative;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;border:1.5px solid var(--border);background:var(--surface);box-shadow:var(--shadow-xs);transition:border-color .15s,box-shadow .15s,background .15s}
+.pkg-opt:hover .pkg-box{border-color:var(--border-strong)}
+.pkg-opt input:checked+.pkg-box{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 6%,var(--surface));box-shadow:0 0 0 3px var(--primary-ring)}
+.pkg-opt input:focus-visible+.pkg-box{box-shadow:0 0 0 3px var(--primary-ring)}
+.pkg-logo.proto-logo{width:46px;height:46px;border-radius:14px}
+.pkg-logo.proto-logo img{border-radius:14px}
+.pkg-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.pkg-name{font-size:.98rem;font-weight:800;line-height:1.5}
+.pkg-chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip-s{padding:2px 9px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:.74rem;font-weight:600;color:var(--text-2);white-space:nowrap}
+.pkg-price{flex:none;display:flex;flex-direction:column;align-items:flex-end;text-align:end;line-height:1.4}
+.pkg-price small{font-size:.7rem;color:var(--muted)}
+.pkg-price b{font-size:.92rem;font-weight:900;white-space:nowrap}
+.pkg-check{position:absolute;top:-8px;inset-inline-start:-8px;width:24px;height:24px;border-radius:50%;display:none;place-items:center;background:var(--primary);color:#fff;font-size:.8rem;font-weight:900;box-shadow:0 0 0 3px var(--surface)}
+.pkg-opt input:checked+.pkg-box .pkg-check{display:grid}
+@media (max-width:420px){.pkg-box{flex-wrap:wrap}.pkg-price{flex-direction:row;align-items:baseline;gap:6px;width:100%;padding-inline-start:58px;justify-content:flex-start}}
+.pdash-cfg{display:flex;flex-wrap:wrap;gap:8px;margin:-4px 0 12px}
+.cfg-dl{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 16px;border-radius:14px;font-weight:800;font-size:.9rem;
+  color:var(--pd);background:color-mix(in srgb,var(--surface) 80%,transparent);border:1.5px dashed color-mix(in srgb,var(--pd) 55%,transparent)}
+.cfg-dl:hover{color:var(--pd);background:var(--surface)}
+.cfg-dl svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
