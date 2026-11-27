@@ -27,7 +27,7 @@
       @if(auth()->user()->can('system.view') || auth()->user()->can('payments.view'))
         @php($notices = app(\App\Services\Notices::class))
         @php($unread = $notices->unreadCount(auth()->user()))
-        <a href="{{ route('notices.index') }}" class="bell" title="اعلان‌ها" data-poll="{{ route('notices.poll') }}" data-last="{{ $notices->lastId() }}">
+        <a href="{{ route('notices.index') }}" class="bell" title="اعلان‌ها" data-poll="{{ route('notices.poll') }}" data-last="{{ session('notice_test') ? session('notice_test') - 1 : $notices->lastId() }}" @if(session('notice_test')) data-poll-now @endif>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
           <span class="bell-count" @if(! $unread) hidden @endif>{{ $unread > 9 ? '۹+' : fa($unread) }}</span>
         </a>

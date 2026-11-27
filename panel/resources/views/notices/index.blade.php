@@ -9,7 +9,10 @@
       <strong>اعلان روی گوشی و مرورگر</strong>
       <p class="muted small">وقتی پنل باز است (حتی در پس‌زمینه)، اعلان‌های جدید با صدا و پیام سیستم نشان داده می‌شوند. برای وقتی پنل بسته است، حساب خود را به <a href="{{ route('bot-link') }}">ربات</a> وصل کنید تا همین هشدارها در تلگرام/بله هم بیاید.</p>
     </div>
-    <button type="button" class="btn btn-sm" data-enable-notify hidden>فعال‌سازی اعلان مرورگر</button>
+    <div class="actions">
+      <button type="button" class="btn btn-sm" data-enable-notify hidden>فعال‌سازی اعلان مرورگر</button>
+      <form method="post" action="{{ route('notices.test') }}">@csrf<button class="btn btn-secondary btn-sm" type="submit">🔔 ارسال اعلان آزمایشی</button></form>
+    </div>
     <span class="badge badge-success" data-notify-on hidden>اعلان مرورگر فعال است</span>
   </div>
 

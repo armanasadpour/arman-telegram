@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PanelNotice;
 use App\Services\Notices;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -24,6 +25,16 @@ class NoticesController extends Controller
             'rows' => PanelNotice::query()->orderByDesc('id')->paginate(40),
             'seen' => $seen,
         ]);
+    }
+
+    /** Test notice: shows up right away as toast + sound + browser notification on this device. */
+    public function test(Request $request, Notices $notices): RedirectResponse
+    {
+        abort_unless($request->user()->can('system.view') || $request->user()->can('payments.view'), 403);
+        $notices->info('test:'.$request->user()->id, '🔔 اعلان آزمایشی', 'اگر این پیام را می‌بینید، اعلان‌های پنل درست کار می‌کند.', route('notices.index'));
+
+        return back()->with('success', 'اعلان آزمایشی ساخته شد؛ چند ثانیه دیگر روی صفحه (و اگر اعلان مرورگر فعال است، روی گوشی) نشان داده می‌شود.')
+            ->with('notice_test', $notices->lastId());
     }
 
     /** Polled by the panel every minute: unread count + notices newer than ?after (for toasts / browser notifications). */

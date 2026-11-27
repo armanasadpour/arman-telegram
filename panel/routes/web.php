@@ -271,6 +271,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/accounting/cards', [AccountingController::class, 'cards'])->name('accounting.cards');
     Route::put('/accounting/cards', [AccountingController::class, 'saveCards'])->name('accounting.cards.save')->middleware('throttle:20,1');
     Route::get('/notices/poll', [NoticesController::class, 'poll'])->name('notices.poll')->middleware('throttle:30,1');
+    Route::post('/notices/test', [NoticesController::class, 'test'])->name('notices.test')->middleware('throttle:10,1');
     Route::post('/system/upgrade', [SystemController::class, 'upgrade'])->name('system.upgrade')->middleware('throttle:10,1');
     Route::get('/system/update', [SystemController::class, 'updateForm'])->name('system.update');
     Route::post('/system/update', [SystemController::class, 'updateUpload'])->name('system.update.store')->middleware('throttle:10,1');

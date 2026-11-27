@@ -84,4 +84,15 @@ class CaptchaAndNoticesTest extends TestCase
         $this->actingAs($admin)->get('/system/update')->assertOk();
         $this->actingAs($admin)->get('/')->assertOk();
     }
+
+    public function test_test_notice_pops_up_right_away(): void
+    {
+        $admin = $this->superAdmin();
+        $this->actingAs($admin)->get('/notices')->assertSee('ارسال اعلان آزمایشی');
+        $res = $this->actingAs($admin)->from('/notices')->post('/notices/test')->assertSessionHas('notice_test');
+        $id = (int) PanelNotice::query()->max('id');
+        $this->actingAs($admin)->withSession(['notice_test' => $id])->get('/notices')->assertSee('data-poll-now', false)->assertSee('data-last="'.($id - 1).'"', false);
+        $this->actingAs($admin)->getJson('/notices/poll?after='.($id - 1))->assertJsonPath('new.0.title', '🔔 اعلان آزمایشی');
+        $this->actingAs($this->userWith([]))->post('/notices/test')->assertForbidden();
+    }
 }

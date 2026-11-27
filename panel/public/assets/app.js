@@ -143,6 +143,7 @@
         }).catch(function () {});
     }
     setInterval(function () { if (!document.hidden || 'serviceWorker' in navigator) poll(); }, 60000);
+    if (bell.hasAttribute('data-poll-now')) setTimeout(poll, 1200);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
   })();
   // Bar widths come from data-w (inline style attributes are blocked by the CSP).
